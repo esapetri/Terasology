@@ -15,6 +15,7 @@
  */
 package org.terasology.config.flexible;
 
+import org.terasology.config.flexible.settings.Setting;
 import org.terasology.config.flexible.validators.SettingValueValidator;
 import org.terasology.engine.SimpleUri;
 
@@ -22,7 +23,7 @@ import java.beans.PropertyChangeListener;
 
 class MockSetting<T> implements Setting<T> {
     private final SimpleUri id;
-    private boolean isSubscribedTo = false;
+    private boolean isSubscribedTo;
 
     MockSetting(SimpleUri id) {
         this.id = id;
@@ -79,4 +80,7 @@ class MockSetting<T> implements Setting<T> {
     public boolean hasSubscribers() {
         return isSubscribedTo;
     }
+
+    @Override
+    public void setValueFromString(String valueString) { }
 }

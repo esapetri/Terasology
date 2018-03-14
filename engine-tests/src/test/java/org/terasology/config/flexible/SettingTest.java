@@ -19,6 +19,8 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.experimental.runners.Enclosed;
 import org.junit.runner.RunWith;
+import org.terasology.config.flexible.settings.Setting;
+import org.terasology.config.flexible.settings.SettingImpl;
 import org.terasology.config.flexible.validators.RangedNumberValidator;
 import org.terasology.engine.SimpleUri;
 import org.terasology.utilities.random.FastRandom;
@@ -96,10 +98,10 @@ public class SettingTest {
 
             Random random = new FastRandom();
 
-            final int MAX_SET_VALUE_COUNT = 50;
+            final int maxSetValueCount = 50;
             int expectedEventCallCount = 0;
 
-            for (int i = 0; i < MAX_SET_VALUE_COUNT; i++) {
+            for (int i = 0; i < maxSetValueCount; i++) {
                 int randomInt = random.nextInt(-50, 150);
                 expectedEventCallCount += setting.setValue(randomInt) ? 1 : 0;
             }
@@ -109,15 +111,15 @@ public class SettingTest {
 
         @Test
         public void testSubscribe() {
-            final int SUBSCRIBER_COUNT = 10;
+            final int subscriberCount = 10;
 
-            for (int i = 0; i < SUBSCRIBER_COUNT; i++) {
+            for (int i = 0; i < subscriberCount; i++) {
                 setting.subscribe(propertyChangeEvent -> eventCallCount++);
             }
 
             setting.setValue(30);
 
-            assertEquals(SUBSCRIBER_COUNT, eventCallCount);
+            assertEquals(subscriberCount, eventCallCount);
         }
 
         @Test

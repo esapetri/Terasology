@@ -16,13 +16,20 @@ Here's a list of modules bundled with the game by default (this line-up will cha
 
 *Note about "Tutorial" modules:* These are more likely for some time to be for developers/modders to learn about different kinds of content and systems, not for players to actually learn stuff in-game. That's usually handled by actual content modules including their own in-game help system.
 
+* [AdditionalFruits](https://github.com/Terasology/AdditionalFruits) - container module for more fruits
+* [AdditionalItemPipes](https://github.com/Terasology/AdditionalItemPipes) - container module for more item pipes
+* [AdditionalRails](https://github.com/Terasology/AdditionalRails) - container module for more rails
+* [AdditionalVegetables](https://github.com/Terasology/AdditionalVegetables) - container module for more vegetables
+* [AdditionalWorlds](https://github.com/Terasology/AdditionalWorlds) - container module for more worlds
 * [AdvancedBehaviors](https://github.com/Terasology/AdvancedBehaviors) - adds behavior trees and logic for NPCs!
 * [AdventureAssets](https://github.com/Terasology/AdventureAssets) - a set of assets for adventure time!
 * [Alchemy](https://github.com/Terasology/Alchemy) - create alchemical potions!
+* [AlchemyPlantGenerator](https://github.com/Terasology/AlchemyPlantGenerator) - a world plugin that'll seed the plants used by Alchemy into a given plugin-capable world
 * [AlterationEffects](https://github.com/Terasology/AlterationEffects) - module for storing some buff/debuff type effects
 * [Anatomy](https://github.com/Terasology/Anatomy) - an anatomical system meant to provide an alternative to typical HP only systems
 * [AnotherWorld](https://github.com/Terasology/AnotherWorld) - world gen module, includes features like ore placement and caves, used by WoodAndStone's world
 * [AnotherWorldPlants](https://github.com/Terasology/AnotherWorldPlants) - farming and tree growth for AnotherWorld
+* [BasicCrafting](https://github.com/Terasology/BasicCrafting) - a basic crafting system
 * [BlockDetector](https://github.com/Terasology/BlockDetector) - adds a simple little tool that can detect specific blocks (beeping in proximity)
 * [BlockNetwork](https://github.com/Terasology/BlockNetwork) - a framework to support blocks that can communicate with each other in some fashion
 * [BlockPicker](https://github.com/Terasology/BlockPicker) - allows the player access to an infinite block inventory with the `B` key
@@ -39,6 +46,7 @@ Here's a list of modules bundled with the game by default (this line-up will cha
 * [ClimateConditions](https://github.com/Terasology/ClimateConditions) - A library module for managing temperature, humidity, and other climate factors
 * [CombatSystem](https://github.com/Terasology/CombatSystem) - an advanced physics-based combat system
 * [CommonWorld](https://github.com/Terasology/CommonWorld) - general world generation utility module
+* [Compass](https://github.com/Terasology/Compass) - a simple compass
 * [ComputerMonitors](https://github.com/Terasology/ComputerMonitors) - allows for the creation of functional multi-block monitors in-game - ModularComputers puts them to work!
 * [Cooking](https://github.com/Terasology/Cooking) - cook stuff!
 * [CopperAndBronze](https://github.com/Terasology/CopperAndBronze) - another era for throughout the ages, this time copper and bronze (comes after wood and stone)
@@ -50,6 +58,7 @@ Here's a list of modules bundled with the game by default (this line-up will cha
 * [Durability](https://github.com/Terasology/Durability) - library module to support destructible items (wear and tear eventually breaks them)
 * [DynamicCities](https://github.com/Terasology/DynamicCities) - variant of Cities that places then grows cities dynamically over time 
 * [Economy](https://github.com/Terasology/Economy) - a module to simulate a basic supply & demand economy system
+* [EdibleFlora](https://github.com/Terasology/EdibleFlora) - basic growth system providing plant stuff you can eat
 * [Equipment](https://github.com/Terasology/Equipment) - an equipment system with a character screen (`c`) showing stats and slots for various equipment types
 * [EventualSkills](https://github.com/Terasology/EventualSkills) - a time-based skill system, a bit akin to EVE Online's system
 * [Fences](https://github.com/Terasology/Fences) - fences!
@@ -59,11 +68,13 @@ Here's a list of modules bundled with the game by default (this line-up will cha
 * [Genome](https://github.com/Terasology/Genome) - genetics WOO! Complete with DNA letters and mutating plants. Part of the Wood & Stone line-up
 * [GooeysQuests](https://github.com/Terasology/GooeysQuests) - spawn our mascot Gooey (console: `spawnPrefab gooey`) then `e` click to interact for commands and quests!
 * [GrowingFlora](https://github.com/Terasology/GrowingFlora) - organically growing (step by step) trees and such
+* [HjerlHede](https://github.com/Terasology/HjerlHede) - a pure build module containing some Structure Template based buildings from the [Danish natural museum Hjerl Hede](http://hjerlhede.dk/en)
 * [Hunger](https://github.com/Terasology/Hunger) - makes the player slowly gets hungry (needs actual GUI work and ways to then actually eat food though). Console `hungerCheck` for stats
 * [Inferno](https://github.com/Terasology/Inferno) - live on in an underworld after death!
 * [InGameHelp](https://github.com/Terasology/InGameHelp) - system for showing help in-game, default key `P`
 * [InGameHelpAPI](https://github.com/Terasology/InGameHelpAPI) - separate API module for IGH to allow support but not forced activation for the help system
 * [IRLCorp](https://github.com/Terasology/IRLCorp) - Industrialized Reduction of Labor Corporation - Helping workmen everywhere
+* [ItemPipes](https://github.com/Terasology/ItemPipes) - pipes! That can contain items!
 * [ItemRendering](https://github.com/Terasology/ItemRendering) - a library for displaying "holographic" items in the world
 * [JoshariasSurvival](https://github.com/Terasology/JoshariasSurvival) - formerly known as TerraTech - gameplay template for a machine-centric survival style
 * [Journal](https://github.com/Terasology/Journal) - allows the player to use an in-game journal for gameplay notifications and such. Default toggle key `J`
@@ -82,10 +93,12 @@ Here's a list of modules bundled with the game by default (this line-up will cha
 * [Maze](https://github.com/Terasology/Maze) - a maze generator. Right-click with the provided maze tool on one block then again on another and a maze will generate between the two points (in multiple layers if the area is tall enough)
 * [MedievalCities](https://github.com/Terasology/MedievalCities) - a set of building templates for a medieval era city
 * [Minerals](https://github.com/Terasology/Minerals) - a large collection of mineral blocks
+* [Minesweeper](https://github.com/Terasology/Minesweeper) - a little game inside a game
 * [Miniion](https://github.com/Terasology/Miniion) - base creature control system, used by MasterOfOreon - old module that has gone through a few redesigns
 * [Minimap](https://github.com/Terasology/Minimap) - a basic minimap. Show/hide with `M` by default and zoom with numpad `-` and `+`
 * [MobileBlocks](https://github.com/Terasology/MobileBlocks) - supports blocks that can move their location based on some directions
 * [ModularComputers](https://github.com/Terasology/ModularComputers) - central module for the creation of computers that themselves can have "hardware modules" of sorts added to them in-game to add interesting functionality
+* [ModuleTestingEnvironment](https://github.com/Terasology/ModuleTestingEnvironment) - a testing framework for in-game tests on simulated server + client(s)
 * [MoreLights](https://github.com/Terasology/MoreLights) - assorted illuminated blocks
 * [MultiBlock](https://github.com/Terasology/MultiBlock) - supports the concept of multiple blocks being part of the same structure
 * [MusicDirector](https://github.com/Terasology/MusicDirector) - allows music assets to be prepared for dynamic inclusion in appropriate contexts (like time of day)
@@ -118,6 +131,7 @@ Here's a list of modules bundled with the game by default (this line-up will cha
 * [StructuralResources](https://github.com/Terasology/StructuralResources) - a set of structural shapes suitable for buildings and such
 * [StructureTemplates](https://github.com/Terasology/StructureTemplates) - a system for placing structures as per some template
 * [SubstanceMatters](https://github.com/Terasology/SubstanceMatters) - library for the definition and usage of materials in various contexts, such as tools with dynamic looks based on material
+* [SurfaceFacets](https://github.com/Terasology/SurfaceFacets) - world generation enhancements related to surfaces
 * [Tasks](https://github.com/Terasology/Tasks) - allows for the definition of tasks/quests
 * [ThroughoutTheAges](https://github.com/Terasology/ThroughoutTheAges) - gameplay module for a large content series letting you slowly climb a tech tree to improve your available tools, foods, and so on
 * [TutorialAssetSystem](https://github.com/Terasology/TutorialAssetSystem) - a tutorial module covering our asset system, see also its [wiki](https://github.com/Terasology/TutorialAssetSystem/wiki)

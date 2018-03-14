@@ -19,6 +19,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.experimental.runners.Enclosed;
 import org.junit.runner.RunWith;
+import org.terasology.config.flexible.settings.Setting;
 import org.terasology.engine.SimpleUri;
 
 import static org.junit.Assert.*;
@@ -137,7 +138,8 @@ public class FlexibleConfigTest {
             SimpleUri id = new SimpleUri("engine-tests:TestSetting");
             Setting setting = new MockSetting(id);
             config.add(setting);
-            setting.subscribe(propertyChangeEvent -> {});
+            setting.subscribe(propertyChangeEvent -> {
+            });
 
             assertFalse(config.remove(id));
         }

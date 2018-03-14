@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MovingBlocks
+ * Copyright 2017 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.terasology.context.internal;
 
-package org.terasology.input.events;
+import org.terasology.context.Context;
 
+public class MockContext implements Context {
+    @Override
+    public <T> T get(Class<? extends T> type) {
+        return null;
+    }
 
-/**
- */
-public class MouseXAxisEvent extends MouseAxisEvent {
-
-    public MouseXAxisEvent(float value, float delta) {
-        super(MouseAxis.X, value, delta);
+    @Override
+    public <T, U extends T> void put(Class<T> type, U object)  {
     }
 }
