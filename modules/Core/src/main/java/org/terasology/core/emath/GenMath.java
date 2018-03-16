@@ -77,8 +77,9 @@ public class GenMath {
                     9929, 9931, 9941, 9949, 9967, 9973, 10007};
 
     /**
-     * fuction that generates square wave between 1 an -1. Value changes to opposite every PI.
-     * @param x
+     * Function f(x)=y, that generates square wave between 1 an -1. Value changes to opposite every PI.
+     *
+     * @param x input
      * @return y
      */
     public static float squareWave(final float x) {
@@ -105,6 +106,95 @@ public class GenMath {
         }
     }
 
+    /**
+     * //TODO JAVADOC
+     * Function f(x)=y, that generates
+     *
+     * @param x input
+     * @return y
+     */
+    public static float sawWave(final float x) {
 
+        if (0 < x) {
+            if (x < PI) {
+                if (HALF_PI < x) {
+                    return (x / HALF_PI) - 2;
+                } else {
+                    return x / HALF_PI;
+                }
+
+            }
+            return sawWave(x % PI);
+
+        } else {
+            if (-PI > x) {
+                return -sawWave(x % PI);
+            } else {
+                if (-HALF_PI < x) {
+                    return -(x / HALF_PI);
+                } else {
+                    return -((x / HALF_PI) + 2);
+                }
+            }
+        }
+    }
+
+    /**
+     * //TODO JAVADOC
+     * Function f(x)=y, that generates
+     *
+     * @param x input
+     * @return y
+     */
+    public static double chirp_wave(final double x) {
+        return Math.cos(x * x);
+    }
+
+
+    /**
+     * //TODO JAVADOC
+     * Function f(x)=y, that generates
+     *
+     * @param x input
+     * @return y
+     */
+    public static float triangle_wave(final float x) {
+
+        if (x == 0)
+            return -1;
+
+        if (x < 0)
+            return triangle_wave(-x);
+
+        if (x > PI)
+            return triangle_wave(x % PI);
+
+        if (x < HALF_PI)
+            return ((x) / FOURTH_PI) - 1;
+
+        return 1 - ((x - HALF_PI) / FOURTH_PI);
+    }
+
+    //experimental stuff
+
+    public static float primeDivisionSquareWave(final float x, final int octaves, final float persistence, final int shift[]) {
+        float total = 0;
+        float amplitude = 1;
+        float maxValue = 0;
+
+        // Used for normalizing result to 0.0 - 1.0
+        int i = 0;
+        while (i < octaves) {
+            total += squareWave(
+                    x * (PRIMES[i + shift[0]] / PRIMES[i + shift[1]])
+            ) * amplitude;
+
+            maxValue = maxValue + amplitude;
+            amplitude = amplitude * persistence;
+            i = i + 1;
+        }
+
+        return total / maxValue;
+    }
 
 }

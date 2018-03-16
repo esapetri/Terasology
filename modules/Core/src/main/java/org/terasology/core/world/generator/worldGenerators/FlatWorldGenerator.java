@@ -18,9 +18,8 @@ package org.terasology.core.world.generator.worldGenerators;
 import org.terasology.core.emath.GenMath;
 import org.terasology.core.emath.MathFormula;
 import org.terasology.core.world.generator.e.procedural.texture.FormulaAdapter;
+import org.terasology.core.world.generator.e.world.generation.facetProviders.*;
 import org.terasology.core.world.generator.facetProviders.*;
-import org.terasology.core.world.generator.e.world.generation.facetProviders.Noise3DBaseTerainProvider;
-import org.terasology.core.world.generator.e.world.generation.facetProviders.SimplePlanetSimulatorProvider;
 import org.terasology.core.world.generator.e.world.generation.TestSolidRasterizer;
 import org.terasology.engine.SimpleUri;
 import org.terasology.math.geom.Vector3f;
@@ -47,7 +46,7 @@ public class FlatWorldGenerator extends BaseFacetedWorldGenerator {
         SimplePlanetSimulatorProvider densityProv =new SimplePlanetSimulatorProvider();
         densityProv.setOrigoOffSet(-534);
         densityProv.setUpHeightMultiplifier(0.002f);
-        densityProv.setUpDensityFunction(2);
+        densityProv.setUpDensityFunction(4);
         densityProv.setDownHeightMultiplifier(0.008f);
         densityProv.setDownDensityFunction(1);
         densityProv.setDensityMultifier(30);
@@ -71,8 +70,16 @@ public class FlatWorldGenerator extends BaseFacetedWorldGenerator {
 
                 .addProvider(new FlatSurfaceHeightProvider(40))
 
+
                 .addProvider(
                         new Noise3DBaseTerainProvider(
+                                new BrownianNoise3D(new SimplexNoise( System.currentTimeMillis() ),6),
+                                new Vector3f(0.00080f, 0.0007f, 0.00080f),0,1,0
+                        )
+                )
+
+                .addProvider(
+                        new Noise3DTerainProvider(
                                 new FormulaAdapter(
                                         new MathFormula() {
                                             @Override
@@ -87,13 +94,26 @@ public class FlatWorldGenerator extends BaseFacetedWorldGenerator {
 
                                             @Override
                                             public float compute(float x, float y, float z) {
-                                                return GenMath.squareWave(x)*GenMath.squareWave(y)*GenMath.squareWave(z);
+                                                return (float)
+                                                        (
+                                                                GenMath.primeDivisionSquareWave(x,7,1.4f,new int[]{2,0})
+                                                                *Math.sin(y/10)
+                                                                *GenMath.primeDivisionSquareWave(z,7,1.4f,new int[]{2,0})
+                                                        );
                                             }
                                         }
                                 ),
                                 new Vector3f(0.5f, 0.5f, 0.5f),0,1,0
                         )
                 )
+
+                 /*
+                .addProvider(new Simplex3DTerainProvider(2,new Vector3f(0.0025f, 0.01f, 0.0025f),10,0,1.2,0))
+                .addProvider(new Perlin3DTerainProvider(3,new Vector3f(0.00085f, 0.0007f, 0.00085f),9,0,0.8,0))
+                .addProvider(new Perlin3DNoiseProvider(4,new Vector3f(0.0042f, 0.0042f, 0.0042f),0,-1.5,0))
+                .addProvider(new Perlin3DNoiseProvider(5,new Vector3f(0.0015f, 0.0010f, 0.0015f),0,-1,0))
+                .addProvider(new PerlinHumidityProvider())
+                 */
 
                 .addProvider(new PerlinHumidityProvider())
                 .addProvider(new PerlinSurfaceTemperatureProvider())
