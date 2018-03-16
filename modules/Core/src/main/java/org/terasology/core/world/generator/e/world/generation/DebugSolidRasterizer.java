@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.boundlessworlds.world.generator.rasterizers;
+package org.terasology.core.world.generator.e.world.generation;
 
-import org.boundlessworlds.world.InfGenBiome;
-import org.boundlessworlds.world.generation.facets.BiomeFacet;
-import org.boundlessworlds.world.generation.facets.InfiniteGenFacet;
+import org.terasology.core.world.CoreBiome;
+import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.math.geom.Vector3i;
 import org.terasology.registry.CoreRegistry;
 import org.terasology.world.block.Block;
@@ -93,11 +92,11 @@ public class DebugSolidRasterizer implements WorldRasterizer {
 
 	@Override
     public void generateChunk(CoreChunk chunk, Region chunkRegion) {
-		BiomeFacet biomeFacet = chunkRegion.getFacet(BiomeFacet.class);
+		//BiomeFacet biomeFacet = chunkRegion.getFacet(BiomeFacet.class);
         InfiniteGenFacet solidityFacet = chunkRegion.getFacet(InfiniteGenFacet.class);
         for (Vector3i pos : ChunkConstants.CHUNK_REGION) {
-            InfGenBiome biome = biomeFacet.get(pos);
-            chunk.setBiome(pos.x, pos.y, pos.z, biome);
+            //InfGenBiome biome = biomeFacet.get(pos);
+            chunk.setBiome(pos.x, pos.y, pos.z, CoreBiome.MOUNTAINS);
             
             float density = solidityFacet.get(pos);
             if (density <= 0) {

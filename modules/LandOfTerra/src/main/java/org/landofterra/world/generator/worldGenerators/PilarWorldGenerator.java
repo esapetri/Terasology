@@ -26,22 +26,28 @@ import org.terasology.core.world.generator.facetProviders.PerlinHumidityProvider
 import org.terasology.core.world.generator.facetProviders.PerlinSurfaceTemperatureProvider;
 import org.terasology.core.world.generator.facetProviders.SeaLevelProvider;
 import org.terasology.engine.SimpleUri;
+import org.terasology.engine.Time;
 import org.terasology.math.geom.Vector3f;
+import org.terasology.registry.In;
 import org.terasology.utilities.procedural.BrownianNoise3D;
 import org.terasology.utilities.procedural.SimplexNoise;
 import org.terasology.world.generation.BaseFacetedWorldGenerator;
 import org.terasology.world.generation.WorldBuilder;
 import org.terasology.world.generator.RegisterWorldGenerator;
+import org.terasology.world.generator.plugin.WorldGeneratorPluginLibrary;
 
 @RegisterWorldGenerator(id = "skypilars", displayName = "PilarWorld")
 public class PilarWorldGenerator extends BaseFacetedWorldGenerator {
+
+	@In
+	private WorldGeneratorPluginLibrary worldGeneratorPluginLibrary;
 
     public PilarWorldGenerator(SimpleUri uri) {
         super(uri);
     }
 
     @Override
-    protected WorldBuilder createWorld(long seed) {
+    protected WorldBuilder createWorld() {
     	SimplePlanetSimulatorProvider densityProv =new SimplePlanetSimulatorProvider();
     	densityProv.setOrigoOffSet(-534);
     	densityProv.setUpHeightMultiplifier(0.002f);
@@ -50,11 +56,11 @@ public class PilarWorldGenerator extends BaseFacetedWorldGenerator {
     	densityProv.setDownDensityFunction(1);
     	densityProv.setDensityMultifier(30);
     	densityProv.setDensityFunction(1);
-        return new WorldBuilder(seed)
+        return new WorldBuilder(worldGeneratorPluginLibrary)
                 .addProvider(new SeaLevelProvider(32))
                 .addProvider( 
                 		new Noise3DBaseTerainProvider(
-                				new BrownianNoise3D(new SimplexNoise(seed),6),
+                				new BrownianNoise3D(new SimplexNoise( System.currentTimeMillis() ),6),
                 				new Vector3f(0.00080f, 0.0007f, 0.00080f),0,1,0
                 				)
                 		)

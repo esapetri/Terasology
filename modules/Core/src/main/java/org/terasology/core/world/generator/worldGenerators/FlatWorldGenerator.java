@@ -15,19 +15,18 @@
  */
 package org.terasology.core.world.generator.worldGenerators;
 
-import org.terasology.core.world.generator.facetProviders.BiomeProvider;
-import org.terasology.core.world.generator.facetProviders.DefaultFloraProvider;
-import org.terasology.core.world.generator.facetProviders.DefaultTreeProvider;
-import org.terasology.core.world.generator.facetProviders.FlatSurfaceHeightProvider;
-import org.terasology.core.world.generator.facetProviders.PerlinHumidityProvider;
-import org.terasology.core.world.generator.facetProviders.PerlinSurfaceTemperatureProvider;
-import org.terasology.core.world.generator.facetProviders.SeaLevelProvider;
-import org.terasology.core.world.generator.facetProviders.SurfaceToDensityProvider;
-import org.terasology.core.world.generator.rasterizers.FloraRasterizer;
-import org.terasology.core.world.generator.rasterizers.SolidRasterizer;
-import org.terasology.core.world.generator.rasterizers.TreeRasterizer;
+import org.terasology.core.emath.GenMath;
+import org.terasology.core.emath.MathFormula;
+import org.terasology.core.world.generator.e.procedural.texture.FormulaAdapter;
+import org.terasology.core.world.generator.facetProviders.*;
+import org.terasology.core.world.generator.e.world.generation.facetProviders.Noise3DBaseTerainProvider;
+import org.terasology.core.world.generator.e.world.generation.facetProviders.SimplePlanetSimulatorProvider;
+import org.terasology.core.world.generator.e.world.generation.TestSolidRasterizer;
 import org.terasology.engine.SimpleUri;
+import org.terasology.math.geom.Vector3f;
 import org.terasology.registry.In;
+import org.terasology.utilities.procedural.BrownianNoise3D;
+import org.terasology.utilities.procedural.SimplexNoise;
 import org.terasology.world.generation.BaseFacetedWorldGenerator;
 import org.terasology.world.generation.WorldBuilder;
 import org.terasology.world.generator.RegisterWorldGenerator;
@@ -45,19 +44,62 @@ public class FlatWorldGenerator extends BaseFacetedWorldGenerator {
 
     @Override
     protected WorldBuilder createWorld() {
+        SimplePlanetSimulatorProvider densityProv =new SimplePlanetSimulatorProvider();
+        densityProv.setOrigoOffSet(-534);
+        densityProv.setUpHeightMultiplifier(0.002f);
+        densityProv.setUpDensityFunction(2);
+        densityProv.setDownHeightMultiplifier(0.008f);
+        densityProv.setDownDensityFunction(1);
+        densityProv.setDensityMultifier(30);
+        densityProv.setDensityFunction(1);
         return new WorldBuilder(worldGeneratorPluginLibrary)
-                .addProvider(new SeaLevelProvider(32))
+                //.addProvider(new SeaLevelProvider(32))
                         // height of 40 so that it is far enough from sea level so that it doesnt just create beachfront
+                //
+                //.addProvider(new PerlinHumidityProvider())
+                //.addProvider(new PerlinSurfaceTemperatureProvider())
+                //.addProvider(new BiomeProvider())
+                //.addProvider(new SurfaceToDensityProvider())
+                //.addProvider(new DefaultFloraProvider())
+                //.addProvider(new DefaultTreeProvider())
+                //.addRasterizer(new FloraRasterizer())
+                //.addRasterizer(new TreeRasterizer())
+                //.addRasterizer(new TestSolidRasterizer())
+                //.addPlugins();
+
+                .addProvider(new SeaLevelProvider(-10))
+
                 .addProvider(new FlatSurfaceHeightProvider(40))
+
+                .addProvider(
+                        new Noise3DBaseTerainProvider(
+                                new FormulaAdapter(
+                                        new MathFormula() {
+                                            @Override
+                                            public float compute(float x) {
+                                                return 0;
+                                            }
+
+                                            @Override
+                                            public float compute(float x, float y) {
+                                                return 0;
+                                            }
+
+                                            @Override
+                                            public float compute(float x, float y, float z) {
+                                                return GenMath.squareWave(x)*GenMath.squareWave(y)*GenMath.squareWave(z);
+                                            }
+                                        }
+                                ),
+                                new Vector3f(0.5f, 0.5f, 0.5f),0,1,0
+                        )
+                )
+
                 .addProvider(new PerlinHumidityProvider())
                 .addProvider(new PerlinSurfaceTemperatureProvider())
                 .addProvider(new BiomeProvider())
-                .addProvider(new SurfaceToDensityProvider())
-                .addProvider(new DefaultFloraProvider())
-                .addProvider(new DefaultTreeProvider())
-                .addRasterizer(new FloraRasterizer())
-                .addRasterizer(new TreeRasterizer())
-                .addRasterizer(new SolidRasterizer())
+                .addProvider(densityProv)
+                .addRasterizer(new TestSolidRasterizer())
                 .addPlugins();
     }
 }

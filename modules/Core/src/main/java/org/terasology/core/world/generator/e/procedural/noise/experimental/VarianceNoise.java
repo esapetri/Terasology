@@ -13,7 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.egeneration.noise.experimental;
+package org.terasology.core.world.generator.e.procedural.noise.experimental;
+
 
 import org.terasology.core.emath.BitScrampler;
 import org.terasology.core.emath.Statistics;
@@ -26,7 +27,7 @@ import org.terasology.utilities.random.FastRandom;
  * Deterministic white noise generator
  * @author Esereja
  */
-public class MeanNoise implements Noise2D, Noise3D {
+public class VarianceNoise implements Noise2D, Noise3D {
 	final private int RANDOMS_LENGHT=3465;
 	
 	private int[] randoms;
@@ -37,7 +38,7 @@ public class MeanNoise implements Noise2D, Noise3D {
      *
      * @param seed a seed value used for permutation shuffling
      */
-    public MeanNoise(long seed) {
+    public VarianceNoise(long seed) {
        FastRandom rand=new FastRandom(seed);
        randoms=new int[RANDOMS_LENGHT];
        for(int i=0;i<randoms.length;i++){
@@ -109,7 +110,17 @@ public class MeanNoise implements Noise2D, Noise3D {
         array[0]=xn;
         array[1]=yn;
         double mean = Statistics.aritmeticMean(array);
-        double r=mean;
+        double variance = Statistics.variance(array, mean);
+        
+        double r=0;
+        
+        if(!(Statistics.sign(xn)^Statistics.sign(yn))){	
+        	r+=variance;
+        }else{
+        	r-=variance;
+        }
+        
+        r*=5;
         
         return (float) (Math.sin(
         		(r)*3.141*2
@@ -215,7 +226,17 @@ public class MeanNoise implements Noise2D, Noise3D {
         array[1]=yn;
         array[2]=zn;
         double mean = Statistics.aritmeticMean(array);
-        double r=mean;
+        double variance = Statistics.variance(array, mean);
+        
+        double r=0;
+        
+        if(!(Statistics.sign(xn)^Statistics.sign(yn)^Statistics.sign(zn))){	
+        	r+=variance;
+        }else{
+        	r-=variance;
+        }
+        
+        r*=5;
         
         return (float) (Math.sin(
         		(r)*3.141*2
@@ -241,6 +262,7 @@ public class MeanNoise implements Noise2D, Noise3D {
         double yw = yin - TeraMath.fastFloor(yin);
         double zw = zin - TeraMath.fastFloor(zin);
         double ww = zin - TeraMath.fastFloor(win);
+        
         
         double xn= TeraMath.lerp(
         		BitScrampler.subZero(BitScrampler.oaatHash(
@@ -373,8 +395,19 @@ public class MeanNoise implements Noise2D, Noise3D {
         array[2]=zn;
         array[3]=wn;
         double mean = Statistics.aritmeticMean(array);
-        double r=mean;
+        double variance = Statistics.variance(array, mean);
 
+        
+        double r=0;
+        
+        if(!(Statistics.sign(xn)^Statistics.sign(yn)^Statistics.sign(zn))){	
+        	r+=variance;
+        }else{
+        	r-=variance;
+        }
+        
+        r*=5;
+        
         return (float) (Math.sin(
         		(r)*3.141*2
         		));

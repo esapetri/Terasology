@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.boundlessworlds.utilities.procedural.texture;
+package org.terasology.core.world.generator.e.procedural.texture;
 
-import org.boundlessworlds.utilities.random.BitScrampler;
+import org.terasology.core.emath.BitScrampler;
 import org.terasology.math.TeraMath;
-import org.terasology.utilities.procedural.Noise;
 import org.terasology.utilities.procedural.Noise2D;
 import org.terasology.utilities.procedural.Noise3D;
 
@@ -69,7 +68,7 @@ public class CubicTexture implements Noise2D, Noise3D {
         double w=0;
         
         if(this.type==1){
-        	w=BitScrampler.sCurve(xw);
+        	w= BitScrampler.sCurve(xw);
         }else{
         	w=BitScrampler.sCurve(yw);
         }

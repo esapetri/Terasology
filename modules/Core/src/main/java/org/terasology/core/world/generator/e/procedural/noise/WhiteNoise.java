@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.egeneration.noise;
+package org.terasology.core.world.generator.e.procedural.noise;
 
 import org.terasology.core.emath.BitScrampler;
 import org.terasology.utilities.procedural.Noise2D;

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.egeneration.noise.experimental;
+package org.terasology.core.world.generator.e.procedural.noise.experimental;
 
 import org.terasology.core.emath.BitScrampler;
 import org.terasology.core.emath.Statistics;
@@ -26,7 +26,7 @@ import org.terasology.utilities.random.FastRandom;
  * Deterministic white noise generator
  * @author Esereja
  */
-public class CoherentNoise implements Noise2D, Noise3D {
+public class MeanNoise implements Noise2D, Noise3D {
 	final private int RANDOMS_LENGHT=3465;
 	
 	private int[] randoms;
@@ -37,7 +37,7 @@ public class CoherentNoise implements Noise2D, Noise3D {
      *
      * @param seed a seed value used for permutation shuffling
      */
-    public CoherentNoise(long seed) {
+    public MeanNoise(long seed) {
        FastRandom rand=new FastRandom(seed);
        randoms=new int[RANDOMS_LENGHT];
        for(int i=0;i<randoms.length;i++){
@@ -109,9 +109,7 @@ public class CoherentNoise implements Noise2D, Noise3D {
         array[0]=xn;
         array[1]=yn;
         double mean = Statistics.aritmeticMean(array);
-        double median = Statistics.median(array);
-        
-        double r =(median+mean)/2;
+        double r=mean;
         
         return (float) (Math.sin(
         		(r)*3.141*2
@@ -217,9 +215,7 @@ public class CoherentNoise implements Noise2D, Noise3D {
         array[1]=yn;
         array[2]=zn;
         double mean = Statistics.aritmeticMean(array);
-        double median = Statistics.median(array);
-        
-        double r =(median+mean)/2;
+        double r=mean;
         
         return (float) (Math.sin(
         		(r)*3.141*2
@@ -245,7 +241,6 @@ public class CoherentNoise implements Noise2D, Noise3D {
         double yw = yin - TeraMath.fastFloor(yin);
         double zw = zin - TeraMath.fastFloor(zin);
         double ww = zin - TeraMath.fastFloor(win);
-        
         
         double xn= TeraMath.lerp(
         		BitScrampler.subZero(BitScrampler.oaatHash(
@@ -378,10 +373,8 @@ public class CoherentNoise implements Noise2D, Noise3D {
         array[2]=zn;
         array[3]=wn;
         double mean = Statistics.aritmeticMean(array);
-        double median = Statistics.median(array);
-        
-        double r =(median+mean)/2;
-        
+        double r=mean;
+
         return (float) (Math.sin(
         		(r)*3.141*2
         		));

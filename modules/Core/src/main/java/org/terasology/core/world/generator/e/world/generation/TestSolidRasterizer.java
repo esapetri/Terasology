@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.world.generator.rasterizers;
+package org.terasology.core.world.generator.e.world.generation;
 
-import org.terasology.core.world.CoreBiome;
 import org.terasology.core.world.generator.facets.BiomeFacet;
-import org.terasology.math.TeraMath;
+import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.math.geom.Vector2i;
 import org.terasology.math.geom.Vector3i;
 import org.terasology.registry.CoreRegistry;
@@ -28,10 +27,6 @@ import org.terasology.world.chunks.ChunkConstants;
 import org.terasology.world.chunks.CoreChunk;
 import org.terasology.world.generation.Region;
 import org.terasology.world.generation.WorldRasterizer;
-import org.terasology.world.generation.facets.DensityFacet;
-import org.terasology.world.generation.facets.SeaLevelFacet;
-import org.terasology.world.generation.facets.SurfaceDepthFacet;
-import org.terasology.world.generation.facets.SurfaceHeightFacet;
 import org.terasology.world.liquid.LiquidData;
 import org.terasology.world.liquid.LiquidType;
 
@@ -65,10 +60,17 @@ public class TestSolidRasterizer implements WorldRasterizer {
         grass = blockManager.getBlock("core:Grass");
     }
 
+    private double algorithm(double x, double y, double z){
+        double res = 0;
+        res = 0;
+        return res;
+    }
+
     @Override
     public void generateChunk(CoreChunk chunk, Region chunkRegion) {
         LiquidData waterLiquid = new LiquidData(LiquidType.WATER, LiquidData.MAX_LIQUID_DEPTH);
-        SurfaceDepthFacet surfaceDepthFacet = chunkRegion.getFacet(SurfaceDepthFacet.class);
+        InfiniteGenFacet solidityFacet = chunkRegion.getFacet(InfiniteGenFacet.class);
+
         BiomeFacet biomeFacet = chunkRegion.getFacet(BiomeFacet.class);
         int seaLevel = -10;
 
@@ -78,17 +80,20 @@ public class TestSolidRasterizer implements WorldRasterizer {
             pos2d.set(pos.x, pos.z);
             int posY = pos.y + chunk.getChunkWorldOffsetY();
 
-            // Check for an optional depth for this layer - if defined stop generating below that level
-            if (posY > 10) {
+            final int maxY = 150;
+            final int minY=1;
+
+            // dont generate after certain height
+            if (posY > maxY) {
                 continue;
             }
 
+            //TODO make into dummy
+            //dummy biome stuff
             Biome biome = biomeFacet.get(pos2d);
             chunk.setBiome(pos.x, pos.y, pos.z, biome);
 
-            //float density = solidityFacet.get(pos);
-
-            double density = (Math.sin((pos.x/10 ))+Math.sin((pos.y/10 ))+Math.sin((pos.z/10 )))*100;
+            double density = solidityFacet.get(pos);
 
             if (density >= 1000) {
                 chunk.setBlock(pos, snow);
