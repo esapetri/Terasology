@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.world.generator.e.world.generation;
+package org.terasology.core.world.generator.e.world.generation.rasterizers;
 
 import org.terasology.core.world.CoreBiome;
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;

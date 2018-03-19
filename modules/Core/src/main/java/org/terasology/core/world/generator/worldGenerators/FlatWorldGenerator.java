@@ -15,13 +15,19 @@
  */
 package org.terasology.core.world.generator.worldGenerators;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.terasology.core.emath.BitScrampler;
 import org.terasology.core.emath.GenMath;
 import org.terasology.core.emath.MathFormula;
 import org.terasology.core.world.generator.e.procedural.texture.FormulaAdapter;
+import org.terasology.core.world.generator.e.procedural.tools.CreateBoxNoiseTool;
+import org.terasology.core.world.generator.e.world.generation.LandFormProvider;
 import org.terasology.core.world.generator.e.world.generation.facetProviders.*;
 import org.terasology.core.world.generator.facetProviders.*;
-import org.terasology.core.world.generator.e.world.generation.TestSolidRasterizer;
+import org.terasology.core.world.generator.e.world.generation.rasterizers.TestSolidRasterizer;
 import org.terasology.engine.SimpleUri;
+import org.terasology.math.TeraMath;
 import org.terasology.math.geom.Vector3f;
 import org.terasology.registry.In;
 import org.terasology.utilities.procedural.BrownianNoise3D;
@@ -34,6 +40,9 @@ import org.terasology.world.generator.plugin.WorldGeneratorPluginLibrary;
 @RegisterWorldGenerator(id = "flat", displayName = "Flat")
 public class FlatWorldGenerator extends BaseFacetedWorldGenerator {
 
+    private static final Logger logger = LoggerFactory.getLogger(FlatWorldGenerator.class);
+    private static int counter =0 ;
+
     @In
     private WorldGeneratorPluginLibrary worldGeneratorPluginLibrary;
 
@@ -43,7 +52,7 @@ public class FlatWorldGenerator extends BaseFacetedWorldGenerator {
 
     @Override
     protected WorldBuilder createWorld() {
-        SimplePlanetSimulatorProvider densityProv =new SimplePlanetSimulatorProvider();
+        SimplePlanetSimulatorProvider densityProv = new SimplePlanetSimulatorProvider();
         densityProv.setOrigoOffSet(-534);
         densityProv.setUpHeightMultiplifier(0.002f);
         densityProv.setUpDensityFunction(4);
@@ -53,7 +62,7 @@ public class FlatWorldGenerator extends BaseFacetedWorldGenerator {
         densityProv.setDensityFunction(1);
         return new WorldBuilder(worldGeneratorPluginLibrary)
                 //.addProvider(new SeaLevelProvider(32))
-                        // height of 40 so that it is far enough from sea level so that it doesnt just create beachfront
+                // height of 40 so that it is far enough from sea level so that it doesnt just create beachfront
                 //
                 //.addProvider(new PerlinHumidityProvider())
                 //.addProvider(new PerlinSurfaceTemperatureProvider())
@@ -68,15 +77,25 @@ public class FlatWorldGenerator extends BaseFacetedWorldGenerator {
 
                 .addProvider(new SeaLevelProvider(-10))
 
-                .addProvider(new FlatSurfaceHeightProvider(40))
+                //for spawn height
+                .addProvider(new FlatSurfaceHeightProvider(200))
 
+                /*
+                .addProvider(
+                        new Noise3DBaseTerainProvider(
+                                new BrownianNoise3D(new SimplexNoise(System.currentTimeMillis()), 6),
+                                new Vector3f(0.00080f, 0.0007f, 0.00080f), 0, 1, 0
+                        )
+                )
+                */
 
                 .addProvider(
                         new Noise3DBaseTerainProvider(
-                                new BrownianNoise3D(new SimplexNoise( System.currentTimeMillis() ),6),
-                                new Vector3f(0.00080f, 0.0007f, 0.00080f),0,1,0
+                                new BrownianNoise3D(new SimplexNoise(System.currentTimeMillis()), 8),
+                                new Vector3f(0.00080f, 0.0007f, 0.00080f), 0, 1, 0
                         )
                 )
+                //.addProvider(new Noise3DBaseTerainProvider(new NullNoise(0), new Vector3f(1f, 1f, 1f), 0, 1, 0))
 
                 .addProvider(
                         new Noise3DTerainProvider(
@@ -94,26 +113,65 @@ public class FlatWorldGenerator extends BaseFacetedWorldGenerator {
 
                                             @Override
                                             public float compute(float x, float y, float z) {
-                                                return (float)
+                                                float part =(float) (
+                                                        //GenMath.pDSW( x, 7, 1.4f, new int[]{0, 2})
+                                                        //                                                                + GenMath.primeDivisionSquareWave( z, 7, 1.4f, new int[]{0, 2})
+                                                        Math.sin(x)
+                                                );
+
+                                                if(1987<counter){
+                                                    logger.warn("val(X:"+x+",Y:"+y+",Z:"+z+"): " + part + "");
+                                                    counter=0;
+                                                }
+
+                                                counter++;
+
+                                                //if(part>4)
+                                                    return part;
+                                                //return 0;
+
+                                                //part /= 4;
+
+                                                //if(part <= 0)
+                                                //    return part;
+                                                /*
+                                                float r =(float)
                                                         (
-                                                                GenMath.primeDivisionSquareWave(x,7,1.4f,new int[]{2,0})
-                                                                *Math.sin(y/10)
-                                                                *GenMath.primeDivisionSquareWave(z,7,1.4f,new int[]{2,0})
+                                                                //part * TeraMath.fastAbs( Math.sin(y))
+                                                                part *  Math.sin(y)
                                                         );
+
+                                                return r;*/
                                             }
                                         }
                                 ),
-                                new Vector3f(0.5f, 0.5f, 0.5f),0,1,0
+                                new Vector3f(0.05f, 0.05f, 0.05f), 0, 1, 0
                         )
                 )
 
-                 /*
-                .addProvider(new Simplex3DTerainProvider(2,new Vector3f(0.0025f, 0.01f, 0.0025f),10,0,1.2,0))
-                .addProvider(new Perlin3DTerainProvider(3,new Vector3f(0.00085f, 0.0007f, 0.00085f),9,0,0.8,0))
-                .addProvider(new Perlin3DNoiseProvider(4,new Vector3f(0.0042f, 0.0042f, 0.0042f),0,-1.5,0))
-                .addProvider(new Perlin3DNoiseProvider(5,new Vector3f(0.0015f, 0.0010f, 0.0015f),0,-1,0))
-                .addProvider(new PerlinHumidityProvider())
-                 */
+                /*.addProvider(
+                        new Noise3DTerainProvider(
+                                new BrownianNoise3D(new SimplexNoise(System.currentTimeMillis()), 6),
+                                new Vector3f(0.00080f, 0.0007f, 0.00080f), 0, 1, 0
+                        )
+                )*/
+
+                /*
+                .addProvider(
+                        new Noise3DModifyTerainProvider(
+                                new CreateBoxNoiseTool(new Vector3f(-10, 100, -10), new Vector3f(10, 200, 10)),
+                                new Vector3f(1f, 1f, 1f), 0, 1, 0
+                        )
+                )*/
+
+
+                /*
+               .addProvider(new Simplex3DTerainProvider(2,new Vector3f(0.0025f, 0.01f, 0.0025f),10,0,1.2,0))
+               .addProvider(new Perlin3DTerainProvider(3,new Vector3f(0.00085f, 0.0007f, 0.00085f),9,0,0.8,0))
+               .addProvider(new Perlin3DNoiseProvider(4,new Vector3f(0.0042f, 0.0042f, 0.0042f),0,-1.5,0))
+               .addProvider(new Perlin3DNoiseProvider(5,new Vector3f(0.0015f, 0.0010f, 0.0015f),0,-1,0))
+               .addProvider(new PerlinHumidityProvider())
+                */
 
                 .addProvider(new PerlinHumidityProvider())
                 .addProvider(new PerlinSurfaceTemperatureProvider())

@@ -13,34 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.world.generator.e.procedural.adapter;
+package org.terasology.core.world.generator.e.world.generation.facets;
 
-import org.terasology.math.geom.Vector3f;
-import org.terasology.utilities.procedural.Noise3D;
+import org.terasology.core.world.generator.e.world.generation.InfGenBiome;
+import org.terasology.math.Region3i;
+import org.terasology.world.generation.Border3D;
+import org.terasology.world.generation.facets.base.BaseObjectFacet3D;
 
 /**
- * @author Esereja
+ * @author Immortius
  */
-public class Scaling3DAdapter implements Noise3D {
-
-    private Noise3D noise;
-    
-    private Vector3f scale;
-
-    /**
-     *
-     * @param noise
-     * @param scale
-     */
-    public Scaling3DAdapter(Noise3D noise,Vector3f scale) {
-        this.noise = noise;
-        this.scale=scale;
+public class BiomeFacet extends BaseObjectFacet3D<InfGenBiome> {
+    public BiomeFacet(Region3i targetRegion, Border3D border) {
+        super(targetRegion, border, InfGenBiome.class);
     }
-
-
-    @Override
-    public float noise(float x, float y,float z) {
-    	return this.noise.noise(x*scale.x , y*scale.y, z*scale.z);
-    }
-  
 }

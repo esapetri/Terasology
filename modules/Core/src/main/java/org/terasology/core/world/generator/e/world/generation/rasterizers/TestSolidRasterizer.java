@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.world.generator.e.world.generation;
+package org.terasology.core.world.generator.e.world.generation.rasterizers;
 
 import org.terasology.core.world.generator.facets.BiomeFacet;
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
@@ -72,7 +72,7 @@ public class TestSolidRasterizer implements WorldRasterizer {
         InfiniteGenFacet solidityFacet = chunkRegion.getFacet(InfiniteGenFacet.class);
 
         BiomeFacet biomeFacet = chunkRegion.getFacet(BiomeFacet.class);
-        int seaLevel = -10;
+        int seaLevel = -200;
 
         Vector2i pos2d = new Vector2i();
         for (Vector3i pos : ChunkConstants.CHUNK_REGION) {
@@ -80,8 +80,7 @@ public class TestSolidRasterizer implements WorldRasterizer {
             pos2d.set(pos.x, pos.z);
             int posY = pos.y + chunk.getChunkWorldOffsetY();
 
-            final int maxY = 150;
-            final int minY=1;
+            final int maxY = 200;
 
             // dont generate after certain height
             if (posY > maxY) {
@@ -100,7 +99,7 @@ public class TestSolidRasterizer implements WorldRasterizer {
                 continue;
             }
 
-            if (density >= 999) {
+            if (density == 49 || density == 99 || density == 199 || density == 299 || density == 399 || density == 499 || density == 599 || density == 699 || density == 799 || density == 899 || density == 999) {
                 chunk.setBlock(pos, glass);
                 continue;
             }
@@ -110,18 +109,8 @@ public class TestSolidRasterizer implements WorldRasterizer {
                 continue;
             }
 
-            if (density >= 99) {
-                chunk.setBlock(pos, glass);
-                continue;
-            }
-
             if (density >= 50) {
                 chunk.setBlock(pos, dirt);
-                continue;
-            }
-
-            if (density >= 49) {
-                chunk.setBlock(pos, glass);
                 continue;
             }
 
@@ -155,7 +144,7 @@ public class TestSolidRasterizer implements WorldRasterizer {
                 continue;
             }
 
-            if (density >= 0) {
+            if (density > 0) {
                 chunk.setBlock(pos, glass);
                 continue;
             }

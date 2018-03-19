@@ -29,7 +29,7 @@ public class MultiplicationAdapter implements Noise3D, Noise2D {
 	private float multiplifier;
 
 	/***
-	 * takes in 3d noise and creates turbulence whit in this noise.
+	 * takes in 3d noise
 	 * @param noise
 	 * @param multiplifier
 	 */
@@ -40,7 +40,7 @@ public class MultiplicationAdapter implements Noise3D, Noise2D {
 	}
 
 	/***
-	 * takes in 2d noise and creates turbulence whit in this noise.
+	 * takes in 2d noise
 	 * @param noise
 	 * @param multiplifier
 	 * @param b

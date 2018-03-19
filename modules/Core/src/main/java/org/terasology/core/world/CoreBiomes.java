@@ -21,6 +21,7 @@ import org.terasology.world.biomes.BiomeRegistrator;
 /**
  * Registers all core biomes with the engine.
  */
+
 public class CoreBiomes implements BiomeRegistrator {
 
     @Override
@@ -31,3 +32,4 @@ public class CoreBiomes implements BiomeRegistrator {
     }
 
 }
+

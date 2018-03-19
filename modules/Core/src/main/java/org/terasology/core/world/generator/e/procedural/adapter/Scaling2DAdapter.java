@@ -15,9 +15,8 @@
  */
 package org.terasology.core.world.generator.e.procedural.adapter;
 
+import org.terasology.math.geom.Vector2f;
 import org.terasology.utilities.procedural.Noise2D;
-
-import javax.vecmath.Vector2f;
 
 /**
  * @author Esereja

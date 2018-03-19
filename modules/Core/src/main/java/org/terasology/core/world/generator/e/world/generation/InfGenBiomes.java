@@ -13,34 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.world.generator.e.procedural.adapter;
+//package org.terasology.core.world.generator.e.world.generation;
 
-import org.terasology.math.geom.Vector3f;
-import org.terasology.utilities.procedural.Noise3D;
+import org.terasology.world.biomes.BiomeRegistry;
+import org.terasology.world.biomes.BiomeRegistrator;
 
 /**
- * @author Esereja
+ * Registers all core biomes with the engine.
  */
-public class Scaling3DAdapter implements Noise3D {
-
-    private Noise3D noise;
-    
-    private Vector3f scale;
-
-    /**
-     *
-     * @param noise
-     * @param scale
-     */
-    public Scaling3DAdapter(Noise3D noise,Vector3f scale) {
-        this.noise = noise;
-        this.scale=scale;
-    }
-
+/*public class InfGenBiomes implements BiomeRegistrator {
 
     @Override
-    public float noise(float x, float y,float z) {
-    	return this.noise.noise(x*scale.x , y*scale.y, z*scale.z);
+    public void registerBiomes(BiomeRegistry registry) {
+        for (InfGenBiome Biomes : InfGenBiome.values()) {
+            registry.registerBiome(Biomes);
+        }
     }
-  
-}
+
+}*/

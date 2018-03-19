@@ -191,10 +191,40 @@ public class GenMath {
 
             maxValue = maxValue + amplitude;
             amplitude = amplitude * persistence;
-            i = i + 1;
+            i++;
         }
 
         return total / maxValue;
+    }
+
+    public static float pDSW(final float x, final int octaves, final float persistence, final int shift[]) {
+        float total = 0;
+        float amplitude = 1;
+
+        // Used for normalizing result to 0.0 - 1.0
+        int i = 0;
+        while (i < octaves) {
+            total += squareWave(
+                    x * (PRIMES[i + shift[0]] / PRIMES[i + shift[1]])
+            ) * amplitude;
+            amplitude = amplitude * persistence;
+            i++;
+        }
+
+        return total;
+    }
+
+
+    public static float onlyPositive(final float x){
+        if (x>0)
+            return x;
+        return 0;
+    }
+
+    public static float onlyNegative(final float x){
+        if (x<0)
+            return x;
+        return 0;
     }
 
 }

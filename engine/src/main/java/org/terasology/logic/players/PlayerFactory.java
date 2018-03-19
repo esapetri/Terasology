@@ -42,6 +42,7 @@ import org.terasology.physics.shapes.SphereShapeComponent;
 import org.terasology.rendering.logic.MeshComponent;
 import org.terasology.world.WorldProvider;
 
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 /**
@@ -101,7 +102,18 @@ public class PlayerFactory {
         EntityBuilder builder = entityManager.newBuilder("engine:player");
         float extraSpace = 0.5f;  // spawn a little bit above the ground
         float entityHeight = getHeightOf(builder) + extraSpace;
-        return findSpawnPos(locationComponent.getWorldPosition(), entityHeight).get(); // TODO: Handle Optional being empty
+
+        Optional<Vector3f> result = findSpawnPos(locationComponent.getWorldPosition(), entityHeight);
+        Vector3f vresult;
+
+        try{
+                vresult = result.get();
+        }catch (NoSuchElementException e){
+            e.printStackTrace();
+            return locationComponent.getWorldPosition();
+        }
+
+        return vresult;
     }
 
     private float getHeightOf(ComponentContainer prefab) {
