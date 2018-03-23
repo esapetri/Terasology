@@ -18,116 +18,82 @@ package org.terasology.core.world.generator.e.world.generation;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.terasology.core.emath.GenMath;
+import org.terasology.math.geom.Vector4f;
 import org.terasology.utilities.procedural.Noise3D;
 
 /**
  * @author esereja
  */
-public class LandFormDefinition implements Noise3D {
+public abstract class LandFormDefinition implements Noise3D {
+
+    protected boolean optimize;
 
     protected List<Noise3D> noiseList;
 
-    protected float formValue;
-
-    protected float minDensity;
-    protected float maxDensity;
-
-    protected float minAltitude;
-    protected float maxAltitude;
-
-    protected float minTemperature;
-    protected float maxTemperature;
-
-    protected float minHumidity;
-    protected float maxHumidity;
+    protected float density;
+    protected float altitude;
+    protected float temperature;
+    protected float humidity;
 
     protected float scoreOffset;
 
+    public LandFormDefinition(float density) {
+        this.altitude = 0;
+        this.density = density;
+        this.temperature = 0;
+        this.humidity = 0;
 
-    /**
-     * @param formValue
-     */
-    protected LandFormDefinition(float formValue) {
-        this.formValue = formValue;
-        this.maxDensity = 0;
-        this.minDensity = 0;
-        this.maxAltitude = 0;
-        this.minAltitude = 0;
-        this.maxTemperature = 0;
-        this.minTemperature = 0;
-        this.maxHumidity = 0;
-        this.minHumidity = 0;
-        this.noiseList = new ArrayList<Noise3D>();
         this.scoreOffset = 0;
+
+        this.noiseList = new ArrayList<Noise3D>();
+        this.optimize = false;
     }
 
-    /**
-     * @param formValue
-     * @param minDensity
-     * @param maxDensity
-     * @param minAltitude
-     * @param maxAltitude
-     * @param minTemperature
-     * @param maxTemperature
-     * @param minHumidity
-     * @param maxHumidity
-     */
-    public LandFormDefinition(float formValue,
-                              float minDensity, float maxDensity, float minAltitude, float maxAltitude, float minTemperature, float maxTemperature
-            , float minHumidity, float maxHumidity) {
-        this.formValue = formValue;
-        this.maxDensity = maxDensity;
-        this.minDensity = minDensity;
-        this.maxAltitude = maxAltitude;
-        this.minAltitude = minAltitude;
-        this.maxTemperature = maxTemperature;
-        this.minTemperature = minTemperature;
-        this.maxHumidity = maxHumidity;
-        this.minHumidity = minHumidity;
-        this.noiseList = new ArrayList<Noise3D>();
+    public LandFormDefinition(float density, float altitude, float temperature, float humidity) {
+        this.altitude = altitude;
+        this.density = density;
+        this.temperature = temperature;
+        this.humidity = humidity;
+
         this.scoreOffset = 0;
+
+        this.noiseList = new ArrayList<Noise3D>();
+        this.optimize = false;
     }
 
-    /**
-     * @param noiseList
-     * @param formValue
-     * @param minDensity
-     * @param maxDensity
-     * @param minAltitude
-     * @param maxAltitude
-     * @param minTemperature
-     * @param maxTemperature
-     * @param minHumidity
-     * @param maxHumidity
-     */
-    public LandFormDefinition(ArrayList<Noise3D> noiseList, float formValue,
-                              float minDensity, float maxDensity, float minAltitude, float maxAltitude, float minTemperature, float maxTemperature
-            , float minHumidity, float maxHumidity) {
-        this.formValue = formValue;
-        this.maxDensity = maxDensity;
-        this.minDensity = minDensity;
-        this.maxAltitude = maxAltitude;
-        this.minAltitude = minAltitude;
-        this.maxTemperature = maxTemperature;
-        this.minTemperature = minTemperature;
-        this.maxHumidity = maxHumidity;
-        this.minHumidity = minHumidity;
+    public LandFormDefinition(ArrayList<Noise3D> noiseList, float density, float altitude, float temperature, float humidity) {
+        this.altitude = altitude;
+        this.density = density;
+        this.temperature = temperature;
+        this.humidity = humidity;
         this.noiseList = noiseList;
+
         this.scoreOffset = 0;
+        this.optimize = false;
     }
+
 
     public float noise(float x, float y, float z) {
         float n = 0;
         int i = 0;
 
-        while (i < this.noiseList.size()) {
-            n += this.noiseList.get(i).noise(x, y, z);
-            i++;
-        }
+        if (this.optimize)
+            while (i < this.noiseList.size()) {
+                n += this.noiseList.get(i).noise(x, y, z);
+                if(n<0)
+                    break;
+                i++;
+            }
+
+        else
+            while (i < this.noiseList.size()) {
+                n += this.noiseList.get(i).noise(x, y, z);
+                i++;
+            }
+
         return n;
     }
-
-    //TODO In need of heavy optimization
 
     /**
      * get Score of suitability of this terrain generator for these conditions.
@@ -135,198 +101,65 @@ public class LandFormDefinition implements Noise3D {
      *
      * @param altitude
      * @param density
-     * @param form
      * @param humidity
      * @param temperature
-     * @return
+     * @return score. This tells how suitable is this noise for given coordinate. Smaller value is the better
      */
-    public float getScore(final float altitude, final float form, final float density, final float humidity, final float temperature) {
-        float result = this.scoreOffset;
+    public float getScore(final float altitude, final float density, final float humidity, final float temperature) {
+        Vector4f v1 = new Vector4f(this.density, this.altitude, this.temperature, this.humidity);
+        Vector4f v2 = new Vector4f(density, altitude, temperature, humidity);
 
-        if (this.formValue != 0) {
-            if (form > this.formValue) {
-                result -= (form - this.formValue) * 10;
-            } else if (form < this.formValue) {
-                result += (form + this.formValue) * 10;
-            }
-        }
-
-        //if(this.maxAltitude!=Float.MAX_VALUE && this.minAltitude!=Float.MIN_VALUE){
-        if (altitude > this.maxAltitude) {
-            result -= altitude - this.maxAltitude;
-        } else if (altitude < this.minAltitude) {
-            result += altitude + this.minAltitude;
-        }
-        //}
-
-        //if(this.maxDensity!=Float.MAX_VALUE && this.minDensity!=Float.MIN_VALUE){
-        if (density > this.maxDensity) {
-            result -= (density - this.maxDensity) * 50;
-        } else if (density < this.minDensity) {
-            result += (density + this.minDensity) * 50;
-        }
-        //}
-
-        //if(this.maxHumidity!=Float.MAX_VALUE && this.minHumidity!=Float.MIN_VALUE){
-        if (humidity > this.maxHumidity) {
-            result -= (humidity - this.maxHumidity) * 100;
-        } else if (humidity < this.minHumidity) {
-            result += (humidity + this.minHumidity) * 100;
-        }
-        //}
-
-        //if(this.maxTemperature!=Float.MAX_VALUE && this.minTemperature!=Float.MIN_VALUE){
-        if (temperature > this.maxTemperature) {
-            result -= (temperature - this.maxTemperature) * 10;
-        } else if (temperature < this.minTemperature) {
-            result += (temperature + this.minTemperature) * 10;
-        }
-        //}
-
-        return result;
+        return GenMath.taxiCapDistance(v1, v2) + this.scoreOffset;
     }
+
 
     public void addNoise(Noise3D noise) {
         this.noiseList.add(noise);
     }
 
-    /**
-     * @return the formValue
-     */
-    public float getFormValue() {
-        return formValue;
+
+    public List<Noise3D> getNoiseList() {
+        return noiseList;
     }
 
-    /**
-     * @param formValue the formValue to set
-     */
-    public void setFormValue(float formValue) {
-        this.formValue = formValue;
+    public float getDensity() {
+        return density;
     }
 
-    /**
-     * @return the minTemperature
-     */
-    public float getMinTemperature() {
-        return minTemperature;
+    public float getAltitude() {
+        return altitude;
     }
 
-    /**
-     * @param minTemperature the minTemperature to set
-     */
-    public void setMinTemperature(float minTemperature) {
-        this.minTemperature = minTemperature;
+    public float getTemperature() {
+        return temperature;
     }
 
-    /**
-     * @return the maxTemperature
-     */
-    public float getMaxTemperature() {
-        return maxTemperature;
+    public float getHumidity() {
+        return humidity;
     }
 
-    /**
-     * @param maxTemperature the maxTemperature to set
-     */
-    public void setMaxTemperature(float maxTemperature) {
-        this.maxTemperature = maxTemperature;
+    public void setDensity(float density) {
+        this.density = density;
     }
 
-    /**
-     * @return the minHumidity
-     */
-    public float getMinHumidity() {
-        return minHumidity;
+    public void setAltitude(float altitude) {
+        this.altitude = altitude;
     }
 
-    /**
-     * @param minHumidity the minHumidity to set
-     */
-    public void setMinHumidity(float minHumidity) {
-        this.minHumidity = minHumidity;
+    public void setTemperature(float temperature) {
+        this.temperature = temperature;
     }
 
-    /**
-     * @return the maxHumidity
-     */
-    public float getMaxHumidity() {
-        return maxHumidity;
+    public void setHumidity(float humidity) {
+        this.humidity = humidity;
     }
 
-    /**
-     * @param maxHumidity the maxHumidity to set
-     */
-    public void setMaxHumidity(float maxHumidity) {
-        this.maxHumidity = maxHumidity;
-    }
-
-    /**
-     * @return the minDensity
-     */
-    public float getMinDensity() {
-        return minDensity;
-    }
-
-    /**
-     * @param minDensity the minDensity to set
-     */
-    public void setMinDensity(float minDensity) {
-        this.minDensity = minDensity;
-    }
-
-    /**
-     * @return the maxDensity
-     */
-    public float getMaxDensity() {
-        return maxDensity;
-    }
-
-    /**
-     * @param maxDensity the maxDensity to set
-     */
-    public void setMaxDensity(float maxDensity) {
-        this.maxDensity = maxDensity;
-    }
-
-    /**
-     * @return the minAltitude
-     */
-    public float getMinAltitude() {
-        return minAltitude;
-    }
-
-    /**
-     * @param minAltitude the minAltitude to set
-     */
-    public void setMinAltitude(float minAltitude) {
-        this.minAltitude = minAltitude;
-    }
-
-    /**
-     * @return the maxAltitude
-     */
-    public float getMaxAltitude() {
-        return maxAltitude;
-    }
-
-    /**
-     * @param maxAltitude the maxAltitude to set
-     */
-    public void setMaxAltitude(float maxAltitude) {
-        this.maxAltitude = maxAltitude;
-    }
-
-    /**
-     * @return the scoreOffset
-     */
-    public float getScoreOffset() {
-        return scoreOffset;
-    }
-
-    /**
-     * @param scoreOffset the scoreOffset to set
-     */
     public void setScoreOffset(float scoreOffset) {
         this.scoreOffset = scoreOffset;
     }
+
+    public void setOptimize(boolean optimize) {
+        this.optimize = optimize;
+    }
+
 }

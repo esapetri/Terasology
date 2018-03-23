@@ -16,8 +16,8 @@
 package org.terasology.core.world.generator.e.world.generation.landformDefinitions;
 
 import org.terasology.core.world.generator.e.procedural.adapter.AdditionAdapter;
-import org.terasology.core.world.generator.e.procedural.adapter.MultiplicationAdapter;
-import org.terasology.core.world.generator.e.world.generation.LandFormDefinition;
+import org.terasology.core.world.generator.e.procedural.adapter.ValueMultiplicationAdapter;
+import org.terasology.core.world.generator.e.world.generation.OldLandFormDefinition;
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.math.geom.Vector3f;
 import org.terasology.utilities.procedural.BrownianNoise3D;
@@ -27,7 +27,7 @@ import org.terasology.utilities.procedural.SubSampledNoise3D;
 import org.terasology.world.generation.Produces;
 
 @Produces(InfiniteGenFacet.class)
-public class NearSurface4Definition extends LandFormDefinition implements Noise3D {
+public class NearSurface4Definition extends OldLandFormDefinition implements Noise3D {
 
     public NearSurface4Definition(Long seed) {
         super(0);
@@ -46,7 +46,7 @@ public class NearSurface4Definition extends LandFormDefinition implements Noise3
                 new Vector3f(0.03f, 0.03f, 0.03f), 4
         ));
 
-        this.noiseList.add(new SubSampledNoise3D(new MultiplicationAdapter(new BrownianNoise3D(new SimplexNoise(seed), 4), 0.5f),
+        this.noiseList.add(new SubSampledNoise3D(new ValueMultiplicationAdapter(new BrownianNoise3D(new SimplexNoise(seed), 4), 0.5f),
                 new Vector3f(0.003f, 0.003f, 0.003f), 4
         ));
     }

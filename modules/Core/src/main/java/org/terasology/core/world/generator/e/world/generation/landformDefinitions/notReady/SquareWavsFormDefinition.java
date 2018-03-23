@@ -20,7 +20,6 @@ import org.terasology.core.emath.MathFormula;
 import org.terasology.core.world.generator.e.procedural.adapter.Scaling3DAdapter;
 import org.terasology.core.world.generator.e.procedural.texture.FormulaAdapter;
 import org.terasology.core.world.generator.e.world.generation.LandFormDefinition;
-import org.terasology.core.world.generator.e.world.generation.facetProviders.Noise3DModifyTerainProvider;
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.math.TeraMath;
 import org.terasology.math.geom.Vector3f;
@@ -32,16 +31,6 @@ public class SquareWavsFormDefinition extends LandFormDefinition implements Nois
 
     public SquareWavsFormDefinition(long seed) {
         super(0);
-        this.maxDensity = Float.MAX_VALUE;
-        this.minDensity = 200F;
-        this.maxAltitude = Float.MAX_VALUE;
-        this.minAltitude = Float.MIN_VALUE;
-        this.maxTemperature = Float.MAX_VALUE;
-        this.minTemperature = Float.MIN_VALUE;
-        this.maxHumidity = Float.MAX_VALUE;
-        this.minHumidity = Float.MIN_VALUE;
-
-        this.setScoreOffset(-400f);
 
         this.noiseList.add(
 
@@ -66,12 +55,12 @@ public class SquareWavsFormDefinition extends LandFormDefinition implements Nois
                                                         + GenMath.primeDivisionSquareWave(z + GenMath.PRIMES[50], 7, 1.4f, new int[]{2, 0})
                                         );
 
-                                        if(part <= 0)
+                                        if (part <= 0)
                                             return part;
 
-                                        float r =(float)
+                                        float r = (float)
                                                 (
-                                                        ( part % 15 ) * TeraMath.fastAbs( Math.sin(y/10)) -5
+                                                        (part % 15) * TeraMath.fastAbs(Math.sin(y / 10)) - 5
                                                 );
 
                                         return r;

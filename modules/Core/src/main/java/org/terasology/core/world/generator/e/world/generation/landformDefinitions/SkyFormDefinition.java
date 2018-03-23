@@ -17,12 +17,13 @@ package org.terasology.core.world.generator.e.world.generation.landformDefinitio
 
 import org.terasology.core.world.generator.e.procedural.adapter.AdditionAdapter;
 import org.terasology.core.world.generator.e.world.generation.LandFormDefinition;
+import org.terasology.core.world.generator.e.world.generation.OldLandFormDefinition;
 import org.terasology.math.geom.Vector3f;
 import org.terasology.utilities.procedural.Noise3D;
 import org.terasology.utilities.procedural.SimplexNoise;
 import org.terasology.utilities.procedural.SubSampledNoise3D;
 
-public class SkyFormDefinition extends LandFormDefinition implements Noise3D {
+public class SkyFormDefinition extends OldLandFormDefinition implements Noise3D {
 
     public SkyFormDefinition(Long seed) {
         super(0);

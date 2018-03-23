@@ -18,6 +18,7 @@ package org.terasology.core.world.generator.e.world.generation.landformDefinitio
 
 import org.terasology.core.world.generator.e.procedural.adapter.AdditionAdapter;
 import org.terasology.core.world.generator.e.world.generation.LandFormDefinition;
+import org.terasology.core.world.generator.e.world.generation.OldLandFormDefinition;
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.math.geom.Vector3f;
 import org.terasology.utilities.procedural.BrownianNoise3D;
@@ -27,7 +28,7 @@ import org.terasology.utilities.procedural.SubSampledNoise3D;
 import org.terasology.world.generation.Produces;
 
 @Produces(InfiniteGenFacet.class)
-public class NearSurface3Definition extends LandFormDefinition implements Noise3D {
+public class NearSurface3Definition extends OldLandFormDefinition implements Noise3D {
     
 
 	public NearSurface3Definition(Long seed){

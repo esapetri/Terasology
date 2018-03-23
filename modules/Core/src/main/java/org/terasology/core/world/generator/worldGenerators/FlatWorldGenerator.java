@@ -17,17 +17,13 @@ package org.terasology.core.world.generator.worldGenerators;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.terasology.core.emath.BitScrampler;
-import org.terasology.core.emath.GenMath;
 import org.terasology.core.emath.MathFormula;
 import org.terasology.core.world.generator.e.procedural.texture.FormulaAdapter;
-import org.terasology.core.world.generator.e.procedural.tools.CreateBoxNoiseTool;
-import org.terasology.core.world.generator.e.world.generation.LandFormProvider;
+import org.terasology.core.world.generator.e.world.generation.SimplePlanetSimulatorProvider;
 import org.terasology.core.world.generator.e.world.generation.facetProviders.*;
 import org.terasology.core.world.generator.facetProviders.*;
 import org.terasology.core.world.generator.e.world.generation.rasterizers.TestSolidRasterizer;
 import org.terasology.engine.SimpleUri;
-import org.terasology.math.TeraMath;
 import org.terasology.math.geom.Vector3f;
 import org.terasology.registry.In;
 import org.terasology.utilities.procedural.BrownianNoise3D;
@@ -54,11 +50,11 @@ public class FlatWorldGenerator extends BaseFacetedWorldGenerator {
     protected WorldBuilder createWorld() {
         SimplePlanetSimulatorProvider densityProv = new SimplePlanetSimulatorProvider();
         densityProv.setOrigoOffSet(-534);
-        densityProv.setUpHeightMultiplifier(0.002f);
+        densityProv.setUpHeightMultiplier(0.002f);
         densityProv.setUpDensityFunction(4);
-        densityProv.setDownHeightMultiplifier(0.008f);
+        densityProv.setDownHeightMultiplier(0.008f);
         densityProv.setDownDensityFunction(1);
-        densityProv.setDensityMultifier(30);
+        densityProv.setDensityMultiplier(30);
         densityProv.setDensityFunction(1);
         return new WorldBuilder(worldGeneratorPluginLibrary)
                 //.addProvider(new SeaLevelProvider(32))

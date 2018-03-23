@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.world.generator.e.world.generation.landformDefinitions.basic;
+package org.terasology.core.world.generator.e.world.generation;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +25,7 @@ import org.terasology.world.generation.Produces;
  * 
  * @author esereja
  */
-public class LandFormDefinition implements Noise3D {
+public abstract class OldLandFormDefinition implements Noise3D {
 	
 	protected List<Noise3D> noiseList;
 	
@@ -50,7 +50,7 @@ public class LandFormDefinition implements Noise3D {
      * 
      * @param formValue
      */
-    protected LandFormDefinition(float formValue){
+    protected OldLandFormDefinition(float formValue){
     	this.formValue=formValue;
     	this.maxDensity=0;
     	this.minDensity=0;
@@ -76,9 +76,9 @@ public class LandFormDefinition implements Noise3D {
      * @param minHumidity
      * @param maxHumidity
      */
-    public LandFormDefinition(float formValue,
-    		float minDensity,float maxDensity,float minAltitude,float maxAltitude,float minTemperature,float maxTemperature
-    		,float minHumidity,float maxHumidity){
+    public OldLandFormDefinition(float formValue,
+								 float minDensity, float maxDensity, float minAltitude, float maxAltitude, float minTemperature, float maxTemperature
+    		, float minHumidity, float maxHumidity){
     	this.formValue=formValue;
     	this.maxDensity=maxDensity;
     	this.minDensity=minDensity;
@@ -105,9 +105,9 @@ public class LandFormDefinition implements Noise3D {
      * @param minHumidity
      * @param maxHumidity
      */
-    public LandFormDefinition( ArrayList<Noise3D> noiseList,float formValue,
-    		float minDensity,float maxDensity,float minAltitude,float maxAltitude,float minTemperature,float maxTemperature
-    		,float minHumidity,float maxHumidity){
+    public OldLandFormDefinition(ArrayList<Noise3D> noiseList, float formValue,
+								 float minDensity, float maxDensity, float minAltitude, float maxAltitude, float minTemperature, float maxTemperature
+    		, float minHumidity, float maxHumidity){
     	this.formValue=formValue;
     	this.maxDensity=maxDensity;
     	this.minDensity=minDensity;

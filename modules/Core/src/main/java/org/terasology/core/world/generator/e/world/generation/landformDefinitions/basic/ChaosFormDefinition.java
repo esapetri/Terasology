@@ -28,15 +28,10 @@ public class ChaosFormDefinition extends LandFormDefinition implements Noise3D {
 
 
     public ChaosFormDefinition(Long seed) {
-        super(-1000);
-        this.maxDensity = 500f;
-        this.minDensity = -2f;
-        this.maxAltitude = 1500f;
-        this.minAltitude = -2000f;
-        this.maxTemperature = Float.MAX_VALUE;
-        this.minTemperature = Float.MIN_VALUE;
-        this.maxHumidity = Float.MAX_VALUE;
-        this.minHumidity = Float.MIN_VALUE;
+        super(100);
+        this.altitude = 250;
+        this.temperature = 0;
+        this.humidity = 0;
 
         this.noiseList.add(new SubSampledNoise3D(
                         new TrigonometricAdapter(new BrownianNoise3D(new SimplexNoise(seed), 2), 2),

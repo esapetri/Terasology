@@ -21,7 +21,6 @@ import org.terasology.core.emath.MathFormula;
 import org.terasology.core.world.generator.e.procedural.adapter.Scaling3DAdapter;
 import org.terasology.core.world.generator.e.procedural.texture.FormulaAdapter;
 import org.terasology.core.world.generator.e.world.generation.LandFormDefinition;
-import org.terasology.core.world.generator.e.world.generation.facetProviders.Noise3DModifyTerainProvider;
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.math.TeraMath;
 import org.terasology.math.geom.Vector3f;
@@ -33,17 +32,6 @@ public class SquareBitsFormDefinition extends LandFormDefinition implements Nois
 
     public SquareBitsFormDefinition(long seed) {
         super(0);
-        this.maxDensity = Float.MAX_VALUE;
-        this.minDensity = 200F;
-        this.maxAltitude = Float.MAX_VALUE;
-        this.minAltitude = Float.MIN_VALUE;
-        this.maxTemperature = Float.MAX_VALUE;
-        this.minTemperature = Float.MIN_VALUE;
-        this.maxHumidity = Float.MAX_VALUE;
-        this.minHumidity = Float.MIN_VALUE;
-
-        this.setScoreOffset(-400f);
-
         this.noiseList.add(
                 new Scaling3DAdapter(
                         new FormulaAdapter(

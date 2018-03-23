@@ -21,7 +21,7 @@ import org.terasology.utilities.procedural.Noise3D;
 /**
  * @author Esereja
  */
-public class MultiplicationAdapter implements Noise3D, Noise2D {
+public class ValueMultiplicationAdapter implements Noise3D, Noise2D {
 
 	private Noise3D noise3;
 	private Noise2D noise2;
@@ -34,7 +34,7 @@ public class MultiplicationAdapter implements Noise3D, Noise2D {
 	 * @param multiplifier
 	 */
 
-	public MultiplicationAdapter(Noise3D noise, float multiplifier) {
+	public ValueMultiplicationAdapter(Noise3D noise, float multiplifier) {
 		this.noise3 = noise;
 		this.multiplifier = multiplifier;
 	}
@@ -46,7 +46,7 @@ public class MultiplicationAdapter implements Noise3D, Noise2D {
 	 * @param b
 	 *            this does nothing. it is just place holder
 	 */
-	public MultiplicationAdapter(Noise2D noise, float multiplifier, byte b) {
+	public ValueMultiplicationAdapter(Noise2D noise, float multiplifier, byte b) {
 		this.noise2 = noise;
 		this.multiplifier = multiplifier;
 	}

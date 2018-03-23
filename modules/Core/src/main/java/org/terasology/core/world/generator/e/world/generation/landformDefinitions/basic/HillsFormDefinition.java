@@ -36,15 +36,8 @@ public class HillsFormDefinition extends LandFormDefinition implements Noise3D {
      * @param seed
      */
 	public HillsFormDefinition(long seed){
-    	super(1);
-    	this.maxDensity=400f;
-    	this.minDensity=-100f;
-    	this.maxAltitude=500f;
-    	this.minAltitude=-1500f;
-    	this.maxTemperature=Float.MAX_VALUE;
-    	this.minTemperature=Float.MIN_VALUE;	
-    	this.maxHumidity=Float.MAX_VALUE;
-    	this.minHumidity=Float.MIN_VALUE;
+    	super(150);
+    	this.altitude=300f;
     	
     	this.noiseList.add(new AdditionAdapter(
     			new SubSampledNoise3D(

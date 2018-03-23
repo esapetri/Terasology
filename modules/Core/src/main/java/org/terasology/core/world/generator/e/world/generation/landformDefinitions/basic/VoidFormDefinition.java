@@ -26,16 +26,8 @@ public class VoidFormDefinition extends LandFormDefinition implements Noise3D {
 
     public VoidFormDefinition(long seed) {
         super(0);
-        this.maxDensity = -200f;
-        this.minDensity = Float.MIN_VALUE;
-        this.maxAltitude = Float.MAX_VALUE;
-        this.minAltitude = Float.MIN_VALUE;
-        this.maxTemperature = Float.MAX_VALUE;
-        this.minTemperature = Float.MIN_VALUE;
-        this.maxHumidity = Float.MAX_VALUE;
-        this.minHumidity = Float.MIN_VALUE;
 
-        this.setScoreOffset(-800f);
+        this.setScoreOffset(0f);
 
         this.noiseList.add(new SubSampledNoise3D(new AdditionAdapter(new SimplexNoise(seed), -1f),
                 new Vector3f(0.02f, 0.02f, 0.02f), 4));

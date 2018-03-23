@@ -72,7 +72,6 @@ public class LandFormProvider implements FacetProvider {
         InfiniteGenFacet denFacet =  region.getRegionFacet(InfiniteGenFacet.class);
         TemperatureFacet tempFacet =  region.getRegionFacet(TemperatureFacet.class);
         HumidityFacet humFacet =  region.getRegionFacet(HumidityFacet.class);
-        FormFacet formFacet =  region.getRegionFacet(FormFacet.class);
 
 		int x1 = denFacet.getWorldRegion().minX();
 		int y1 = denFacet.getWorldRegion().minY();
@@ -85,7 +84,6 @@ public class LandFormProvider implements FacetProvider {
         			float orginal=denFacet.get(x, y, z);
         			
         			float humidity=humFacet.get(x, y, z);
-        			float form=formFacet.get(x, y, z);
         			float temperature=tempFacet.get(x, y, z);
         			float result = 0;
         			int i=0;
@@ -95,7 +93,7 @@ public class LandFormProvider implements FacetProvider {
         			float[] scores=  new float[depth];
         			float[] t= new float[depth];
         			while(i<this.noiseList.size()){
-        				scores[i]=this.noiseList.get(i).getScore(y1, form, orginal, humidity, temperature);
+        				scores[i]=this.noiseList.get(i).getScore(y1, orginal, temperature, humidity);
         				t= Statistics.sortAdd(t, i, scores[i]);
         				//i could save position of score in orginal array and save some
         				//cpu which is used in searching later.

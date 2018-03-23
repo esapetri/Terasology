@@ -16,14 +16,12 @@
 package org.terasology.core.world.generator.e.world.generation.landformDefinitions.basic;
 
 import org.terasology.core.world.generator.e.procedural.adapter.AdditionAdapter;
-import org.terasology.core.world.generator.e.procedural.adapter.MultiplicationAdapter;
-import org.terasology.core.world.generator.e.procedural.adapter.TrigonometricAdapter;
+import org.terasology.core.world.generator.e.procedural.adapter.ValueMultiplicationAdapter;
 import org.terasology.core.world.generator.e.world.generation.LandFormDefinition;
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.math.geom.Vector3f;
 import org.terasology.utilities.procedural.BrownianNoise3D;
 import org.terasology.utilities.procedural.Noise3D;
-import org.terasology.utilities.procedural.PerlinNoise;
 import org.terasology.utilities.procedural.SimplexNoise;
 import org.terasology.utilities.procedural.SubSampledNoise3D;
 import org.terasology.world.generation.Produces;
@@ -32,18 +30,11 @@ import org.terasology.world.generation.Produces;
 public class PlainFormDefinition extends LandFormDefinition implements Noise3D {
 
 	public PlainFormDefinition(long seed){
-    	super(10);
-    	this.maxDensity=3f;
-    	this.minDensity=Float.MIN_VALUE;
-    	this.maxAltitude=1000f;
-    	this.minAltitude=-500f;
-    	this.maxTemperature=Float.MAX_VALUE;
-    	this.minTemperature=Float.MIN_VALUE;	
-    	this.maxHumidity=Float.MAX_VALUE;
-    	this.minHumidity=Float.MIN_VALUE;
+    	super(70);
+    	this.altitude=700f;
     	
     	this.noiseList.add(new SubSampledNoise3D(
-    			new MultiplicationAdapter(new AdditionAdapter(new BrownianNoise3D(new SimplexNoise(seed),2),0.1f),0.8f),
+    			new ValueMultiplicationAdapter(new AdditionAdapter(new BrownianNoise3D(new SimplexNoise(seed),2),0.1f),0.8f),
     					new Vector3f(0.0005f, 0.0005f, 0.0005f),4
     			)
     	);

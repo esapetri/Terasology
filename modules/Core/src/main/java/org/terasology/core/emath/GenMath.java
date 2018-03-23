@@ -1,5 +1,10 @@
 package org.terasology.core.emath;
 
+import org.terasology.math.TeraMath;
+import org.terasology.math.geom.Vector2f;
+import org.terasology.math.geom.Vector3f;
+import org.terasology.math.geom.Vector4f;
+
 public class GenMath {
 
     public static final float PI = 3.141592653589793f;
@@ -215,16 +220,53 @@ public class GenMath {
     }
 
 
-    public static float onlyPositive(final float x){
-        if (x>0)
+    public static float onlyPositive(final float x) {
+        if (x > 0)
             return x;
         return 0;
     }
 
-    public static float onlyNegative(final float x){
-        if (x<0)
+    public static float onlyNegative(final float x) {
+        if (x < 0)
             return x;
         return 0;
+    }
+
+    public static float D1taxiCapDistance(float x1, float x2) {
+        return TeraMath.fastAbs(x1 - x2);
+    }
+
+    public static float D2taxiCapDistance(float x1, float x2, float y1, float y2) {
+        return TeraMath.fastAbs(x1 - x2) + TeraMath.fastAbs(y1 - y2);
+    }
+
+    public static float taxiCapDistance(Vector2f v1, Vector2f v2) {
+        float x = TeraMath.fastAbs(v1.x - v2.x);
+        float y = TeraMath.fastAbs(v1.y - v2.y);
+        return x + y;
+    }
+
+    public static float taxiCapDistance(Vector3f v1, Vector3f v2) {
+        float x = TeraMath.fastAbs(v1.x - v2.x);
+        float y = TeraMath.fastAbs(v1.y - v2.y);
+        float z = TeraMath.fastAbs(v1.z - v2.z);
+        return x + y + z;
+    }
+
+    public static float taxiCapDistance(float x1, float x2, float y1, float y2, float z1, float z2, float w1, float w2) {
+        float x = TeraMath.fastAbs(x1 - x2);
+        float y = TeraMath.fastAbs(y1 - y2);
+        float z = TeraMath.fastAbs(z1 - z2);
+        float w = TeraMath.fastAbs(w1 - w2);
+        return x + y + z + w;
+    }
+
+    public static float taxiCapDistance(Vector4f v1, Vector4f v2) {
+        float x = TeraMath.fastAbs(v1.x - v2.x);
+        float y = TeraMath.fastAbs(v1.y - v2.y);
+        float z = TeraMath.fastAbs(v1.z - v2.z);
+        float w = TeraMath.fastAbs(v1.w - v2.w);
+        return x + y + z + w;
     }
 
 }

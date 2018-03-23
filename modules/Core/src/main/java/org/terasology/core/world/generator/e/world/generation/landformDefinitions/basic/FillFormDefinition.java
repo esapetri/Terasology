@@ -16,7 +16,7 @@
 package org.terasology.core.world.generator.e.world.generation.landformDefinitions.basic;
 
 import org.terasology.core.world.generator.e.procedural.adapter.AdditionAdapter;
-import org.terasology.core.world.generator.e.procedural.adapter.MultiplicationAdapter;
+import org.terasology.core.world.generator.e.procedural.adapter.ValueMultiplicationAdapter;
 import org.terasology.core.world.generator.e.world.generation.LandFormDefinition;
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.math.geom.Vector3f;
@@ -31,19 +31,9 @@ public class FillFormDefinition extends LandFormDefinition implements Noise3D {
 
     public FillFormDefinition(long seed) {
         super(0);
-        this.maxDensity = Float.MAX_VALUE;
-        this.minDensity = 200F;
-        this.maxAltitude = Float.MAX_VALUE;
-        this.minAltitude = Float.MIN_VALUE;
-        this.maxTemperature = Float.MAX_VALUE;
-        this.minTemperature = Float.MIN_VALUE;
-        this.maxHumidity = Float.MAX_VALUE;
-        this.minHumidity = Float.MIN_VALUE;
-
-        this.setScoreOffset(-400f);
 
         this.noiseList.add(new SubSampledNoise3D(
-                new MultiplicationAdapter(new AdditionAdapter(new BrownianNoise3D(new SimplexNoise(seed), 2), 0.9f), 5),
+                new ValueMultiplicationAdapter(new AdditionAdapter(new BrownianNoise3D(new SimplexNoise(seed), 2), 0.9f), 5),
                 new Vector3f(0.05f, 0.05f, 0.05f), 4
         ));
     }

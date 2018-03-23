@@ -16,15 +16,17 @@
  */
 package org.terasology.core.world.generator.worldGenerators;
 
-import org.terasology.core.world.generator.facetProviders.BiomeProvider;
-import org.terasology.core.world.generator.facetProviders.FlatSurfaceHeightProvider;
-import org.terasology.core.world.generator.facetProviders.PerlinHumidityProvider;
-import org.terasology.core.world.generator.facetProviders.PerlinSurfaceTemperatureProvider;
-import org.terasology.core.world.generator.facetProviders.SeaLevelProvider;
-import org.terasology.core.world.generator.facetProviders.SurfaceToDensityProvider;
-import org.terasology.core.world.generator.rasterizers.SolidRasterizer;
+import org.terasology.core.world.generator.e.procedural.adapter.NoiseMultiplicationAdapter;
+import org.terasology.core.world.generator.e.procedural.adapter.SimplePlanetSimulationAdapter;
+import org.terasology.core.world.generator.e.world.generation.SimpleDensityProvider;
+import org.terasology.core.world.generator.e.world.generation.facetProviders.Noise3DBaseTerainProvider;
+import org.terasology.core.world.generator.e.world.generation.rasterizers.TestSolidRasterizer;
+import org.terasology.core.world.generator.facetProviders.*;
 import org.terasology.engine.SimpleUri;
+import org.terasology.math.geom.Vector3f;
 import org.terasology.registry.In;
+import org.terasology.utilities.procedural.BrownianNoise3D;
+import org.terasology.utilities.procedural.SimplexNoise;
 import org.terasology.world.generation.BaseFacetedWorldGenerator;
 import org.terasology.world.generation.WorldBuilder;
 import org.terasology.world.generator.RegisterWorldGenerator;
@@ -35,7 +37,6 @@ import org.terasology.world.generator.plugin.WorldGeneratorPluginLibrary;
  */
 @RegisterWorldGenerator(id = "testworldgenerator", displayName = "TestWorldGenerator", description = "test flat world generator")
 public class TestWorldGenerator extends BaseFacetedWorldGenerator {
-
     @In
     private WorldGeneratorPluginLibrary worldGeneratorPluginLibrary;
 
@@ -45,15 +46,46 @@ public class TestWorldGenerator extends BaseFacetedWorldGenerator {
 
     @Override
     protected WorldBuilder createWorld() {
+        SimplePlanetSimulationAdapter planetSimulationAdapter = new SimplePlanetSimulationAdapter(
+                new NoiseMultiplicationAdapter(
+                        new BrownianNoise3D(new SimplexNoise(System.currentTimeMillis()), 4),
+                        new SimplexNoise(System.currentTimeMillis() + 1)));
+
+        //planetSimulationAdapter.setOrigoOffSet(-534);
+        planetSimulationAdapter.setOrigoOffSet(-2000);
+        //planetSimulationAdapter.setUpHeightMultiplier(0.002f);
+        planetSimulationAdapter.setUpHeightMultiplier(0.02f);
+        planetSimulationAdapter.setUpDensityFunction(4);
+        planetSimulationAdapter.setDownHeightMultiplier(0.012f);
+        //planetSimulationAdapter.setDownHeightMultiplier(0.008f);
+        //planetSimulationAdapter.setDownDensityFunction(2);
+        planetSimulationAdapter.setDownDensityFunction(3);
+        planetSimulationAdapter.setDensityMultiplier(30);
+        planetSimulationAdapter.setDensityFunction(1);
+
+        SimpleDensityProvider densityProvider = new SimpleDensityProvider(true);
+
         return new WorldBuilder(worldGeneratorPluginLibrary)
-                .addProvider(new SeaLevelProvider(32))
-                        // height of 40 so that it is far enough from sea level so that it doesnt just create beachfront
-                .addProvider(new FlatSurfaceHeightProvider(40))
+
+                .addProvider(new SeaLevelProvider(-10))
+
+                //for spawn height
+                .addProvider(new FlatSurfaceHeightProvider(200))
+
+                //base noise
+                .addProvider(
+                        new Noise3DBaseTerainProvider(
+                                planetSimulationAdapter,
+                                //new Vector3f(0.008f, 0.008f, 0.008f), 0, 25, 0
+                                new Vector3f(0.008f, 0.008f, 0.008f), 0, 25, 0
+                        )
+                )
+
                 .addProvider(new PerlinHumidityProvider())
                 .addProvider(new PerlinSurfaceTemperatureProvider())
                 .addProvider(new BiomeProvider())
-                .addProvider(new SurfaceToDensityProvider())
-                .addRasterizer(new SolidRasterizer())
+                .addProvider(densityProvider)
+                .addRasterizer(new TestSolidRasterizer())
                 .addPlugins();
     }
 }

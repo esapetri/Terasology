@@ -15,8 +15,8 @@
  */
 package org.terasology.core.world.generator.e.world.generation.landformDefinitions;
 
-import org.terasology.core.world.generator.e.procedural.adapter.MultiplicationAdapter;
-import org.terasology.core.world.generator.e.world.generation.LandFormDefinition;
+import org.terasology.core.world.generator.e.procedural.adapter.ValueMultiplicationAdapter;
+import org.terasology.core.world.generator.e.world.generation.OldLandFormDefinition;
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.math.geom.Vector3f;
 import org.terasology.utilities.procedural.BrownianNoise3D;
@@ -27,7 +27,7 @@ import org.terasology.utilities.procedural.SubSampledNoise3D;
 import org.terasology.world.generation.Produces;
 
 @Produces(InfiniteGenFacet.class)
-public class DevilsToothFormDefinition extends LandFormDefinition implements Noise3D {
+public class DevilsToothFormDefinition extends OldLandFormDefinition implements Noise3D {
 
 
 	public DevilsToothFormDefinition(Long seed){
@@ -44,16 +44,16 @@ public class DevilsToothFormDefinition extends LandFormDefinition implements Noi
     	this.noiseList.add(new SubSampledNoise3D(new BrownianNoise3D(new SimplexNoise(seed),6),
     					new Vector3f(0.00080f, 0.0007f, 0.00080f),4)
     	);
-    	this.noiseList.add(new SubSampledNoise3D(new MultiplicationAdapter(new BrownianNoise3D(new SimplexNoise(seed+1),10),1.2f),
+    	this.noiseList.add(new SubSampledNoise3D(new ValueMultiplicationAdapter(new BrownianNoise3D(new SimplexNoise(seed+1),10),1.2f),
     			new Vector3f(0.0025f, 0.01f, 0.0025f),4)
     	);
-    	this.noiseList.add(new SubSampledNoise3D(new MultiplicationAdapter(new BrownianNoise3D(new PerlinNoise(seed+2),9),0.8f),
+    	this.noiseList.add(new SubSampledNoise3D(new ValueMultiplicationAdapter(new BrownianNoise3D(new PerlinNoise(seed+2),9),0.8f),
     			new Vector3f(0.00085f, 0.0007f, 0.00085f),4)
     	);
-    	this.noiseList.add(new SubSampledNoise3D(new MultiplicationAdapter(new PerlinNoise(seed+3),1.5f),
+    	this.noiseList.add(new SubSampledNoise3D(new ValueMultiplicationAdapter(new PerlinNoise(seed+3),1.5f),
     			new Vector3f(0.0042f, 0.0042f, 0.0042f),4)
     	);
-    	this.noiseList.add(new SubSampledNoise3D(new MultiplicationAdapter(new PerlinNoise(seed+4),0.8f),
+    	this.noiseList.add(new SubSampledNoise3D(new ValueMultiplicationAdapter(new PerlinNoise(seed+4),0.8f),
     			new Vector3f(0.0015f, 0.0010f, 0.0015f),4)
     	);
     }
