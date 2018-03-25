@@ -19,7 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.terasology.core.emath.MathFormula;
 import org.terasology.core.world.generator.e.procedural.texture.FormulaAdapter;
-import org.terasology.core.world.generator.e.world.generation.SimplePlanetSimulatorProvider;
+import org.terasology.core.world.generator.e.world.generation.OldSimplePlanetSimulatorProvider;
 import org.terasology.core.world.generator.e.world.generation.facetProviders.*;
 import org.terasology.core.world.generator.facetProviders.*;
 import org.terasology.core.world.generator.e.world.generation.rasterizers.TestSolidRasterizer;
@@ -48,7 +48,7 @@ public class FlatWorldGenerator extends BaseFacetedWorldGenerator {
 
     @Override
     protected WorldBuilder createWorld() {
-        SimplePlanetSimulatorProvider densityProv = new SimplePlanetSimulatorProvider();
+        OldSimplePlanetSimulatorProvider densityProv = new OldSimplePlanetSimulatorProvider();
         densityProv.setOrigoOffSet(-534);
         densityProv.setUpHeightMultiplier(0.002f);
         densityProv.setUpDensityFunction(4);

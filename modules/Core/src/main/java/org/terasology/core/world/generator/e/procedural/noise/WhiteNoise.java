@@ -103,4 +103,7 @@ public class WhiteNoise implements Noise2D, Noise3D {
         );
     }
 
+    public void setSeed(long seed) {
+        this.seed =seed;
+    }
 }

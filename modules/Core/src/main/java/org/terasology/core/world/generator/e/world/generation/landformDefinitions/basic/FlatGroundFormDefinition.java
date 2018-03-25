@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.world.generator.e.world.generation.landformDefinitions;
-
+package org.terasology.core.world.generator.e.world.generation.landformDefinitions.basic;
 
 import org.terasology.core.world.generator.e.procedural.adapter.ValueAdditionAdapter;
-import org.terasology.core.world.generator.e.world.generation.OldLandFormDefinition;
+import org.terasology.core.world.generator.e.procedural.adapter.ValueMultiplicationAdapter;
+import org.terasology.core.world.generator.e.world.generation.LandFormDefinition;
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.math.geom.Vector3f;
 import org.terasology.utilities.procedural.BrownianNoise3D;
@@ -27,25 +27,24 @@ import org.terasology.utilities.procedural.SubSampledNoise3D;
 import org.terasology.world.generation.Produces;
 
 @Produces(InfiniteGenFacet.class)
-public class NearSurface3Definition extends OldLandFormDefinition implements Noise3D {
-    
+public class FlatGroundFormDefinition extends LandFormDefinition implements Noise3D {
 
-	public NearSurface3Definition(Long seed){
-    	super(0);
-    	this.maxDensity=20f;
-    	this.minDensity=-50f;
-    	this.maxAltitude=Float.MAX_VALUE;
-    	this.minAltitude=Float.MIN_VALUE;
-    	this.maxTemperature=Float.MAX_VALUE;
-    	this.minTemperature=Float.MIN_VALUE;	
-    	this.maxHumidity=Float.MAX_VALUE;
-    	this.minHumidity=Float.MIN_VALUE;
-    	
-    	this.setScoreOffset(-210f);
-    	
-    	this.noiseList.add(new SubSampledNoise3D(new ValueAdditionAdapter(new BrownianNoise3D(new SimplexNoise(seed),5),0.6f),
-				new Vector3f(0.002f, 0.002f, 0.002f),4
-		));
+    public FlatGroundFormDefinition(long seed) {
+        super(10);
+        super.altitude=0;
+
+        this.noiseList.add(
+                new SubSampledNoise3D(
+                    new ValueMultiplicationAdapter(
+                                new ValueAdditionAdapter(
+                                        new SimplexNoise(seed),
+                                        0.9f
+                                ),
+                            5
+                    ),
+                new Vector3f(0.05f, 0.05f, 0.05f), 4
+                )
+        );
     }
-    
+
 }

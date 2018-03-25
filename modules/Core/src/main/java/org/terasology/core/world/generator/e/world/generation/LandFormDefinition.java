@@ -15,12 +15,12 @@
  */
 package org.terasology.core.world.generator.e.world.generation;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.terasology.core.emath.GenMath;
 import org.terasology.math.geom.Vector4f;
 import org.terasology.utilities.procedural.Noise3D;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @author esereja
@@ -38,12 +38,24 @@ public abstract class LandFormDefinition implements Noise3D {
 
     protected float scoreOffset;
 
-    public LandFormDefinition(float density) {
-        this.altitude = 0;
-        this.density = density;
-        this.temperature = 0;
-        this.humidity = 0;
+    public LandFormDefinition() {
+        this.altitude = Float.MAX_VALUE;
+        this.density = 0;
+        this.temperature = Float.MAX_VALUE;
+        this.humidity = Float.MAX_VALUE;
 
+        this.scoreOffset = 0;
+
+        this.noiseList = new ArrayList<Noise3D>();
+        this.optimize = false;
+    }
+
+    public LandFormDefinition(float density) {
+        this.altitude = Float.MAX_VALUE;
+        this.density = density;
+        this.density = 0;
+        this.temperature = Float.MAX_VALUE;
+        this.humidity = Float.MAX_VALUE;
         this.scoreOffset = 0;
 
         this.noiseList = new ArrayList<Noise3D>();
@@ -81,7 +93,7 @@ public abstract class LandFormDefinition implements Noise3D {
         if (this.optimize)
             while (i < this.noiseList.size()) {
                 n += this.noiseList.get(i).noise(x, y, z);
-                if(n<0)
+                if (n < 0)
                     break;
                 i++;
             }
@@ -106,17 +118,28 @@ public abstract class LandFormDefinition implements Noise3D {
      * @return score. This tells how suitable is this noise for given coordinate. Smaller value is the better
      */
     public float getScore(final float altitude, final float density, final float humidity, final float temperature) {
-        Vector4f v1 = new Vector4f(this.density, this.altitude, this.temperature, this.humidity);
-        Vector4f v2 = new Vector4f(density, altitude, temperature, humidity);
+        float alt = 0;
+        float den = GenMath.D1taxiCapDistance(this.density, density);
+        float hum = 0;
+        float temp = 0;
 
-        return GenMath.taxiCapDistance(v1, v2) + this.scoreOffset;
+        if (this.altitude != Float.MAX_VALUE)
+            alt = GenMath.D1taxiCapDistance(this.altitude, altitude);
+
+        if (this.humidity != Float.MAX_VALUE)
+            hum = GenMath.D1taxiCapDistance(this.humidity, humidity);
+
+        if (this.temperature != Float.MAX_VALUE)
+            temp = GenMath.D1taxiCapDistance(this.temperature, temperature);
+
+        return alt + den + hum + temp + this.scoreOffset;
     }
 
+    /*-------------------------------------- Setters and Getters---------------------------------------------*/
 
     public void addNoise(Noise3D noise) {
         this.noiseList.add(noise);
     }
-
 
     public List<Noise3D> getNoiseList() {
         return noiseList;
@@ -126,28 +149,28 @@ public abstract class LandFormDefinition implements Noise3D {
         return density;
     }
 
-    public float getAltitude() {
-        return altitude;
-    }
-
-    public float getTemperature() {
-        return temperature;
-    }
-
-    public float getHumidity() {
-        return humidity;
-    }
-
     public void setDensity(float density) {
         this.density = density;
+    }
+
+    public float getAltitude() {
+        return altitude;
     }
 
     public void setAltitude(float altitude) {
         this.altitude = altitude;
     }
 
+    public float getTemperature() {
+        return temperature;
+    }
+
     public void setTemperature(float temperature) {
         this.temperature = temperature;
+    }
+
+    public float getHumidity() {
+        return humidity;
     }
 
     public void setHumidity(float humidity) {
@@ -156,6 +179,10 @@ public abstract class LandFormDefinition implements Noise3D {
 
     public void setScoreOffset(float scoreOffset) {
         this.scoreOffset = scoreOffset;
+    }
+
+    public boolean isOptimize() {
+        return optimize;
     }
 
     public void setOptimize(boolean optimize) {

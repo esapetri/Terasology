@@ -21,7 +21,7 @@ import org.terasology.utilities.procedural.Noise3D;
 /**
  * @author Esereja
  */
-public class AdditionAdapter implements Noise3D,Noise2D {
+public class ValueAdditionAdapter implements Noise3D,Noise2D {
 
     private Noise3D noise3;
     private Noise2D noise2;
@@ -34,7 +34,7 @@ public class AdditionAdapter implements Noise3D,Noise2D {
      * @param noise
      * @param Addition
      */
-    public AdditionAdapter(Noise3D noise,float Addition) {
+    public ValueAdditionAdapter(Noise3D noise, float Addition) {
         this.noise3 = noise;
         this.Addition=Addition;
     }
@@ -45,7 +45,7 @@ public class AdditionAdapter implements Noise3D,Noise2D {
      * @param Addition
      * @param b
      */
-    public AdditionAdapter(Noise2D noise,float Addition,byte b) {
+    public ValueAdditionAdapter(Noise2D noise, float Addition, byte b) {
         this.noise2 = noise;
         this.Addition=Addition;
     }

@@ -31,19 +31,21 @@ import org.terasology.world.generation.Updates;
 @Updates(@Facet(InfiniteGenFacet.class))
 public class Noise3DModifyTerainProvider implements FacetProvider {
 
+	protected long seed;
+
 	protected SubSampledNoise3D sampledNoise;
 
 	protected Vector3f zoom;
 
 	protected double modulus;
-	protected double multifier;
+	protected double multiplier;
 	protected double increase;
 
 	public Noise3DModifyTerainProvider(Noise3D noise, Vector3f zoom,
-                                       double frequency, double multificator, double increase) {
+                                       double frequency, double multiplier, double increase) {
 		this.zoom = zoom;
 		this.modulus = frequency;
-		this.multifier = multificator;
+		this.multiplier = multiplier;
 		this.increase = increase;
 		this.sampledNoise = new SubSampledNoise3D(noise, zoom, 4);
 	}
@@ -53,18 +55,19 @@ public class Noise3DModifyTerainProvider implements FacetProvider {
 	 *
 	 * @param zoom
 	 * @param frequency
-	 * @param multificator
+	 * @param multiplier
 	 * @param increase
 	 */
 	public Noise3DModifyTerainProvider(Vector3f zoom, double frequency,
-                                       double multificator, double increase) {
+                                       double multiplier, double increase) {
 		this.zoom = zoom;
 		this.modulus = frequency;
-		this.multifier = multificator;
+		this.multiplier = multiplier;
 		this.increase = increase;
 	}
 
 	public void setSeed(long seed) {
+		this.seed =seed;
 	}
 
 	public void process(GeneratingRegion region) {
@@ -73,7 +76,7 @@ public class Noise3DModifyTerainProvider implements FacetProvider {
 
 		float[] orginalData = facet.getInternal();
 		for (int i = 0; orginalData.length > i; i++) {
-			noise[i] *= multifier;
+			noise[i] *= multiplier;
 			if (modulus != 0) {
 				noise[i] = (float) (noise[i] % modulus);
 			}
@@ -137,7 +140,7 @@ public class Noise3DModifyTerainProvider implements FacetProvider {
 	 * @return the multificator
 	 */
 	public double getMultificator() {
-		return multifier;
+		return multiplier;
 	}
 
 	/**
@@ -145,7 +148,7 @@ public class Noise3DModifyTerainProvider implements FacetProvider {
 	 *            the multificator to set
 	 */
 	public void setMultificator(double multificator) {
-		this.multifier = multificator;
+		this.multiplier = multificator;
 	}
 
 	/**

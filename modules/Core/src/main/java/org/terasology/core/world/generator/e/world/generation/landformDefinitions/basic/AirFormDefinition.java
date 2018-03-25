@@ -15,22 +15,27 @@
  */
 package org.terasology.core.world.generator.e.world.generation.landformDefinitions.basic;
 
-import org.terasology.core.world.generator.e.procedural.adapter.AdditionAdapter;
+import org.terasology.core.world.generator.e.procedural.adapter.ValueAdditionAdapter;
+import org.terasology.core.world.generator.e.procedural.adapter.ValueMultiplicationAdapter;
+import org.terasology.core.world.generator.e.procedural.noise.NullNoise;
 import org.terasology.core.world.generator.e.world.generation.LandFormDefinition;
+import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.math.geom.Vector3f;
+import org.terasology.utilities.procedural.BrownianNoise3D;
 import org.terasology.utilities.procedural.Noise3D;
 import org.terasology.utilities.procedural.SimplexNoise;
 import org.terasology.utilities.procedural.SubSampledNoise3D;
+import org.terasology.world.generation.Produces;
 
-public class VoidFormDefinition extends LandFormDefinition implements Noise3D {
+@Produces(InfiniteGenFacet.class)
+public class AirFormDefinition extends LandFormDefinition implements Noise3D {
 
-    public VoidFormDefinition(long seed) {
-        super(0);
+    public AirFormDefinition() {
+        super(-1000);
 
-        this.setScoreOffset(0f);
-
-        this.noiseList.add(new SubSampledNoise3D(new AdditionAdapter(new SimplexNoise(seed), -1f),
-                new Vector3f(0.02f, 0.02f, 0.02f), 4));
+        this.noiseList.add(
+                new NullNoise(-1)
+        );
     }
 
 }

@@ -31,6 +31,8 @@ import org.terasology.world.generation.Updates;
 @Updates(@Facet(InfiniteGenFacet.class))
 public class Noise3DTerainProvider implements FacetProvider {
 
+	protected long seed;
+
 	protected SubSampledNoise3D sampledNoise;
 
 	protected Vector3f zoom;
@@ -64,8 +66,11 @@ public class Noise3DTerainProvider implements FacetProvider {
 		this.increase = increase;
 	}
 
+	@Override
 	public void setSeed(long seed) {
+		this.seed=seed;
 	}
+
 
 	public void process(GeneratingRegion region) {
 		InfiniteGenFacet facet = region.getRegionFacet(InfiniteGenFacet.class);

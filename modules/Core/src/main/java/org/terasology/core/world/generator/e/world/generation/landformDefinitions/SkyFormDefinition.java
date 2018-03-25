@@ -15,8 +15,7 @@
  */
 package org.terasology.core.world.generator.e.world.generation.landformDefinitions;
 
-import org.terasology.core.world.generator.e.procedural.adapter.AdditionAdapter;
-import org.terasology.core.world.generator.e.world.generation.LandFormDefinition;
+import org.terasology.core.world.generator.e.procedural.adapter.ValueAdditionAdapter;
 import org.terasology.core.world.generator.e.world.generation.OldLandFormDefinition;
 import org.terasology.math.geom.Vector3f;
 import org.terasology.utilities.procedural.Noise3D;
@@ -38,7 +37,7 @@ public class SkyFormDefinition extends OldLandFormDefinition implements Noise3D 
 
         this.setScoreOffset(-600f);
 
-        this.noiseList.add(new SubSampledNoise3D(new AdditionAdapter(new SimplexNoise(seed), -0.9f),
+        this.noiseList.add(new SubSampledNoise3D(new ValueAdditionAdapter(new SimplexNoise(seed), -0.9f),
                 new Vector3f(0.01f, 0.01f, 0.01f), 4));
     }
 

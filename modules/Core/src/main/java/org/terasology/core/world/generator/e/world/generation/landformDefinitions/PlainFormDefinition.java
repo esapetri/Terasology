@@ -13,31 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.world.generator.e.world.generation.landformDefinitions.basic;
+package org.terasology.core.world.generator.e.world.generation.landformDefinitions;
 
-
-import org.terasology.core.world.generator.e.procedural.adapter.TrigonometricAdapter;
+import org.terasology.core.world.generator.e.procedural.adapter.ValueAdditionAdapter;
+import org.terasology.core.world.generator.e.procedural.adapter.ValueMultiplicationAdapter;
 import org.terasology.core.world.generator.e.world.generation.LandFormDefinition;
+import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.math.geom.Vector3f;
 import org.terasology.utilities.procedural.BrownianNoise3D;
 import org.terasology.utilities.procedural.Noise3D;
 import org.terasology.utilities.procedural.SimplexNoise;
 import org.terasology.utilities.procedural.SubSampledNoise3D;
+import org.terasology.world.generation.Produces;
 
-public class ChaosFormDefinition extends LandFormDefinition implements Noise3D {
+@Produces(InfiniteGenFacet.class)
+public class PlainFormDefinition extends LandFormDefinition implements Noise3D {
 
-
-    public ChaosFormDefinition(Long seed) {
-        super(100);
-        this.altitude = 250;
-        this.temperature = 0;
-        this.humidity = 0;
-
-        this.noiseList.add(new SubSampledNoise3D(
-                        new TrigonometricAdapter(new BrownianNoise3D(new SimplexNoise(seed), 2), 2),
-                        new Vector3f(0.008f, 0.008f, 0.008f), 4
-                )
-        );
+	public PlainFormDefinition(long seed){
+    	super(70);
+    	this.altitude=700f;
+    	
+    	this.noiseList.add(new SubSampledNoise3D(
+    			new ValueMultiplicationAdapter(new ValueAdditionAdapter(new BrownianNoise3D(new SimplexNoise(seed),2),0.1f),0.8f),
+    					new Vector3f(0.0005f, 0.0005f, 0.0005f),4
+    			)
+    	);
     }
-
+    
 }

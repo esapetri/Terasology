@@ -34,11 +34,12 @@ import org.terasology.world.liquid.LiquidType;
 
 public class TestSolidRasterizer implements WorldRasterizer {
 
-    private boolean debug = true;
     private static final Logger logger = LoggerFactory.getLogger(TestSolidRasterizer.class);
     private static int counter = 0;
-    private static double min=0;
-    private static double max=0;
+    private static double min = 0;
+    private static double max = 0;
+    private boolean debug = true;
+    private boolean seaActivated = false;
 
     private Block water;
     private Block ice;
@@ -83,7 +84,7 @@ public class TestSolidRasterizer implements WorldRasterizer {
             pos2d.set(pos.x, pos.z);
             int posY = pos.y + chunk.getChunkWorldOffsetY();
 
-            final int maxY = 200;
+            final int maxY = 10000;
 
             // dont generate after certain height
             if (posY > maxY) {
@@ -97,13 +98,13 @@ public class TestSolidRasterizer implements WorldRasterizer {
 
             double density = solidityFacet.get(pos);
 
-            if(4987<counter && this.debug){
-                if(density>max)
-                    max=density;
-                if(density<min)
-                    min=density;
-                logger.warn("Density at (X:"+pos.x+",Y:"+pos.y+",Z:"+pos.z+") (min:"+min+",max:"+max+"): " + density + "");
-                counter=0;
+            if (20000 < counter && this.debug) {
+                if (density > max)
+                    max = density;
+                if (density < min)
+                    min = density;
+                logger.warn("Density at (X:" + pos.x + ",Y:" + pos.y + ",Z:" + pos.z + ") (min:" + min + ",max:" + max + "): " + density + "");
+                counter = 0;
             }
             counter++;
 
@@ -161,7 +162,8 @@ public class TestSolidRasterizer implements WorldRasterizer {
             }
 
             //fill with water
-            if (density < 0) {
+
+            if (density < 0 && this.seaActivated) {
                 // fill up terrain up to sealevel height with water or ice
                 if (posY <= seaLevel) {         // either OCEAN or SNOW
                     chunk.setBlock(pos, water);
@@ -170,6 +172,22 @@ public class TestSolidRasterizer implements WorldRasterizer {
             }
 
         }
+    }
+
+    public boolean isDebug() {
+        return debug;
+    }
+
+    public void setDebug(boolean debug) {
+        this.debug = debug;
+    }
+
+    public boolean isSeaActivated() {
+        return seaActivated;
+    }
+
+    public void setSeaActivated(boolean seaActivated) {
+        this.seaActivated = seaActivated;
     }
 
 }

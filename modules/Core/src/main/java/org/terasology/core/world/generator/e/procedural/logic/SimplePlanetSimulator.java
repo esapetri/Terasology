@@ -42,71 +42,61 @@ public class SimplePlanetSimulator {
         }
 
         if (y + origoOffSet < 0) {
-            switch (downDensityFunction) {
-                case 1://linear growth
-                    density = linearGrowth(y, density, downHeightMultiplier);
-                    break;
-                case 2://linear decrease
-                    density = linearDecrease(y, density, downHeightMultiplier);
-                    break;
-                case 3://exponential growth
-                    density = expGrowth(y, density, downHeightMultiplier);
-                    break;
-                case 4://exponential decrease
-                    density = expDecrease(y, density, downHeightMultiplier);
-                    break;
-                case 5://edited exponential growth
-                    density = eexpGrowth(y, density, downHeightMultiplier);
-                    break;
-                case 6://edited exponential decrease
-                    density = eexpDecrease(y, density, downHeightMultiplier);
-                    break;
-                case 7://linear increase
-                    density = linearIncrease(y, density, downHeightMultiplier);
-                    break;
-                case 8://linear decrease
-                    density = linearSubraction(y, density, downHeightMultiplier);
-                    break;
-                case 0:
-                default:
-            }
+            density = this.computeDensity(downDensityFunction, density, y, downHeightMultiplier);
         } else {
-            switch (upDensityFunction) {
-                case 1://linear growth
-                    density = linearGrowth(y, density, upHeightMultiplier);
-                    break;
-                case 2://linear decrease
-                    density = linearDecrease(y, density, upHeightMultiplier);
-                    break;
-                case 3://exponential growth
-                    density = expGrowth(y, density, upHeightMultiplier);
-                    break;
-                case 4://exponential decrease
-                    density = expDecrease(y, density, upHeightMultiplier);
-                    break;
-                case 5://edited exponential growth
-                    density = eexpGrowth(y, density, upHeightMultiplier);
-                    break;
-                case 6://edited exponential decrease
-                    density = eexpDecrease(y, density, upHeightMultiplier);
-                    break;
-                case 7://linear increase
-                    density = linearIncrease(y, density, upHeightMultiplier);
-                    break;
-                case 8://linear decrease
-                    density = linearSubraction(y, density, upHeightMultiplier);
-                    break;
-                case 0:
-                default:
-            }
+            density = this.computeDensity(upDensityFunction, density, y, upHeightMultiplier);
         }
         return density;
 
     }
 
+    private float computeDensity(final int densityFunction, final float inDensity, final float y, final float heightMultiplier) {
+        float density = inDensity;
+
+        switch (densityFunction) {
+            case 1:
+                density = linearMultiplication(y, density, heightMultiplier);
+                break;
+            case 2:
+                density = linearDivision(y, density, heightMultiplier);
+                break;
+            case 3:
+                density = exponentialMultiplication(y, density, heightMultiplier);
+                break;
+            case 4:
+                density = exponentialDivision(y, density, heightMultiplier);
+                break;
+            case 5:
+                density = exp3Multiplication(y, density, heightMultiplier);
+                break;
+            case 6:
+                density = exp3Division(y, density, heightMultiplier);
+                break;
+            case 7:
+                density = linearAddition(y, density, heightMultiplier);
+                break;
+            case 8:
+                density = linearSubtraction(y, density, heightMultiplier);
+                break;
+            case 9:
+                density = bruteLinearAddition(y, density, heightMultiplier);
+                break;
+            case 10:
+                density = bruteLinearSubtraction(y, density, heightMultiplier);
+                break;
+            case -1:
+                density = heightMultiplier;
+                break;
+            case 0:
+            default:
+        }
+
+        return density;
+    }
+
     /*----------------------------logic-----------------------------------*/
 
-    protected float linearGrowth(float y, float denst, float multiplifier) {
+    protected float linearMultiplication(float y, float denst, float multiplifier) {
         double a = TeraMath.fastAbs(((y + origoOffSet) * multiplifier + 1));
         if (a != 0) {
             return (float) (denst * a);
@@ -114,7 +104,7 @@ public class SimplePlanetSimulator {
         return denst;
     }
 
-    protected float linearDecrease(float y, float denst, float multiplifier) {
+    protected float linearDivision(float y, float denst, float multiplifier) {
         double a = TeraMath.fastAbs(((y + origoOffSet) * multiplifier + 1));
         if (a != 0) {
             return (float) (denst / a);
@@ -122,7 +112,7 @@ public class SimplePlanetSimulator {
         return denst;
     }
 
-    protected float expGrowth(float y, float denst, float multiplifier) {
+    protected float exponentialMultiplication(float y, float denst, float multiplifier) {
         double a = TeraMath.fastAbs(((y + origoOffSet) * multiplifier + 1));
         if (a != 0) {
             return (float) (denst * a * a);
@@ -130,7 +120,7 @@ public class SimplePlanetSimulator {
         return denst;
     }
 
-    protected float expDecrease(float y, float denst, float multiplifier) {
+    protected float exponentialDivision(float y, float denst, float multiplifier) {
         double a = TeraMath.fastAbs(((y + origoOffSet) * multiplifier + 1));
         if (a != 0) {
             return (float) (denst / (a * a));
@@ -138,7 +128,7 @@ public class SimplePlanetSimulator {
         return denst;
     }
 
-    protected float eexpGrowth(float y, float denst, float multiplifier) {
+    protected float exp3Multiplication(float y, float denst, float multiplifier) {
         double a = TeraMath.fastAbs(((y + origoOffSet) * multiplifier + 1));
         if (a != 0) {
             return (float) (denst * a * a * multiplifier);
@@ -146,7 +136,7 @@ public class SimplePlanetSimulator {
         return denst;
     }
 
-    protected float eexpDecrease(float y, float denst, float multiplifier) {
+    protected float exp3Division(float y, float denst, float multiplifier) {
         double a = TeraMath.fastAbs(((y + origoOffSet) * multiplifier + 1));
         if (a != 0) {
             return (float) (denst / (a * a * multiplifier));
@@ -154,7 +144,7 @@ public class SimplePlanetSimulator {
         return denst;
     }
 
-    protected float linearIncrease(float y, float denst, float multiplifier) {
+    protected float linearAddition(float y, float denst, float multiplifier) {
         double a = TeraMath.fastAbs(((y + origoOffSet) * multiplifier));
         if (a != 0) {
             return (float) ((denst + denst * a));
@@ -162,7 +152,7 @@ public class SimplePlanetSimulator {
         return denst;
     }
 
-    protected float linearSubraction(float y, float denst, float multiplifier) {
+    protected float linearSubtraction(float y, float denst, float multiplifier) {
         double a = TeraMath.fastAbs(((y + origoOffSet) * multiplifier));
         if (a != 0) {
             return (float) ((denst - denst * a));
@@ -170,6 +160,33 @@ public class SimplePlanetSimulator {
         return denst;
     }
 
+    protected float bruteLinearAddition(float y, float denst, float multiplifier) {
+        double a = TeraMath.fastAbs(((y + origoOffSet) * multiplifier));
+        return (float) (denst + a);
+
+    }
+
+    protected float bruteLinearSubtraction(float y, float denst, float multiplifier) {
+        double a = TeraMath.fastAbs(((y + origoOffSet) * multiplifier));
+        return (float) (denst - a);
+    }
+
+    public String toString(){
+        String s=new String();
+
+        s += "origoOffSet: "+ this.origoOffSet +"\n";
+
+        s += "densityFunction: "+ this.densityFunction +"\n";
+        s += "densityMultiplier: "+ this.densityMultiplier +"\n";
+
+        s += "upDensityFunction: "+ this.upDensityFunction +"\n";
+        s += "upHeightMultiplier: "+ this.upHeightMultiplier +"\n";
+
+        s += "downDensityFunction: "+ this.downDensityFunction +"\n";
+        s += "downHeightMultiplier: "+ this.downHeightMultiplier +"\n";
+
+        return s;
+    }
 
     /*------------------------Getters and setters-------------------------------*/
 

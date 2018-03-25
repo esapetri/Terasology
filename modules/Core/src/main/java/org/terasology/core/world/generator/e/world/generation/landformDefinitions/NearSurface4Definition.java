@@ -15,7 +15,7 @@
  */
 package org.terasology.core.world.generator.e.world.generation.landformDefinitions;
 
-import org.terasology.core.world.generator.e.procedural.adapter.AdditionAdapter;
+import org.terasology.core.world.generator.e.procedural.adapter.ValueAdditionAdapter;
 import org.terasology.core.world.generator.e.procedural.adapter.ValueMultiplicationAdapter;
 import org.terasology.core.world.generator.e.world.generation.OldLandFormDefinition;
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
@@ -42,7 +42,7 @@ public class NearSurface4Definition extends OldLandFormDefinition implements Noi
 
         this.setScoreOffset(-150f);
 
-        this.noiseList.add(new SubSampledNoise3D(new AdditionAdapter(new BrownianNoise3D(new SimplexNoise(seed), 4), -0.2f),
+        this.noiseList.add(new SubSampledNoise3D(new ValueAdditionAdapter(new BrownianNoise3D(new SimplexNoise(seed), 4), -0.2f),
                 new Vector3f(0.03f, 0.03f, 0.03f), 4
         ));
 

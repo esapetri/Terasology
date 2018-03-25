@@ -16,10 +16,16 @@
  */
 package org.terasology.core.world.generator.worldGenerators;
 
-import org.terasology.core.world.generator.e.procedural.adapter.NoiseMultiplicationAdapter;
-import org.terasology.core.world.generator.e.procedural.adapter.SimplePlanetSimulationAdapter;
+import org.terasology.core.world.generator.e.procedural.adapter.ValueMultiplicationAdapter;
+import org.terasology.core.world.generator.e.world.generation.LandFormProvider;
 import org.terasology.core.world.generator.e.world.generation.SimpleDensityProvider;
+import org.terasology.core.world.generator.e.world.generation.SimplePlanetSimulatorProvider;
 import org.terasology.core.world.generator.e.world.generation.facetProviders.Noise3DBaseTerainProvider;
+import org.terasology.core.world.generator.e.world.generation.facetProviders.special.ValueMultiplyModifyTerainProvider;
+import org.terasology.core.world.generator.e.world.generation.landformDefinitions.basic.AirFormDefinition;
+import org.terasology.core.world.generator.e.world.generation.landformDefinitions.basic.FlatGroundFormDefinition;
+import org.terasology.core.world.generator.e.world.generation.landformDefinitions.basic.FillFormDefinition;
+import org.terasology.core.world.generator.e.world.generation.landformDefinitions.basic.HillsFormDefinition;
 import org.terasology.core.world.generator.e.world.generation.rasterizers.TestSolidRasterizer;
 import org.terasology.core.world.generator.facetProviders.*;
 import org.terasology.engine.SimpleUri;
@@ -46,40 +52,63 @@ public class TestWorldGenerator extends BaseFacetedWorldGenerator {
 
     @Override
     protected WorldBuilder createWorld() {
-        SimplePlanetSimulationAdapter planetSimulationAdapter = new SimplePlanetSimulationAdapter(
-                new NoiseMultiplicationAdapter(
-                        new BrownianNoise3D(new SimplexNoise(System.currentTimeMillis()), 4),
-                        new SimplexNoise(System.currentTimeMillis() + 1)));
 
-        //planetSimulationAdapter.setOrigoOffSet(-534);
-        planetSimulationAdapter.setOrigoOffSet(-2000);
-        //planetSimulationAdapter.setUpHeightMultiplier(0.002f);
-        planetSimulationAdapter.setUpHeightMultiplier(0.02f);
-        planetSimulationAdapter.setUpDensityFunction(4);
-        planetSimulationAdapter.setDownHeightMultiplier(0.012f);
-        //planetSimulationAdapter.setDownHeightMultiplier(0.008f);
-        //planetSimulationAdapter.setDownDensityFunction(2);
-        planetSimulationAdapter.setDownDensityFunction(3);
-        planetSimulationAdapter.setDensityMultiplier(30);
-        planetSimulationAdapter.setDensityFunction(1);
+        //planet simulator
+        SimplePlanetSimulatorProvider simplePlanetSimulatorProvider = new SimplePlanetSimulatorProvider(true);
 
+        //simplePlanetSimulatorProvider.setOrigoOffSet(-1000);
+        //simplePlanetSimulatorProvider.setDensityFunction(1);
+        //simplePlanetSimulatorProvider.setDensityMultiplier(1000);
+
+        simplePlanetSimulatorProvider.setUpDensityFunction(10);
+        simplePlanetSimulatorProvider.setUpHeightMultiplier(0.01f);
+
+        //simplePlanetSimulatorProvider.setDownDensityFunction(9);
+        //simplePlanetSimulatorProvider.setDownHeightMultiplier(0.001f);
+        simplePlanetSimulatorProvider.setDownDensityFunction(-1);
+        simplePlanetSimulatorProvider.setDownHeightMultiplier(1f);
+
+        //simplePlanetSimulatorProvider.setOrigoOffSet(-534);
+        //simplePlanetSimulatorProvider.setUpHeightMultiplier(0.002f);
+        //simplePlanetSimulatorProvider.setDownHeightMultiplier(0.008f);
+        //simplePlanetSimulatorProvider.setDownDensityFunction(2);
+
+        //density provider
         SimpleDensityProvider densityProvider = new SimpleDensityProvider(true);
+
+        //Create world
+        LandFormProvider landFormProvider =new LandFormProvider();
+        //basic forms
+        landFormProvider.addNoise(new FillFormDefinition(landFormProvider.getSeed()));
+        landFormProvider.addNoise(new AirFormDefinition());
+        landFormProvider.addNoise(new FlatGroundFormDefinition(landFormProvider.getSeed()));
+
+        //more detailed ones
+        landFormProvider.addNoise(new HillsFormDefinition(landFormProvider.getSeed()));
+
 
         return new WorldBuilder(worldGeneratorPluginLibrary)
 
                 .addProvider(new SeaLevelProvider(-10))
 
                 //for spawn height
-                .addProvider(new FlatSurfaceHeightProvider(200))
+                .addProvider(new FlatSurfaceHeightProvider(0))
 
                 //base noise
                 .addProvider(
                         new Noise3DBaseTerainProvider(
-                                planetSimulationAdapter,
+                                new ValueMultiplicationAdapter(
+                                        new BrownianNoise3D(new SimplexNoise(System.currentTimeMillis()), 4)
+                                        ,0.25f
+                                ),
                                 //new Vector3f(0.008f, 0.008f, 0.008f), 0, 25, 0
-                                new Vector3f(0.008f, 0.008f, 0.008f), 0, 25, 0
+                                new Vector3f(0.008f, 0.008f, 0.008f), 0, 1, 0
                         )
                 )
+                .addProvider(simplePlanetSimulatorProvider)
+                .addProvider(new ValueMultiplyModifyTerainProvider(1000f))
+
+
 
                 .addProvider(new PerlinHumidityProvider())
                 .addProvider(new PerlinSurfaceTemperatureProvider())

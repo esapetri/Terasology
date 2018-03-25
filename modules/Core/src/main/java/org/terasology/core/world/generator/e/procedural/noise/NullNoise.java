@@ -19,20 +19,17 @@ import org.terasology.utilities.procedural.Noise2D;
 import org.terasology.utilities.procedural.Noise3D;
 
 /**
- * 
  * @author Esereja
  */
 public class NullNoise implements Noise2D, Noise3D {
 
-	private float value;
-	
+    private float value;
+
     /**
-     * Initialize permutations with a given seed
-     *
-     * @param seed a seed value used for permutation shuffling
+     * @param value
      */
     public NullNoise(float value) {
-       this.value=value;
+        this.value = value;
     }
 
 
@@ -41,35 +38,32 @@ public class NullNoise implements Noise2D, Noise3D {
      *
      * @param xin the x input coordinate
      * @param yin the y input coordinate
-     * @return 
+     * @return
      */
     @Override
     public float noise(float xin, float yin) {
         return this.value;
-    	} 
+    }
+
     /**
-     * 
-     *
      * @param xin the x input coordinate
      * @param yin the y input coordinate
      * @param zin the z input coordinate
-     * @return 
+     * @return
      */
     @Override
     public float noise(float xin, float yin, float zin) {
-    	return this.value;
-	} 
+        return this.value;
+    }
 
 
     /**
-     * 
-     *
      * @param xin the x input coordinate
      * @param yin the y input coordinate
      * @param zin the z input coordinate
-     * @return 
+     * @return
      */
     public float noise(float xin, float yin, float zin, float win) {
-    	return this.value;
-	} 
+        return this.value;
+    }
 }

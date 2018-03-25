@@ -15,7 +15,7 @@
  */
 package org.terasology.core.world.generator.e.world.generation.landformDefinitions;
 
-import org.terasology.core.world.generator.e.procedural.adapter.AdditionAdapter;
+import org.terasology.core.world.generator.e.procedural.adapter.ValueAdditionAdapter;
 import org.terasology.core.world.generator.e.procedural.adapter.ValueMultiplicationAdapter;
 import org.terasology.core.world.generator.e.world.generation.OldLandFormDefinition;
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
@@ -44,7 +44,7 @@ public class Underground2Definition extends OldLandFormDefinition implements Noi
 
         this.noiseList.add(
                 new SubSampledNoise3D(
-                        new ValueMultiplicationAdapter(new AdditionAdapter(new BrownianNoise3D(new SimplexNoise(seed), 2), 0.7f), 10f),
+                        new ValueMultiplicationAdapter(new ValueAdditionAdapter(new BrownianNoise3D(new SimplexNoise(seed), 2), 0.7f), 10f),
                         new Vector3f(0.005f, 0.01f, 0.005f), 4));
     }
 

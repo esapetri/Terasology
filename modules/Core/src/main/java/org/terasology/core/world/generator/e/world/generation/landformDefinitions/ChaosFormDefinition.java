@@ -13,37 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.world.generator.e.world.generation.landformDefinitions.basic;
+package org.terasology.core.world.generator.e.world.generation.landformDefinitions;
 
-import org.terasology.core.world.generator.e.procedural.adapter.ValueAdditionAdapter;
+
+import org.terasology.core.world.generator.e.procedural.adapter.TrigonometricAdapter;
 import org.terasology.core.world.generator.e.world.generation.LandFormDefinition;
-import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.math.geom.Vector3f;
 import org.terasology.utilities.procedural.BrownianNoise3D;
 import org.terasology.utilities.procedural.Noise3D;
 import org.terasology.utilities.procedural.SimplexNoise;
 import org.terasology.utilities.procedural.SubSampledNoise3D;
-import org.terasology.world.generation.Produces;
 
-/**
- * @author esereja
- */
-@Produces(InfiniteGenFacet.class)
-public class HillsFormDefinition extends LandFormDefinition implements Noise3D {
+public class ChaosFormDefinition extends LandFormDefinition implements Noise3D {
 
-    /**
-     * @param seed
-     */
-    public HillsFormDefinition(long seed) {
-        super(30);
-        this.altitude = 100f;
+    public ChaosFormDefinition(Long seed) {
+        super(100);
+        this.altitude = 250;
+        this.temperature = 0;
+        this.humidity = 0;
 
-        this.noiseList.add(
-                new ValueAdditionAdapter(
-                    new SubSampledNoise3D(
-                            new BrownianNoise3D(new SimplexNoise(seed), 4),
-                            new Vector3f(0.005f, 0.005f, 0.005f), 4),
-                0.1f)
+        this.noiseList.add(new SubSampledNoise3D(
+                        new TrigonometricAdapter(new BrownianNoise3D(new SimplexNoise(seed), 2), 2),
+                        new Vector3f(0.008f, 0.008f, 0.008f), 4
+                )
         );
     }
 
