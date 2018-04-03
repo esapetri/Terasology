@@ -28,6 +28,7 @@ import org.terasology.utilities.random.FastRandom;
  * Deterministic white noise generator
  * @author Esereja
  */
+@Deprecated
 public class TestNoise implements Noise2D, Noise3D {
 	final private int RANDOMS_LENGHT=3465;//27 81 243 729
 	

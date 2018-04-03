@@ -17,8 +17,7 @@ package org.terasology.core.world.generator.e.world.generation.facetProviders;
 
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.math.geom.Vector3f;
-import org.terasology.utilities.procedural.BrownianNoise3D;
-import org.terasology.utilities.procedural.PerlinNoise;
+import org.terasology.utilities.procedural.SimplexNoise;
 import org.terasology.world.generation.Facet;
 import org.terasology.world.generation.FacetProvider;
 import org.terasology.world.generation.Updates;
@@ -28,32 +27,25 @@ import org.terasology.world.generation.Updates;
  * @author esereja
  */
 @Updates(@Facet(InfiniteGenFacet.class))
-public class Perlin3DTerainProvider extends Noise3DTerainProvider implements
-		FacetProvider {
-
-	private int octaves;
+public class AdvancedSimplex3DNoiseProvider extends AdvancedNoise3DDensityProvider implements FacetProvider  {
+	
 	private int seedOffset;
-
+    
 	/**
 	 * 
 	 * @param seedOffset
 	 * @param zoom
-	 * @param octaves
 	 * @param frequency
 	 * @param multificator
 	 * @param increase
 	 */
-	public Perlin3DTerainProvider(int seedOffset, Vector3f zoom, int octaves,
-			double frequency, double multificator, double increase) {
-		super(zoom, frequency, multificator, increase);
-		this.octaves = octaves;
-		this.seedOffset = seedOffset;
-	}
-
-	@Override
-	public void setSeed(long seed) {
-		this.setSurfaceNoise(new BrownianNoise3D(new PerlinNoise(seed
-				+ seedOffset), this.octaves));
-	}
-
+    public AdvancedSimplex3DNoiseProvider(int seedOffset, Vector3f zoom, double frequency, double multificator, double increase){
+    	super(zoom,frequency,multificator,increase);
+    	this.seedOffset=seedOffset;
+    }
+    
+    @Override
+    public void setSeed(long seed) {
+    	this.setSurfaceNoise(new SimplexNoise(seed+seedOffset));
+    }
 }

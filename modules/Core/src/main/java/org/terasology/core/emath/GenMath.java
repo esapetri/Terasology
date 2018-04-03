@@ -220,6 +220,8 @@ public class GenMath {
     }
 
 
+    /*-----------------------------Random usefull operators-------------------------------*/
+
     public static float onlyPositive(final float x) {
         if (x > 0)
             return x;
@@ -230,6 +232,12 @@ public class GenMath {
         if (x < 0)
             return x;
         return 0;
+    }
+
+    public static float isolateSign(final float x) {
+        if (x > 0)
+            return 1;
+        return -1;
     }
 
     public static float D1taxiCapDistance(float x1, float x2) {

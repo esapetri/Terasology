@@ -30,7 +30,7 @@ import org.terasology.world.generation.Produces;
  * @author esereja
  */
 @Produces(InfiniteGenFacet.class)
-public class Noise3DBaseTerainProvider implements FacetProvider {
+public class AdvancedNoise3DBaseDensityProvider implements FacetProvider {
 
     protected long seed;
 
@@ -49,13 +49,29 @@ public class Noise3DBaseTerainProvider implements FacetProvider {
      * @param multificator
      * @param increase
      */
-    public Noise3DBaseTerainProvider(Noise3D noise, Vector3f zoom, double frequency, double multificator, double increase) {
+    public AdvancedNoise3DBaseDensityProvider(Noise3D noise, Vector3f zoom, double frequency, double multificator, double increase) {
         this.zoom = zoom;
         this.modulus = frequency;
         this.multifier = multificator;
         this.increase = increase;
         this.surfaceNoise = new SubSampledNoise3D(noise, zoom, 4);
     }
+
+    /**
+     * @param noise
+     * @param zoom
+     * @param frequency
+     * @param multificator
+     * @param increase
+     */
+    public AdvancedNoise3DBaseDensityProvider(Noise3D noise, Vector3f zoom, int sampleRate, double frequency, double multificator, double increase) {
+        this.zoom = zoom;
+        this.modulus = frequency;
+        this.multifier = multificator;
+        this.increase = increase;
+        this.surfaceNoise = new SubSampledNoise3D(noise, zoom, sampleRate);
+    }
+
 
     /**
      * this constructor doesn't initialize noise, so do it by hand!
@@ -65,7 +81,7 @@ public class Noise3DBaseTerainProvider implements FacetProvider {
      * @param multificator
      * @param increase
      */
-    public Noise3DBaseTerainProvider(Vector3f zoom, double frequency, double multificator, double increase) {
+    public AdvancedNoise3DBaseDensityProvider(Vector3f zoom, double frequency, double multificator, double increase) {
         this.zoom = zoom;
         this.modulus = frequency;
         this.multifier = multificator;

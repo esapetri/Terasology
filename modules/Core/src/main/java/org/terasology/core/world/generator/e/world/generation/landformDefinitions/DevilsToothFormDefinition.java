@@ -15,7 +15,7 @@
  */
 package org.terasology.core.world.generator.e.world.generation.landformDefinitions;
 
-import org.terasology.core.world.generator.e.procedural.adapter.ValueMultiplicationAdapter;
+import org.terasology.core.world.generator.e.procedural.adapter.basic.ValueMultiplicationAdapter;
 import org.terasology.core.world.generator.e.world.generation.OldLandFormDefinition;
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.math.geom.Vector3f;

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.world.generator.e.procedural.adapter;
+package org.terasology.core.world.generator.e.procedural.adapter.basic;
 
 import org.terasology.utilities.procedural.Noise2D;
 import org.terasology.utilities.procedural.Noise3D;
@@ -21,7 +21,7 @@ import org.terasology.utilities.procedural.Noise3D;
 /**
  * @author Esereja
  */
-public class CompineAdapter implements Noise3D,Noise2D {
+public class NoiseMultiplicationAdapter implements Noise3D,Noise2D {
 
     private Noise3D noise31;
     private Noise2D noise21;
@@ -35,7 +35,7 @@ public class CompineAdapter implements Noise3D,Noise2D {
      * @param noise1
      * @param noise2
      */
-    public CompineAdapter(Noise3D noise1,Noise3D noise2) {
+    public NoiseMultiplicationAdapter(Noise3D noise1, Noise3D noise2) {
         this.noise31 = noise1;
         this.noise32 = noise2;
     }
@@ -46,7 +46,7 @@ public class CompineAdapter implements Noise3D,Noise2D {
      * @param noise2
      * @param b
      */
-    public CompineAdapter(Noise2D noise1,Noise2D noise2,byte b) {
+    public NoiseMultiplicationAdapter(Noise2D noise1, Noise2D noise2, byte b) {
         this.noise21 = noise1;
         this.noise22 = noise2;
     }
@@ -54,12 +54,12 @@ public class CompineAdapter implements Noise3D,Noise2D {
 
     @Override
     public float noise(float x, float y,float z) {
-    	return this.noise31.noise(x, y, z)+this.noise32.noise(x, y, z);
+    	return this.noise31.noise(x, y, z)*this.noise32.noise(x, y, z);
     }
     
     @Override
     public float noise(float x, float y) {
-		return this.noise21.noise(x, y)+this.noise22.noise(x, y);
+		return this.noise21.noise(x, y)*this.noise22.noise(x, y);
     }
   
 }

@@ -18,7 +18,7 @@ package org.terasology.core.world.generator.e.world.generation.landformDefinitio
 import org.terasology.core.emath.BitScrampler;
 import org.terasology.core.emath.GenMath;
 import org.terasology.core.emath.MathFormula;
-import org.terasology.core.world.generator.e.procedural.adapter.Scaling3DAdapter;
+import org.terasology.core.world.generator.e.procedural.adapter.basic.SubSample3DAdapter;
 import org.terasology.core.world.generator.e.procedural.texture.FormulaAdapter;
 import org.terasology.core.world.generator.e.world.generation.LandFormDefinition;
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
@@ -33,7 +33,7 @@ public class SquareBitsFormDefinition extends LandFormDefinition implements Nois
     public SquareBitsFormDefinition(long seed) {
         super(0);
         this.noiseList.add(
-                new Scaling3DAdapter(
+                new SubSample3DAdapter(
                         new FormulaAdapter(
                                 new MathFormula() {
                                     @Override

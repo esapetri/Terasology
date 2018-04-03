@@ -13,47 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.world.generator.e.procedural.adapter;
+package org.terasology.core.world.generator.e.procedural.adapter.basic;
 
-import org.terasology.math.TeraMath;
-import org.terasology.utilities.procedural.Noise2D;
 import org.terasology.utilities.procedural.Noise3D;
 
 /**
  * @author Esereja
  */
-public class AbsAdapter implements Noise3D,Noise2D {
+public class Perturbation3DAdapter implements Noise3D {
 
-    private Noise3D noise3;
-    private Noise2D noise2;
+    private Noise3D noise;
+    private Noise3D noiseX;
+    private Noise3D noiseY;
+    private Noise3D noiseZ;
 
-
-    /**
-     *
-     * @param noise
-     */
-    public AbsAdapter(Noise3D noise) {
-        this.noise3 = noise;
+    public Perturbation3DAdapter(Noise3D noise, Noise3D noiseX, Noise3D noiseY, Noise3D noiseZ) {
+        this.noise = noise;
+        this.noiseX=noiseX;
+        this.noiseY=noiseY;
+        this.noiseZ=noiseZ;
     }
-
-    /**
-     *
-     * @param noise
-     * @param b
-     */
-    public AbsAdapter(Noise2D noise, byte b) {
-        this.noise2 = noise;
-    }
-
 
     @Override
     public float noise(float x, float y,float z) {
-    	return TeraMath.fastAbs(this.noise3.noise(x, y, z));
+        return noise.noise(x+noiseX.noise(x, y, z), y+noiseY.noise(x, y, z), z+noiseZ.noise(x, y, z));
     }
-    
-    @Override
-    public float noise(float x, float y) {
-		return TeraMath.fastAbs(this.noise2.noise(x, y));
-    }
-  
 }

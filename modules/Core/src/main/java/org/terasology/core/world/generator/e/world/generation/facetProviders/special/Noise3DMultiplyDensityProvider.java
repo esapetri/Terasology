@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.world.generator.e.world.generation.facetProviders;
+package org.terasology.core.world.generator.e.world.generation.facetProviders.special;
 
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.math.geom.Vector3f;
@@ -29,7 +29,7 @@ import org.terasology.world.generation.Updates;
  * @author esereja
  */
 @Updates(@Facet(InfiniteGenFacet.class))
-public class Noise3DTerainProvider implements FacetProvider {
+public class Noise3DMultiplyDensityProvider implements FacetProvider {
 
 	protected long seed;
 
@@ -38,39 +38,37 @@ public class Noise3DTerainProvider implements FacetProvider {
 	protected Vector3f zoom;
 
 	protected double modulus;
-	protected double multifier;
+	protected double multiplier;
 	protected double increase;
 
-	public Noise3DTerainProvider(Noise3D noise, Vector3f zoom,
-                                 double frequency, double multificator, double increase) {
+	public Noise3DMultiplyDensityProvider(Noise3D noise, Vector3f zoom,
+										  double frequency, double multiplier, double increase) {
 		this.zoom = zoom;
 		this.modulus = frequency;
-		this.multifier = multificator;
+		this.multiplier = multiplier;
 		this.increase = increase;
 		this.sampledNoise = new SubSampledNoise3D(noise, zoom, 4);
 	}
 
 	/**
 	 * this constructor doesn't initialize noise, so do it by hand!
-	 * 
+	 *
 	 * @param zoom
 	 * @param frequency
-	 * @param multificator
+	 * @param multiplier
 	 * @param increase
 	 */
-	public Noise3DTerainProvider(Vector3f zoom, double frequency,
-                                 double multificator, double increase) {
+	public Noise3DMultiplyDensityProvider(Vector3f zoom, double frequency,
+										  double multiplier, double increase) {
 		this.zoom = zoom;
 		this.modulus = frequency;
-		this.multifier = multificator;
+		this.multiplier = multiplier;
 		this.increase = increase;
 	}
 
-	@Override
 	public void setSeed(long seed) {
-		this.seed=seed;
+		this.seed =seed;
 	}
-
 
 	public void process(GeneratingRegion region) {
 		InfiniteGenFacet facet = region.getRegionFacet(InfiniteGenFacet.class);
@@ -78,12 +76,12 @@ public class Noise3DTerainProvider implements FacetProvider {
 
 		float[] orginalData = facet.getInternal();
 		for (int i = 0; orginalData.length > i; i++) {
-			noise[i] *= multifier;
+			noise[i] *= multiplier;
 			if (modulus != 0) {
 				noise[i] = (float) (noise[i] % modulus);
 			}
 			noise[i] += increase;
-			orginalData[i] += noise[i];
+			orginalData[i] *= noise[i];
 			if (facet.getMax() < orginalData[i]) {
 				facet.setMax(orginalData[i]);
 			} else if (facet.getMin() > orginalData[i]) {
@@ -142,7 +140,7 @@ public class Noise3DTerainProvider implements FacetProvider {
 	 * @return the multificator
 	 */
 	public double getMultificator() {
-		return multifier;
+		return multiplier;
 	}
 
 	/**
@@ -150,7 +148,7 @@ public class Noise3DTerainProvider implements FacetProvider {
 	 *            the multificator to set
 	 */
 	public void setMultificator(double multificator) {
-		this.multifier = multificator;
+		this.multiplier = multificator;
 	}
 
 	/**

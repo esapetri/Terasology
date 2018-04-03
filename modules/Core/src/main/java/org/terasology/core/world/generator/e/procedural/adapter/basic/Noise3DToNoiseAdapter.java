@@ -13,51 +13,45 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.world.generator.e.procedural.adapter;
+package org.terasology.core.world.generator.e.procedural.adapter.basic;
 
+import org.terasology.utilities.procedural.Noise;
 import org.terasology.utilities.procedural.Noise2D;
 import org.terasology.utilities.procedural.Noise3D;
 
 /**
  * @author Esereja
  */
-public class ModulusAdapter implements Noise3D,Noise2D {
+public class Noise3DToNoiseAdapter implements Noise3D, Noise2D, Noise {
 
-    private Noise3D noise3;
-    private Noise2D noise2;
-    
-    private float Modulus;
-    
+    private Noise3D noise3d;
+
     /**
-     * 
      * @param noise
-     * @param Modulus
      */
-    public ModulusAdapter(Noise3D noise,float Modulus) {
-        this.noise3 = noise;
-        this.Modulus=Modulus;
-    }
-    
-    /**
-     * 
-     * @param noise
-     * @param Modulus
-     * @param b
-     */
-    public ModulusAdapter(Noise2D noise,float Modulus,byte b) {
-        this.noise2 = noise;
-        this.Modulus=Modulus;
+    public Noise3DToNoiseAdapter(Noise3D noise) {
+        this.noise3d = noise;
     }
 
 
     @Override
-    public float noise(float x, float y,float z) {
-    	return this.noise3.noise(x, y, z)%this.Modulus;
+    public float noise(float x, float y, float z) {
+        return this.noise3d.noise(x, y, z);
     }
-    
+
     @Override
     public float noise(float x, float y) {
-		return this.noise2.noise(x, y)%this.Modulus;
+        return this.noise3d.noise(x, y, 1);
     }
-  
+
+    @Override
+    public float noise(int x, int y) {
+        return this.noise3d.noise(x, y, 0);
+    }
+
+    @Override
+    public float noise(int x, int y, int z) {
+        return this.noise3d.noise(x, y, z);
+    }
+
 }

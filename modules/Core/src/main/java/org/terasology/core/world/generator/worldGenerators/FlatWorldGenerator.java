@@ -78,7 +78,7 @@ public class FlatWorldGenerator extends BaseFacetedWorldGenerator {
 
                 /*
                 .addProvider(
-                        new Noise3DBaseTerainProvider(
+                        new AdvancedNoise3DBaseDensityProvider(
                                 new BrownianNoise3D(new SimplexNoise(System.currentTimeMillis()), 6),
                                 new Vector3f(0.00080f, 0.0007f, 0.00080f), 0, 1, 0
                         )
@@ -86,15 +86,15 @@ public class FlatWorldGenerator extends BaseFacetedWorldGenerator {
                 */
 
                 .addProvider(
-                        new Noise3DBaseTerainProvider(
+                        new AdvancedNoise3DBaseDensityProvider(
                                 new BrownianNoise3D(new SimplexNoise(System.currentTimeMillis()), 8),
                                 new Vector3f(0.00080f, 0.0007f, 0.00080f), 0, 1, 0
                         )
                 )
-                //.addProvider(new Noise3DBaseTerainProvider(new NullNoise(0), new Vector3f(1f, 1f, 1f), 0, 1, 0))
+                //.addProvider(new AdvancedNoise3DBaseDensityProvider(new NullNoise(0), new Vector3f(1f, 1f, 1f), 0, 1, 0))
 
                 .addProvider(
-                        new Noise3DTerainProvider(
+                        new AdvancedNoise3DDensityProvider(
                                 new FormulaAdapter(
                                         new MathFormula() {
                                             @Override
@@ -146,7 +146,7 @@ public class FlatWorldGenerator extends BaseFacetedWorldGenerator {
                 )
 
                 /*.addProvider(
-                        new Noise3DTerainProvider(
+                        new AdvancedNoise3DDensityProvider(
                                 new BrownianNoise3D(new SimplexNoise(System.currentTimeMillis()), 6),
                                 new Vector3f(0.00080f, 0.0007f, 0.00080f), 0, 1, 0
                         )
@@ -154,7 +154,7 @@ public class FlatWorldGenerator extends BaseFacetedWorldGenerator {
 
                 /*
                 .addProvider(
-                        new Noise3DModifyTerainProvider(
+                        new Noise3DMultiplyDensityProvider(
                                 new CreateBoxNoiseTool(new Vector3f(-10, 100, -10), new Vector3f(10, 200, 10)),
                                 new Vector3f(1f, 1f, 1f), 0, 1, 0
                         )
@@ -162,10 +162,10 @@ public class FlatWorldGenerator extends BaseFacetedWorldGenerator {
 
 
                 /*
-               .addProvider(new Simplex3DTerainProvider(2,new Vector3f(0.0025f, 0.01f, 0.0025f),10,0,1.2,0))
-               .addProvider(new Perlin3DTerainProvider(3,new Vector3f(0.00085f, 0.0007f, 0.00085f),9,0,0.8,0))
-               .addProvider(new Perlin3DNoiseProvider(4,new Vector3f(0.0042f, 0.0042f, 0.0042f),0,-1.5,0))
-               .addProvider(new Perlin3DNoiseProvider(5,new Vector3f(0.0015f, 0.0010f, 0.0015f),0,-1,0))
+               .addProvider(new AdvancedSimplex3DDensityProvider(2,new Vector3f(0.0025f, 0.01f, 0.0025f),10,0,1.2,0))
+               .addProvider(new AdvancedPerlin3DDensityProvider(3,new Vector3f(0.00085f, 0.0007f, 0.00085f),9,0,0.8,0))
+               .addProvider(new AdvancedPerlin3DNoiseProvider(4,new Vector3f(0.0042f, 0.0042f, 0.0042f),0,-1.5,0))
+               .addProvider(new AdvancedPerlin3DNoiseProvider(5,new Vector3f(0.0015f, 0.0010f, 0.0015f),0,-1,0))
                .addProvider(new PerlinHumidityProvider())
                 */
 

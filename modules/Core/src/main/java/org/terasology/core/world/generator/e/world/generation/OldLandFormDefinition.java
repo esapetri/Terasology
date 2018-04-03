@@ -25,6 +25,7 @@ import org.terasology.world.generation.Produces;
  * 
  * @author esereja
  */
+@Deprecated
 public abstract class OldLandFormDefinition implements Noise3D {
 	
 	protected List<Noise3D> noiseList;

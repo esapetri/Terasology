@@ -27,7 +27,7 @@ import org.terasology.world.generation.Updates;
  * @author esereja
  */
 @Updates(@Facet(InfiniteGenFacet.class))
-public class Perlin3DNoiseProvider extends Noise3DTerainProvider implements
+public class AdvancedPerlin3DNoiseProvider extends AdvancedNoise3DDensityProvider implements
 		FacetProvider {
 
 	private int seedOffset;
@@ -40,8 +40,8 @@ public class Perlin3DNoiseProvider extends Noise3DTerainProvider implements
 	 * @param multificator
 	 * @param increase
 	 */
-	public Perlin3DNoiseProvider(int seedOffset, Vector3f zoom,
-			double frequency, double multificator, double increase) {
+	public AdvancedPerlin3DNoiseProvider(int seedOffset, Vector3f zoom,
+                                         double frequency, double multificator, double increase) {
 		super(zoom, frequency, multificator, increase);
 		this.seedOffset = seedOffset;
 	}

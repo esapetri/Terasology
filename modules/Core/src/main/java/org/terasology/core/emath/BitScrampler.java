@@ -123,18 +123,15 @@ public class BitScrampler {
     public static float scrampleBits(final float fIn, final int rounds) {
     	return (float) (scrampleBits(Float.floatToRawIntBits(fIn),rounds));
     }
-    
-    
-    
-    
-    
-    /***
-     * This function returns always values between [-1,1].
-     * this function is copied from libnoise project.
-     * @param n
-     * @return
-     */
-    public static double integerNoise (final int in){
+
+
+	/**
+	 * This function returns always values between [-1,1].
+	 * this function is copied from libnoise project.
+	 * @param in
+	 * @return
+	 */
+	public static double integerNoise (final int in){
     	int n=in;
     	n = (n >> 13) ^ n;
     	int nn = (n * (n * n * 60493 + 19990303) + 1376312589) & 0x7fffffff;

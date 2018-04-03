@@ -13,52 +13,47 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.world.generator.e.procedural.adapter;
+package org.terasology.core.world.generator.e.procedural.adapter.basic;
 
+import org.terasology.math.TeraMath;
 import org.terasology.utilities.procedural.Noise2D;
 import org.terasology.utilities.procedural.Noise3D;
 
 /**
  * @author Esereja
  */
-public class ValueAdditionAdapter implements Noise3D,Noise2D {
+public class AbsAdapter implements Noise3D,Noise2D {
 
     private Noise3D noise3;
     private Noise2D noise2;
-    
-    private float Addition;
-    
+
 
     /**
-     * 
+     *
      * @param noise
-     * @param Addition
      */
-    public ValueAdditionAdapter(Noise3D noise, float Addition) {
+    public AbsAdapter(Noise3D noise) {
         this.noise3 = noise;
-        this.Addition=Addition;
     }
-    
+
     /**
-     * 
+     *
      * @param noise
-     * @param Addition
      * @param b
      */
-    public ValueAdditionAdapter(Noise2D noise, float Addition, byte b) {
+    public AbsAdapter(Noise2D noise, byte b) {
         this.noise2 = noise;
-        this.Addition=Addition;
     }
 
 
     @Override
     public float noise(float x, float y,float z) {
-    	return this.noise3.noise(x, y, z)+this.Addition;
+    	return TeraMath.fastAbs(this.noise3.noise(x, y, z));
     }
     
     @Override
     public float noise(float x, float y) {
-		return this.noise2.noise(x, y)+this.Addition;
+		return TeraMath.fastAbs(this.noise2.noise(x, y));
     }
   
 }

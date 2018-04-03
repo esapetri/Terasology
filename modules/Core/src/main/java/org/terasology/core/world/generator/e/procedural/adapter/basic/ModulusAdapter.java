@@ -13,34 +13,51 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.world.generator.e.procedural.adapter;
+package org.terasology.core.world.generator.e.procedural.adapter.basic;
 
-import org.terasology.math.geom.Vector3f;
+import org.terasology.utilities.procedural.Noise2D;
 import org.terasology.utilities.procedural.Noise3D;
 
 /**
  * @author Esereja
  */
-public class Scaling3DAdapter implements Noise3D {
+public class ModulusAdapter implements Noise3D,Noise2D {
 
-    private Noise3D noise;
+    private Noise3D noise3;
+    private Noise2D noise2;
     
-    private Vector3f scale;
-
+    private float Modulus;
+    
     /**
-     *
+     * 
      * @param noise
-     * @param scale
+     * @param Modulus
      */
-    public Scaling3DAdapter(Noise3D noise,Vector3f scale) {
-        this.noise = noise;
-        this.scale=scale;
+    public ModulusAdapter(Noise3D noise,float Modulus) {
+        this.noise3 = noise;
+        this.Modulus=Modulus;
+    }
+    
+    /**
+     * 
+     * @param noise
+     * @param Modulus
+     * @param b
+     */
+    public ModulusAdapter(Noise2D noise,float Modulus,byte b) {
+        this.noise2 = noise;
+        this.Modulus=Modulus;
     }
 
 
     @Override
     public float noise(float x, float y,float z) {
-    	return this.noise.noise(x*scale.x , y*scale.y, z*scale.z);
+    	return this.noise3.noise(x, y, z)%this.Modulus;
+    }
+    
+    @Override
+    public float noise(float x, float y) {
+		return this.noise2.noise(x, y)%this.Modulus;
     }
   
 }

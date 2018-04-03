@@ -21,7 +21,7 @@ import org.terasology.utilities.procedural.Noise3D;
 /**
  * @author Esereja
  */
-public class FastPerturbationAdapter implements Noise3D,Noise2D {
+public class AdvancedPerturbationAdapter implements Noise3D,Noise2D {
 
     private Noise3D noise3;
     private Noise2D noise2;
@@ -33,7 +33,7 @@ public class FastPerturbationAdapter implements Noise3D,Noise2D {
      * isn't that strong as whit variable seeds. but it is much cheaper computationally.
      * @param noise 3d noise 
      */
-    public FastPerturbationAdapter(Noise3D noise) {
+    public AdvancedPerturbationAdapter(Noise3D noise) {
         this.noise3 = noise;
         this.function=0;
     }
@@ -43,7 +43,7 @@ public class FastPerturbationAdapter implements Noise3D,Noise2D {
      * isn't that strong as whit variable seeds. but it is much cheaper computationally.
      * @param noise 3d noise 
      */
-    public FastPerturbationAdapter(Noise3D noise,int function) {
+    public AdvancedPerturbationAdapter(Noise3D noise, int function) {
         this.noise3 = noise;
         this.function=function;
     }
@@ -54,7 +54,7 @@ public class FastPerturbationAdapter implements Noise3D,Noise2D {
      * @param noise 2d noise
      * @param b does nothing, give it some small value. like zero. 
      */
-    public FastPerturbationAdapter(Noise2D noise, byte b) {
+    public AdvancedPerturbationAdapter(Noise2D noise, byte b) {
         this.noise2 = noise;
         this.function=0;
     }
@@ -66,7 +66,7 @@ public class FastPerturbationAdapter implements Noise3D,Noise2D {
      * @param function
      * @param b
      */
-    public FastPerturbationAdapter(Noise2D noise,int function, byte b) {
+    public AdvancedPerturbationAdapter(Noise2D noise, int function, byte b) {
         this.noise2 = noise;
         this.function=function;
     } 

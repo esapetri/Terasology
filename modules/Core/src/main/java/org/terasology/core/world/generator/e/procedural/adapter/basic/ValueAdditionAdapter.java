@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.world.generator.e.procedural.adapter;
+package org.terasology.core.world.generator.e.procedural.adapter.basic;
 
 import org.terasology.utilities.procedural.Noise2D;
 import org.terasology.utilities.procedural.Noise3D;
@@ -21,40 +21,44 @@ import org.terasology.utilities.procedural.Noise3D;
 /**
  * @author Esereja
  */
-public class Noise2DTo3DAdapter implements Noise3D {
+public class ValueAdditionAdapter implements Noise3D,Noise2D {
 
+    private Noise3D noise3;
     private Noise2D noise2;
-    private int mode;
     
-    /***
+    private float Addition;
+    
+
+    /**
      * 
      * @param noise
+     * @param Addition
      */
-    public Noise2DTo3DAdapter(Noise2D noise) {
-        this.noise2 = noise;
-        this.mode=1;
+    public ValueAdditionAdapter(Noise3D noise, float Addition) {
+        this.noise3 = noise;
+        this.Addition=Addition;
     }
     
-    /***
+    /**
      * 
      * @param noise
+     * @param Addition
+     * @param b
      */
-    public Noise2DTo3DAdapter(Noise2D noise,int mode) {
+    public ValueAdditionAdapter(Noise2D noise, float Addition, byte b) {
         this.noise2 = noise;
-        this.mode=mode;
+        this.Addition=Addition;
     }
 
 
     @Override
     public float noise(float x, float y,float z) {
-    	switch(this.mode){	
-    		case 2:
-				return this.noise2.noise(y, z);
-			case 1:
-    			return this.noise2.noise(x, z);
-    		default:
-    			return this.noise2.noise(x, y);		
-    	}
+    	return this.noise3.noise(x, y, z)+this.Addition;
+    }
+    
+    @Override
+    public float noise(float x, float y) {
+		return this.noise2.noise(x, y)+this.Addition;
     }
   
 }

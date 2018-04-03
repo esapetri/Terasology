@@ -13,34 +13,45 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.world.generator.e.procedural.adapter;
+package org.terasology.core.world.generator.e.procedural.adapter.basic;
 
-import org.terasology.math.geom.Vector2f;
+import org.terasology.utilities.procedural.Noise;
 import org.terasology.utilities.procedural.Noise2D;
+import org.terasology.utilities.procedural.Noise3D;
 
 /**
  * @author Esereja
  */
-public class Scaling2DAdapter implements Noise2D {
+public class Noise2DToNoiseAdapter implements Noise3D, Noise2D, Noise {
 
-    private Noise2D noise;
-    
-    private Vector2f scale;
+    private Noise2D noise2d;
 
     /**
-     *
      * @param noise
-     * @param scale
      */
-    public Scaling2DAdapter(Noise2D noise,Vector2f scale) {
-        this.noise = noise;
-        this.scale=scale;
+    public Noise2DToNoiseAdapter(Noise2D noise) {
+        this.noise2d = noise;
     }
 
 
     @Override
-    public float noise(float x, float y) {
-    	return this.noise.noise(x*scale.x , y*scale.y);
+    public float noise(float x, float y, float z) {
+        return this.noise2d.noise(x, y);
     }
-  
+
+    @Override
+    public float noise(float x, float y) {
+        return this.noise2d.noise(x, y);
+    }
+
+    @Override
+    public float noise(int x, int y) {
+        return this.noise2d.noise(x, y);
+    }
+
+    @Override
+    public float noise(int x, int y, int z) {
+        return this.noise2d.noise(x, y);
+    }
+
 }

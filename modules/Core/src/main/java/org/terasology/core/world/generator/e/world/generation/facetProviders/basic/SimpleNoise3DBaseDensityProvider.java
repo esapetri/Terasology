@@ -13,23 +13,44 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.world.generator.e.world.generation.landformDefinitions.basic;
+package org.terasology.core.world.generator.e.world.generation.facetProviders.basic;
 
-import org.terasology.core.world.generator.e.procedural.noise.NullNoise;
-import org.terasology.core.world.generator.e.world.generation.LandFormDefinition;
+
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.utilities.procedural.Noise3D;
+import org.terasology.world.generation.FacetProvider;
 import org.terasology.world.generation.Produces;
 
+/**
+ * @author esereja
+ */
 @Produces(InfiniteGenFacet.class)
-public class AirFormDefinition extends LandFormDefinition implements Noise3D {
+public class SimpleNoise3DBaseDensityProvider extends BaseDensityProvider implements FacetProvider {
 
-    public AirFormDefinition() {
-        super(-1000);
+    protected long seed;
+    protected Noise3D noise;
 
-        this.noiseList.add(
-                new NullNoise(-1)
-        );
+    /**
+     * @param noise
+     */
+    public SimpleNoise3DBaseDensityProvider(Noise3D noise) {
+        this.noise = noise;
     }
+
+
+    protected float calculate(int x, int y,int z){
+        return this.noise.noise(x,y,z);
+    }
+
+    /*-------------------getters at setters------------------------*/
+
+    public Noise3D getNoise() {
+        return noise;
+    }
+
+    public void setNoise(Noise3D noise) {
+        this.noise = noise;
+    }
+
 
 }

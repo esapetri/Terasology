@@ -15,12 +15,11 @@
  */
 package org.terasology.core.world.generator.e.world.generation.landformDefinitions.basic;
 
-import org.terasology.core.world.generator.e.procedural.adapter.ValueAdditionAdapter;
-import org.terasology.core.world.generator.e.procedural.adapter.ValueMultiplicationAdapter;
+import org.terasology.core.world.generator.e.procedural.adapter.basic.ValueAdditionAdapter;
+import org.terasology.core.world.generator.e.procedural.adapter.basic.ValueMultiplicationAdapter;
 import org.terasology.core.world.generator.e.world.generation.LandFormDefinition;
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.math.geom.Vector3f;
-import org.terasology.utilities.procedural.BrownianNoise3D;
 import org.terasology.utilities.procedural.Noise3D;
 import org.terasology.utilities.procedural.SimplexNoise;
 import org.terasology.utilities.procedural.SubSampledNoise3D;

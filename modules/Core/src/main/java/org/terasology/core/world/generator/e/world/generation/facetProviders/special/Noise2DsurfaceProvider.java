@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.terasology.core.world.generator.e.world.generation.facetProviders;
+package org.terasology.core.world.generator.e.world.generation.facetProviders.special;
 
 import org.terasology.core.world.generator.e.procedural.adapter.AreaLimitAdapter;
-import org.terasology.core.world.generator.e.procedural.adapter.Noise2DTo3DAdapter;
-import org.terasology.core.world.generator.e.procedural.adapter.ValueAdditionAdapter;
+import org.terasology.core.world.generator.e.procedural.adapter.basic.Noise2DTo3DAdapter;
+import org.terasology.core.world.generator.e.procedural.adapter.basic.ValueAdditionAdapter;
+import org.terasology.core.world.generator.e.world.generation.facetProviders.AdvancedNoise3DDensityProvider;
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.math.geom.Vector3f;
 import org.terasology.utilities.procedural.Noise2D;
@@ -27,7 +28,7 @@ import org.terasology.world.generation.FacetProvider;
 import org.terasology.world.generation.Updates;
 
 @Updates(@Facet(InfiniteGenFacet.class))
-public class Noise2DSurfaceProvider extends Noise3DTerainProvider implements FacetProvider {
+public class Noise2DsurfaceProvider extends AdvancedNoise3DDensityProvider implements FacetProvider {
 
     private AreaLimitAdapter adapter;
 
@@ -41,7 +42,7 @@ public class Noise2DSurfaceProvider extends Noise3DTerainProvider implements Fac
      * @param multificator
      * @param increase
      */
-    public Noise2DSurfaceProvider(Noise2D noise, Vector3f zoom, float center, float width, int ignore, int function, float preIncrease, double frequency, double multificator, double increase) {
+    public Noise2DsurfaceProvider(Noise2D noise, Vector3f zoom, float center, float width, int ignore, int function, float preIncrease, double frequency, double multificator, double increase) {
         super(zoom, frequency, multificator, increase);
         byte b = 0;
         Noise3D noise3 = new Noise2DTo3DAdapter(new ValueAdditionAdapter(noise, preIncrease, b));

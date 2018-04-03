@@ -31,6 +31,7 @@ import org.terasology.world.generation.Updates;
  *
  * @author esereja
  */
+@Deprecated
 @Updates(@Facet(InfiniteGenFacet.class))
 public class OldSimplePlanetSimulatorProvider implements FacetProvider {
 

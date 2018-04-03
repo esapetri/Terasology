@@ -18,7 +18,7 @@ package org.terasology.core.world.generator.e.world.generation.facetProviders;
 import org.terasology.core.world.generator.e.world.generation.facets.InfiniteGenFacet;
 import org.terasology.math.geom.Vector3f;
 import org.terasology.utilities.procedural.BrownianNoise3D;
-import org.terasology.utilities.procedural.SimplexNoise;
+import org.terasology.utilities.procedural.PerlinNoise;
 import org.terasology.world.generation.Facet;
 import org.terasology.world.generation.FacetProvider;
 import org.terasology.world.generation.Updates;
@@ -28,28 +28,32 @@ import org.terasology.world.generation.Updates;
  * @author esereja
  */
 @Updates(@Facet(InfiniteGenFacet.class))
-public class Simplex3DTerainProvider extends Noise3DTerainProvider implements FacetProvider  {
-	
+public class AdvancedPerlin3DDensityProvider extends AdvancedNoise3DDensityProvider implements
+		FacetProvider {
+
 	private int octaves;
 	private int seedOffset;
-	
-    /**
-     * 
-     * @param seedOffset
-     * @param zoom
-     * @param octaves
-     * @param frequency
-     * @param multificator
-     * @param increase
-     */
-    public Simplex3DTerainProvider(int seedOffset,Vector3f zoom,int octaves,double frequency, double multificator,double increase){
-    	super(zoom,frequency,multificator,increase);
-    	this.octaves=octaves;
-    	this.seedOffset=seedOffset;
-    }
-    
-    @Override
-    public void setSeed(long seed) {
-    	this.setSurfaceNoise(new BrownianNoise3D(new SimplexNoise(seed+seedOffset),this.octaves));
-    }
+
+	/**
+	 * 
+	 * @param seedOffset
+	 * @param zoom
+	 * @param octaves
+	 * @param frequency
+	 * @param multificator
+	 * @param increase
+	 */
+	public AdvancedPerlin3DDensityProvider(int seedOffset, Vector3f zoom, int octaves,
+                                           double frequency, double multificator, double increase) {
+		super(zoom, frequency, multificator, increase);
+		this.octaves = octaves;
+		this.seedOffset = seedOffset;
+	}
+
+	@Override
+	public void setSeed(long seed) {
+		this.setSurfaceNoise(new BrownianNoise3D(new PerlinNoise(seed
+				+ seedOffset), this.octaves));
+	}
+
 }

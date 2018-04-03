@@ -1,27 +1,38 @@
 package org.terasology.core.world.generator.e.procedural.logic;
 
+import org.terasology.core.emath.GenMath;
 import org.terasology.math.TeraMath;
 import org.terasology.math.geom.Vector3f;
 
 public class SimplePlanetSimulator {
     protected int origoOffSet;
 
+    protected int densityFunction;
     protected float densityMultiplier;
+
+    protected int upDensityFunction;
     protected float upHeightMultiplier;
+
+    protected int downDensityFunction;
     protected float downHeightMultiplier;
 
-    protected int densityFunction;
-    protected int upDensityFunction;
-    protected int downDensityFunction;
+    protected int crustDensityFunction;
+    protected int crustRadius;
+    protected float crustDensityMultiplier;
 
     public SimplePlanetSimulator() {
-        this.upHeightMultiplier = 0.1f;
-        this.downHeightMultiplier = 0.1f;
         this.origoOffSet = 0;
-        this.upDensityFunction = 0;
-        this.downDensityFunction = 0;
         this.densityFunction = 0;
         this.densityMultiplier = 1;
+
+        this.upDensityFunction = 0;
+        this.downDensityFunction = 0;
+        this.upHeightMultiplier = 0.1f;
+        this.downHeightMultiplier = 0.1f;
+
+        this.crustDensityFunction = 0;
+        this.crustRadius = 0;
+        this.crustDensityMultiplier = 1;
     }
 
     public float compute(final float value, final Vector3f v) {
@@ -41,11 +52,20 @@ public class SimplePlanetSimulator {
             default:
         }
 
-        if (y + origoOffSet < 0) {
-            density = this.computeDensity(downDensityFunction, density, y, downHeightMultiplier);
+        float Y = y + origoOffSet;
+
+        if (TeraMath.fastAbs(Y) < this.crustRadius) {
+            density = this.computeDensity(this.crustDensityFunction, density,
+                    GenMath.isolateSign(Y) * (TeraMath.fastAbs(Y) + (this.crustRadius - TeraMath.fastAbs(Y))),
+                    this.crustDensityMultiplier);
         } else {
-            density = this.computeDensity(upDensityFunction, density, y, upHeightMultiplier);
+            if (Y < 0) {
+                density = this.computeDensity(downDensityFunction, density, Y, downHeightMultiplier);
+            } else {
+                density = this.computeDensity(upDensityFunction, density, Y, upHeightMultiplier);
+            }
         }
+
         return density;
 
     }
@@ -84,6 +104,12 @@ public class SimplePlanetSimulator {
             case 10:
                 density = bruteLinearSubtraction(y, density, heightMultiplier);
                 break;
+            case 11:
+                density = bruteExponentialAddition(y, density, heightMultiplier);
+                break;
+            case 12:
+                density = bruteExponentialSubtraction(y, density, heightMultiplier);
+                break;
             case -1:
                 density = heightMultiplier;
                 break;
@@ -104,6 +130,7 @@ public class SimplePlanetSimulator {
         return denst;
     }
 
+    // HEAVY
     protected float linearDivision(float y, float denst, float multiplifier) {
         double a = TeraMath.fastAbs(((y + origoOffSet) * multiplifier + 1));
         if (a != 0) {
@@ -120,6 +147,7 @@ public class SimplePlanetSimulator {
         return denst;
     }
 
+    // HEAVY
     protected float exponentialDivision(float y, float denst, float multiplifier) {
         double a = TeraMath.fastAbs(((y + origoOffSet) * multiplifier + 1));
         if (a != 0) {
@@ -136,6 +164,7 @@ public class SimplePlanetSimulator {
         return denst;
     }
 
+    // HEAVY
     protected float exp3Division(float y, float denst, float multiplifier) {
         double a = TeraMath.fastAbs(((y + origoOffSet) * multiplifier + 1));
         if (a != 0) {
@@ -144,6 +173,7 @@ public class SimplePlanetSimulator {
         return denst;
     }
 
+    // medium/light
     protected float linearAddition(float y, float denst, float multiplifier) {
         double a = TeraMath.fastAbs(((y + origoOffSet) * multiplifier));
         if (a != 0) {
@@ -152,6 +182,7 @@ public class SimplePlanetSimulator {
         return denst;
     }
 
+    // medium/light
     protected float linearSubtraction(float y, float denst, float multiplifier) {
         double a = TeraMath.fastAbs(((y + origoOffSet) * multiplifier));
         if (a != 0) {
@@ -160,30 +191,45 @@ public class SimplePlanetSimulator {
         return denst;
     }
 
+    //light
     protected float bruteLinearAddition(float y, float denst, float multiplifier) {
         double a = TeraMath.fastAbs(((y + origoOffSet) * multiplifier));
         return (float) (denst + a);
 
     }
 
+    //light
     protected float bruteLinearSubtraction(float y, float denst, float multiplifier) {
         double a = TeraMath.fastAbs(((y + origoOffSet) * multiplifier));
         return (float) (denst - a);
     }
 
-    public String toString(){
-        String s=new String();
+    // Medium
+    protected float bruteExponentialAddition(float y, float denst, float multiplifier) {
+        double a = TeraMath.fastAbs(((y + origoOffSet) * multiplifier));
+        return (float) (denst + a * a);
 
-        s += "origoOffSet: "+ this.origoOffSet +"\n";
+    }
 
-        s += "densityFunction: "+ this.densityFunction +"\n";
-        s += "densityMultiplier: "+ this.densityMultiplier +"\n";
+    // Medium
+    protected float bruteExponentialSubtraction(float y, float denst, float multiplifier) {
+        double a = TeraMath.fastAbs(((y + origoOffSet) * multiplifier));
+        return (float) (denst - a * a);
+    }
 
-        s += "upDensityFunction: "+ this.upDensityFunction +"\n";
-        s += "upHeightMultiplier: "+ this.upHeightMultiplier +"\n";
+    public String toString() {
+        String s = new String();
 
-        s += "downDensityFunction: "+ this.downDensityFunction +"\n";
-        s += "downHeightMultiplier: "+ this.downHeightMultiplier +"\n";
+        s += "origoOffSet: " + this.origoOffSet + "\n";
+
+        s += "densityFunction: " + this.densityFunction + "\n";
+        s += "densityMultiplier: " + this.densityMultiplier + "\n";
+
+        s += "upDensityFunction: " + this.upDensityFunction + "\n";
+        s += "upHeightMultiplier: " + this.upHeightMultiplier + "\n";
+
+        s += "downDensityFunction: " + this.downDensityFunction + "\n";
+        s += "downHeightMultiplier: " + this.downHeightMultiplier + "\n";
 
         return s;
     }
@@ -339,5 +385,30 @@ public class SimplePlanetSimulator {
     public void setDensityFunction(int densityFunction) {
         this.densityFunction = densityFunction;
     }
+
+    public int getCrustDensityFunction() {
+        return crustDensityFunction;
+    }
+
+    public void setCrustDensityFunction(int crustDensityFunction) {
+        this.crustDensityFunction = crustDensityFunction;
+    }
+
+    public int getCrustRadius() {
+        return crustRadius;
+    }
+
+    public void setCrustRadius(int crustRadius) {
+        this.crustRadius = crustRadius;
+    }
+
+    public float getCrustDensityMultiplier() {
+        return crustDensityMultiplier;
+    }
+
+    public void setCrustDensityMultiplier(float crustDensityMultiplier) {
+        this.crustDensityMultiplier = crustDensityMultiplier;
+    }
+
 
 }

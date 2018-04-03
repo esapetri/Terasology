@@ -15,6 +15,7 @@
  */
 package org.terasology.core.world.generator.e.procedural.adapter;
 
+import org.terasology.core.world.generator.e.procedural.adapter.basic.TurbulenceAdapter;
 import org.terasology.math.TeraMath;
 import org.terasology.utilities.procedural.Noise2D;
 import org.terasology.utilities.procedural.Noise3D;
