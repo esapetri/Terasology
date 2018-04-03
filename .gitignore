@@ -96,3 +96,4 @@ config/metrics/
 
 
 # Ignore weird stuff that might be obsolete
+/configs/engine/rendering.cfg
