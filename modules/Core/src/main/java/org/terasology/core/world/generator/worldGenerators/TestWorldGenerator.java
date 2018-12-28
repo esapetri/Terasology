@@ -16,9 +16,10 @@
  */
 package org.terasology.core.world.generator.worldGenerators;
 
+import org.terasology.core.world.generator.e.procedural.adapter.AxelValueDipAdapter;
 import org.terasology.core.world.generator.e.procedural.adapter.NoiseStretchAdapter;
 import org.terasology.core.world.generator.e.procedural.adapter.basic.ScalingAdapter;
-import org.terasology.core.world.generator.e.procedural.adapter.basic.SubSample3DAdapter;
+import org.terasology.core.world.generator.e.procedural.adapter.basic.ValueAdditionAdapter;
 import org.terasology.core.world.generator.e.world.generation.LandFormProvider;
 import org.terasology.core.world.generator.e.world.generation.SimpleDensityProvider;
 import org.terasology.core.world.generator.e.world.generation.SimplePlanetSimulatorProvider;
@@ -105,7 +106,7 @@ public class TestWorldGenerator extends BaseFacetedWorldGenerator {
                 //base noise
                 .addProvider(
                         new SimpleNoise3DBaseDensityProvider(
-                                (new NoiseStretchAdapter(
+                                new ValueAdditionAdapter(new AxelValueDipAdapter(new NoiseStretchAdapter(
                                         /*
                                         new SubSample3DAdapter(
                                                 new PerlinNoise(System.currentTimeMillis()),
@@ -125,7 +126,11 @@ public class TestWorldGenerator extends BaseFacetedWorldGenerator {
                                         'y',
                                         100,
                                         1000
-                                ))
+                                ),
+                                        'z',
+                                        110,
+                                        210),
+                                        -1)
                         )
                 )
                 .addProvider(simplePlanetSimulatorProvider)

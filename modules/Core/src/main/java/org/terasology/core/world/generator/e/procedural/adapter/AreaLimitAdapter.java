@@ -23,6 +23,7 @@ import org.terasology.utilities.procedural.Noise3D;
 /**
  * @author Esereja
  */
+@Deprecated
 public class AreaLimitAdapter implements Noise3D,Noise2D {
 
     private Noise3D noise3;
