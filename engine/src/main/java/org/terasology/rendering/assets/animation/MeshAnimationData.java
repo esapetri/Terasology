@@ -18,12 +18,12 @@ package org.terasology.rendering.assets.animation;
 import com.google.common.collect.ImmutableList;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
-import org.terasology.asset.AssetData;
+import org.terasology.assets.AssetData;
+import org.terasology.math.AABB;
 
 import java.util.List;
 
 /**
- * @author Immortius
  */
 public class MeshAnimationData implements AssetData {
 
@@ -33,14 +33,17 @@ public class MeshAnimationData implements AssetData {
     private TIntList boneParent;
     private List<MeshAnimationFrame> frames;
     private float timePerFrame;
+    private AABB aabb;
 
     /**
      * @param boneNames    The names of the bones this animation expects
      * @param boneParents  The indices of the parent of each bone in the boneNames list, NO_PARENT for no parent.
+     * @param aabb A bounding box that contains the object in all animation stops.
      * @param frames
      * @param timePerFrame
      */
-    public MeshAnimationData(List<String> boneNames, TIntList boneParents, List<MeshAnimationFrame> frames, float timePerFrame) {
+    public MeshAnimationData(List<String> boneNames, TIntList boneParents, List<MeshAnimationFrame> frames,
+                             float timePerFrame, AABB aabb) {
         if (boneNames.size() != boneParents.size()) {
             throw new IllegalArgumentException("Bone names and boneParent indices must align");
         }
@@ -48,6 +51,7 @@ public class MeshAnimationData implements AssetData {
         this.boneParent = new TIntArrayList(boneParents);
         this.frames = ImmutableList.copyOf(frames);
         this.timePerFrame = timePerFrame;
+        this.aabb = aabb;
     }
 
     public List<String> getBoneNames() {
@@ -64,5 +68,9 @@ public class MeshAnimationData implements AssetData {
 
     public float getTimePerFrame() {
         return timePerFrame;
+    }
+
+    public AABB getAabb() {
+        return aabb;
     }
 }

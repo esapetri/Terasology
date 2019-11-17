@@ -15,13 +15,12 @@
  */
 package org.terasology.entitySystem.entity.internal;
 
-import org.terasology.asset.AssetUri;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.entity.LowLevelEntityManager;
+import org.terasology.entitySystem.prefab.Prefab;
 import org.terasology.network.NetworkComponent;
 
 /**
- * @author Immortius <immortius@gmail.com>
  */
 public class PojoEntityRef extends BaseEntityRef {
     private long id;
@@ -51,10 +50,9 @@ public class PojoEntityRef extends BaseEntityRef {
     }
 
 
-
     @Override
     public String toString() {
-        AssetUri prefabUri = getPrefabURI();
+        Prefab parent = getParentPrefab();
         StringBuilder builder = new StringBuilder();
         builder.append("EntityRef{id = ");
         builder.append(id);
@@ -63,9 +61,9 @@ public class PojoEntityRef extends BaseEntityRef {
             builder.append(", netId = ");
             builder.append(networkComponent.getNetworkId());
         }
-        if (prefabUri != null) {
+        if (parent != null) {
             builder.append(", prefab = '");
-            builder.append(prefabUri.toSimpleString());
+            builder.append(parent.getUrn());
             builder.append("'");
         }
         builder.append("}");

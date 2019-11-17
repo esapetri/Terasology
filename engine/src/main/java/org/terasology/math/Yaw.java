@@ -17,10 +17,9 @@ package org.terasology.math;
 
 /**
  * Enumeration for yaw
- * <p/>
+ * <br><br>
  * Pitch, yaw and roll enumerations are all very similar, but separated to allow for safer usage in Rotation.
  *
- * @author Immortius
  */
 public enum Yaw {
     NONE((byte) 0b00, 0, 0),
@@ -28,11 +27,11 @@ public enum Yaw {
     CLOCKWISE_180((byte) 0b10, (float) (Math.PI), 2),
     CLOCKWISE_270((byte) 0b11, (float) (-0.5f * Math.PI), 3);
 
-    private byte index;
-    private float radians;
-    private int increments;
+    private final byte index;
+    private final float radians;
+    private final int increments;
 
-    private Yaw(byte index, float radians, int increments) {
+     Yaw(byte index, float radians, int increments) {
         this.index = index;
         this.radians = radians;
         this.increments = increments;

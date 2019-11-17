@@ -17,7 +17,6 @@ package org.terasology.persistence;
 
 import com.google.common.collect.Lists;
 import com.google.protobuf.ByteString;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.terasology.engine.TerasologyConstants;
@@ -36,7 +35,6 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
 /**
- * @author Immortius <immortius@gmail.com>
  */
 public class EntityDataJSONFormatTest {
 

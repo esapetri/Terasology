@@ -20,9 +20,8 @@ import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Maps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.terasology.asset.AssetType;
-import org.terasology.asset.AssetUri;
-import org.terasology.asset.Assets;
+import org.terasology.utilities.Assets;
+import org.terasology.assets.ResourceUrn;
 import org.terasology.engine.SimpleUri;
 import org.terasology.engine.module.ModuleManager;
 import org.terasology.entitySystem.Component;
@@ -39,12 +38,12 @@ import org.terasology.registry.CoreRegistry;
 
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 /**
  * Implementation of WorldSerializer for EngineEntityManager.
  *
- * @author Immortius <immortius@gmail.com>
  */
 public class WorldSerializerImpl implements WorldSerializer {
 
@@ -90,6 +89,35 @@ public class WorldSerializerImpl implements WorldSerializer {
         return world.build();
     }
 
+    @Override
+    public EntityData.GlobalStore serializeWorld(boolean verbose, List<Class<? extends Component>> filterComponents) {
+        if (filterComponents == null) {
+            return serializeWorld(true);
+        }
+        final EntityData.GlobalStore.Builder world = EntityData.GlobalStore.newBuilder();
+
+        if (!verbose) {
+            writeComponentTypeTable(world);
+        }
+
+        for (Prefab prefab : prefabManager.listPrefabs()) {
+            if (prefab.hasAnyComponents(filterComponents)) {
+                world.addPrefab(prefabSerializer.serialize(prefab));
+            }
+        }
+
+        for (EntityRef entity : entityManager.getAllEntities()) {
+            if ((verbose || entity.isPersistent()) && entity.hasAnyComponents(filterComponents)) {
+                world.addEntity(entitySerializer.serialize(entity));
+            }
+        }
+
+        writeIdInfo(world);
+
+        entitySerializer.removeComponentIdMapping();
+        prefabSerializer.removeComponentIdMapping();
+        return world.build();
+    }
 
     @Override
     public void deserializeWorld(EntityData.GlobalStore world) {
@@ -108,24 +136,20 @@ public class WorldSerializerImpl implements WorldSerializer {
         // Prefabs that still need to be created, by their required parent
         ListMultimap<String, EntityData.Prefab> pendingPrefabs = ArrayListMultimap.create();
 
-        for (EntityData.Prefab prefabData : world.getPrefabList()) {
-            if (!prefabManager.exists(prefabData.getName())) {
-                if (!prefabData.hasParentName()) {
-                    createPrefab(prefabData);
-                } else {
-                    pendingPrefabs.put(prefabData.getParentName(), prefabData);
-                }
+        world.getPrefabList().stream().filter(prefabData -> !prefabManager.exists(prefabData.getName())).forEach(prefabData -> {
+            if (!prefabData.hasParentName()) {
+                createPrefab(prefabData);
+            } else {
+                pendingPrefabs.put(prefabData.getParentName(), prefabData);
             }
-        }
+        });
 
         while (!pendingPrefabs.isEmpty()) {
             Iterator<Map.Entry<String, Collection<EntityData.Prefab>>> i = pendingPrefabs.asMap().entrySet().iterator();
             while (i.hasNext()) {
                 Map.Entry<String, Collection<EntityData.Prefab>> entry = i.next();
                 if (prefabManager.exists(entry.getKey())) {
-                    for (EntityData.Prefab prefabData : entry.getValue()) {
-                        createPrefab(prefabData);
-                    }
+                    entry.getValue().forEach(this::createPrefab);
                     i.remove();
                 }
             }
@@ -144,7 +168,7 @@ public class WorldSerializerImpl implements WorldSerializer {
         SimpleUri uri = new SimpleUri(prefabData.getName());
         try (ModuleContext.ContextSpan ignored = ModuleContext.setContext(moduleManager.getEnvironment().get(uri.getModuleName()))) {
             PrefabData protoPrefab = prefabSerializer.deserialize(prefabData);
-            Assets.generateAsset(new AssetUri(AssetType.PREFAB, prefabData.getName()), protoPrefab, Prefab.class);
+            Assets.generateAsset(new ResourceUrn(prefabData.getName()), protoPrefab, Prefab.class);
         } catch (Exception e) {
             logger.error("Failed to create prefab {}", prefabData.getName());
         }

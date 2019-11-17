@@ -20,7 +20,6 @@ import java.lang.annotation.RetentionPolicy;
 
 /**
  * This is the sub-annotation for describing facets in Requires and Updates annotations
- * @author Immortius
  */
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Facet {
@@ -28,13 +27,6 @@ public @interface Facet {
      * @return The class of the facet
      */
     Class<? extends WorldFacet> value();
-
-    /**
-     * This allows a facet provider to be ordered after the completion of a facet - this should be used where a provider
-     * uses one or more facets to produce a derivative facet.
-     * @return Whether the facet should be complete before this system is called (for @Requires)
-     */
-    boolean complete() default true;
 
     /**
      * @return The desired minimum border around the main facet data

@@ -18,6 +18,7 @@ package org.terasology.physics.components;
 
 import com.google.common.collect.Lists;
 import org.terasology.entitySystem.Component;
+import org.terasology.network.Replicate;
 import org.terasology.physics.CollisionGroup;
 import org.terasology.physics.StandardCollisionGroup;
 import org.terasology.world.block.ForceBlockActive;
@@ -25,9 +26,12 @@ import org.terasology.world.block.ForceBlockActive;
 import java.util.List;
 
 /**
- * @author Immortius
  */
 @ForceBlockActive
 public class TriggerComponent implements Component {
+    @Replicate
+    public CollisionGroup collisionGroup = StandardCollisionGroup.SENSOR;
+    
+    @Replicate
     public List<CollisionGroup> detectGroups = Lists.<CollisionGroup>newArrayList(StandardCollisionGroup.DEFAULT);
 }

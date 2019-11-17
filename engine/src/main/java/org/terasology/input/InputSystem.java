@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MovingBlocks
+ * Copyright 2018 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,17 +15,23 @@
  */
 package org.terasology.input;
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import org.terasology.config.Config;
-import org.terasology.engine.GameEngine;
+import com.google.common.collect.Queues;
+import org.terasology.config.ControllerConfig.ControllerInfo;
+import org.terasology.config.facade.InputDeviceConfiguration;
 import org.terasology.engine.SimpleUri;
+import org.terasology.engine.Time;
+import org.terasology.engine.subsystem.DisplayDevice;
+import org.terasology.engine.subsystem.config.BindsManager;
+import org.terasology.engine.subsystem.config.BindsSubsystem;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.systems.BaseComponentSystem;
 import org.terasology.input.cameraTarget.CameraTargetSystem;
-import org.terasology.input.device.InputAction;
+import org.terasology.input.device.ControllerAction;
+import org.terasology.input.device.KeyboardAction;
 import org.terasology.input.device.KeyboardDevice;
+import org.terasology.input.device.MouseAction;
 import org.terasology.input.device.MouseDevice;
+import org.terasology.input.device.nulldevices.NullControllerDevice;
 import org.terasology.input.device.nulldevices.NullKeyboardDevice;
 import org.terasology.input.device.nulldevices.NullMouseDevice;
 import org.terasology.input.events.InputEvent;
@@ -36,67 +42,58 @@ import org.terasology.input.events.KeyUpEvent;
 import org.terasology.input.events.LeftMouseDownButtonEvent;
 import org.terasology.input.events.LeftMouseUpButtonEvent;
 import org.terasology.input.events.MouseAxisEvent;
+import org.terasology.input.events.MouseAxisEvent.MouseAxis;
 import org.terasology.input.events.MouseButtonEvent;
 import org.terasology.input.events.MouseDownButtonEvent;
 import org.terasology.input.events.MouseUpButtonEvent;
 import org.terasology.input.events.MouseWheelEvent;
-import org.terasology.input.events.MouseXAxisEvent;
-import org.terasology.input.events.MouseYAxisEvent;
 import org.terasology.input.events.RightMouseDownButtonEvent;
 import org.terasology.input.events.RightMouseUpButtonEvent;
-import org.terasology.input.internal.BindableAxisImpl;
-import org.terasology.input.internal.BindableButtonImpl;
+import org.terasology.input.internal.AbstractBindableAxis;
+import org.terasology.input.internal.BindableRealAxis;
 import org.terasology.logic.players.LocalPlayer;
-import org.terasology.math.Vector2i;
-import org.terasology.registry.CoreRegistry;
+import org.terasology.math.geom.Vector2i;
 import org.terasology.registry.In;
 
 import java.util.List;
-import java.util.Map;
+import java.util.Queue;
 
 /**
  * This system processes input, sending it out as events against the LocalPlayer entity.
- * <p/>
+ * <br><br>
  * In addition to raw keyboard and mouse input, the system handles Bind Buttons and Bind Axis, which can be mapped
  * to one or more inputs.
  */
 public class InputSystem extends BaseComponentSystem {
 
     @In
-    private Config config;
+    private InputDeviceConfiguration inputDeviceConfig;
 
     @In
-    private GameEngine engine;
+    private BindsManager bindsManager;
+
+    @In
+    private Time time;
+
+    @In
+    private DisplayDevice display;
+
+    @In
+    private LocalPlayer localPlayer;
+
+    @In
+    private CameraTargetSystem targetSystem;
+
+    @In
+    private BindsSubsystem bindsSubsystem;
 
     private MouseDevice mouse = new NullMouseDevice();
     private KeyboardDevice keyboard = new NullKeyboardDevice();
+    private ControllerDevice controllers = new NullControllerDevice();
 
-    private Map<String, BindableAxisImpl> axisLookup = Maps.newHashMap();
-    private Map<SimpleUri, BindableButtonImpl> buttonLookup = Maps.newHashMap();
+    private Queue<KeyboardAction> simulatedKeys = Queues.newArrayDeque();
 
-    private List<BindableAxisImpl> axisBinds = Lists.newArrayList();
-    private List<BindableButtonImpl> buttonBinds = Lists.newArrayList();
-
-    // Links between primitive inputs and bind buttons
-    private Map<Integer, BindableButtonImpl> keyBinds = Maps.newHashMap();
-    private Map<MouseInput, BindableButtonImpl> mouseButtonBinds = Maps.newHashMap();
-    private BindableButtonImpl mouseWheelUpBind;
-    private BindableButtonImpl mouseWheelDownBind;
-
-    private LocalPlayer localPlayer;
-    private CameraTargetSystem targetSystem;
-
-    @Override
-    public void initialise() {
-        localPlayer = CoreRegistry.get(LocalPlayer.class);
-        targetSystem = CoreRegistry.get(CameraTargetSystem.class);
-    }
-
-    @Override
-    public void shutdown() {
-        localPlayer = null;
-        targetSystem = null;
-    }
+    private EntityRef[] inputEntities;
 
     public void setMouseDevice(MouseDevice mouseDevice) {
         this.mouse = mouseDevice;
@@ -114,237 +111,323 @@ public class InputSystem extends BaseComponentSystem {
         return keyboard;
     }
 
-    public BindableButton registerBindButton(SimpleUri bindId, String displayName) {
-        return registerBindButton(bindId, displayName, new BindButtonEvent());
+    public ControllerDevice getControllerDevice() {
+        return controllers;
     }
 
-    public BindableButton registerBindButton(SimpleUri bindId, String displayName, BindButtonEvent event) {
-        BindableButtonImpl bind = new BindableButtonImpl(bindId, displayName, event);
-        buttonLookup.put(bindId, bind);
-        buttonBinds.add(bind);
-        return bind;
+    public void setControllerDevice(ControllerDevice controllerDevice) {
+        this.controllers = controllerDevice;
     }
 
-    public void clearBinds() {
-        buttonLookup.clear();
-        buttonBinds.clear();
-        axisLookup.clear();
-        axisBinds.clear();
-        keyBinds.clear();
-        mouseButtonBinds.clear();
-        mouseWheelUpBind = null;
-        mouseWheelDownBind = null;
+    @Override
+    public void initialise() {
+        bindsManager.registerBinds();
     }
 
-    public BindableButton getBindButton(SimpleUri bindId) {
-        return buttonLookup.get(bindId);
-    }
-
-    public void linkBindButtonToInput(Input input, SimpleUri bindId) {
-        switch (input.getType()) {
-            case KEY:
-                linkBindButtonToKey(input.getId(), bindId);
-                break;
-            case MOUSE_BUTTON:
-                MouseInput button = MouseInput.find(input.getType(), input.getId());
-                linkBindButtonToMouse(button, bindId);
-                break;
-            case MOUSE_WHEEL:
-                linkBindButtonToMouseWheel(input.getId(), bindId);
-                break;
-            default:
-                break;
-        }
-    }
-
-    public void linkBindButtonToInput(InputEvent input, SimpleUri bindId) {
-        if (input instanceof KeyEvent) {
-            linkBindButtonToKey(((KeyEvent) input).getKey().getId(), bindId);
-        } else if (input instanceof MouseButtonEvent) {
-            linkBindButtonToMouse(((MouseButtonEvent) input).getButton(), bindId);
-        } else if (input instanceof MouseWheelEvent) {
-            linkBindButtonToMouseWheel(((MouseWheelEvent) input).getWheelTurns(), bindId);
-        }
-    }
-
-    public void linkBindButtonToKey(int key, SimpleUri bindId) {
-        BindableButtonImpl bindInfo = buttonLookup.get(bindId);
-        keyBinds.put(key, bindInfo);
-    }
-
-    public void linkBindButtonToMouse(MouseInput mouseButton, SimpleUri bindId) {
-        BindableButtonImpl bindInfo = buttonLookup.get(bindId);
-        mouseButtonBinds.put(mouseButton, bindInfo);
-    }
-
-    public void linkBindButtonToMouseWheel(int direction, SimpleUri bindId) {
-        if (direction > 0) {
-            mouseWheelDownBind = buttonLookup.get(bindId);
-        } else if (direction < 0) {
-            mouseWheelUpBind = buttonLookup.get(bindId);
-        }
-    }
-
-    public BindableAxis registerBindAxis(String id, BindableButton positiveButton, BindableButton negativeButton) {
-        return registerBindAxis(id, new BindAxisEvent(), positiveButton, negativeButton);
-    }
-
-    public BindableAxis registerBindAxis(String id, BindAxisEvent event, SimpleUri positiveButtonId, SimpleUri negativeButtonId) {
-        return registerBindAxis(id, event, getBindButton(positiveButtonId), getBindButton(negativeButtonId));
-    }
-
-    public BindableAxis registerBindAxis(String id, BindAxisEvent event, BindableButton positiveButton, BindableButton negativeButton) {
-        BindableAxisImpl axis = new BindableAxisImpl(id, event, positiveButton, negativeButton);
-        axisBinds.add(axis);
-        axisLookup.put(id, axis);
-        return axis;
-    }
-
+    /**
+     * Updates/processes user input across all of the players input devices.
+     *
+     * @param delta The length of the current frame.
+     */
     public void update(float delta) {
+        updateInputEntities();
         processMouseInput(delta);
         processKeyboardInput(delta);
+        processControllerInput(delta);
         processBindRepeats(delta);
         processBindAxis(delta);
     }
 
+    /**
+     * Returns true if the game window currently has display focus, therefore mouse input is being captured.
+     *
+     * @return true if display currently has focus, else false.
+     */
+    public boolean isCapturingMouse() {
+        return display.hasFocus();
+    }
+
+    /**
+     * Updates the client and input entities of the local player, to be used in input events against the local player.
+     */
+    private void updateInputEntities() {
+        if (inputEntities == null
+                || inputEntities.length != 2
+                || inputEntities[0] == null
+                || inputEntities[1] == null
+                || !inputEntities[0].equals(localPlayer.getClientEntity())
+                || !inputEntities[1].equals(localPlayer.getCharacterEntity())) {
+            inputEntities = new EntityRef[]{localPlayer.getClientEntity(), localPlayer.getCharacterEntity()};
+        }
+    }
+
+    /**
+     * Processes the current input state of the mouse, sends input events and updates bind buttons.
+     *
+     * Mouse position actions are handled here, while mouse button and mouse wheel actions are handled at
+     * {@link #processMouseButtonInput(float, MouseAction)} and {@link #processMouseWheelInput(float, MouseAction)}
+     * accordingly.
+     *
+     * @param delta The length of the current frame.
+     */
     private void processMouseInput(float delta) {
-        if (!engine.hasFocus()) {
+        if (!isCapturingMouse()) {
             return;
         }
 
         Vector2i deltaMouse = mouse.getDelta();
         //process mouse movement x axis
         if (deltaMouse.x != 0) {
-            MouseAxisEvent event = new MouseXAxisEvent(deltaMouse.x * config.getInput().getMouseSensitivity(), delta);
-            setupTarget(event);
-            for (EntityRef entity : getInputEntities()) {
-                entity.send(event);
-                if (event.isConsumed()) {
-                    break;
-                }
-            }
+            float xValue = deltaMouse.x * inputDeviceConfig.getMouseSensitivity();
+            MouseAxisEvent event = MouseAxisEvent.create(MouseAxis.X, xValue, delta);
+            send(event);
         }
 
         //process mouse movement y axis
         if (deltaMouse.y != 0) {
-            int yMovement = config.getInput().isMouseYAxisInverted() ? deltaMouse.y * -1 : deltaMouse.y;
-            MouseAxisEvent event = new MouseYAxisEvent(yMovement * config.getInput().getMouseSensitivity(), delta);
-            setupTarget(event);
-            for (EntityRef entity : getInputEntities()) {
-                entity.send(event);
-                if (event.isConsumed()) {
-                    break;
-                }
-            }
+            int yMovement = inputDeviceConfig.isMouseYAxisInverted() ? deltaMouse.y * -1 : deltaMouse.y;
+            float yValue = yMovement * inputDeviceConfig.getMouseSensitivity();
+            MouseAxisEvent event = MouseAxisEvent.create(MouseAxis.Y, yValue, delta);
+            send(event);
         }
 
         //process mouse clicks
-        for (InputAction action : mouse.getInputQueue()) {
+        for (MouseAction action : mouse.getInputQueue()) {
             switch (action.getInput().getType()) {
                 case MOUSE_BUTTON:
-                    int id = action.getInput().getId();
-                    if (id != -1) {
-                        MouseInput button = MouseInput.find(action.getInput().getType(), action.getInput().getId());
-                        boolean consumed = sendMouseEvent(button, action.getState().isDown(), action.getMousePosition(), delta);
-
-                        BindableButtonImpl bind = mouseButtonBinds.get(button);
-                        if (bind != null) {
-                            bind.updateBindState(
-                                    action.getInput(),
-                                    action.getState().isDown(),
-                                    delta,
-                                    getInputEntities(),
-                                    targetSystem.getTarget(),
-                                    targetSystem.getTargetBlockPosition(),
-                                    targetSystem.getHitPosition(),
-                                    targetSystem.getHitNormal(),
-                                    consumed
-                            );
-                        }
-                    }
+                    processMouseButtonInput(delta, action);
                     break;
                 case MOUSE_WHEEL:
-                    int dir = action.getInput().getId();
-                    if (dir != 0 && action.getTurns() != 0) {
-                        boolean consumed = sendMouseWheelEvent(action.getMousePosition(), dir * action.getTurns(), delta);
-
-                        BindableButtonImpl bind = (dir == 1) ? mouseWheelUpBind : mouseWheelDownBind;
-                        if (bind != null) {
-                            for (int i = 0; i < action.getTurns(); ++i) {
-                                bind.updateBindState(
-                                        action.getInput(),
-                                        true,
-                                        delta,
-                                        getInputEntities(),
-                                        targetSystem.getTarget(),
-                                        targetSystem.getTargetBlockPosition(),
-                                        targetSystem.getHitPosition(),
-                                        targetSystem.getHitNormal(),
-                                        consumed
-                                );
-                                bind.updateBindState(
-                                        action.getInput(),
-                                        false,
-                                        delta,
-                                        getInputEntities(),
-                                        targetSystem.getTarget(),
-                                        targetSystem.getTargetBlockPosition(),
-                                        targetSystem.getHitPosition(),
-                                        targetSystem.getHitNormal(),
-                                        consumed
-                                );
-                            }
-                        }
-                    }
+                    processMouseWheelInput(delta, action);
                     break;
-                case KEY:
+                default:
                     break;
             }
         }
     }
 
-    private void setupTarget(InputEvent event) {
-        if (targetSystem.isTargetAvailable()) {
-            event.setTargetInfo(targetSystem.getTarget(), targetSystem.getTargetBlockPosition(), targetSystem.getHitPosition(), targetSystem.getHitNormal());
+    /**
+     * Processes input actions by the mouse buttons, sends input events and updates bind buttons accordingly.
+     *
+     * @param delta The length of the current frame.
+     * @param action The input action to be processed.
+     */
+    private void processMouseButtonInput(float delta, MouseAction action) {
+        int id = action.getInput().getId();
+        if (id != MouseInput.NONE.getId()) {
+            MouseInput button = MouseInput.find(action.getInput().getType(), action.getInput().getId());
+            boolean consumed = sendMouseEvent(button, action.getState().isDown(), action.getMousePosition(), delta);
+            BindableButton bind = bindsManager.getMouseButtonBinds().get(button);
+            if (bind != null) {
+                updateBindState(bind, action.getInput(), action.getState().isDown(), delta, consumed);
+            }
         }
     }
 
+    /**
+     * Processes input actions by the mouse wheel, sends input events and updates bind buttons accordingly.
+     *
+     * @param delta The length of the current frame.
+     * @param action The input action to be processed.
+     */
+    private void processMouseWheelInput(float delta, MouseAction action) {
+        int dir = action.getInput().getId();
+        if (dir != 0 && action.getTurns() != 0) {
+            boolean consumed = sendMouseWheelEvent(action.getMousePosition(), dir * action.getTurns(), delta);
+            BindableButton bind = (dir == 1) ? bindsManager.getMouseWheelUpBind() : bindsManager.getMouseWheelDownBind();
+            if (bind != null) {
+                for (int i = 0; i < action.getTurns(); ++i) {
+                    updateBindState(bind, action.getInput(), true, delta, consumed);
+                    updateBindState(bind, action.getInput(), false, delta, consumed);
+                }
+            }
+        }
+    }
+
+    /**
+     * Processes the current input state of any connected controllers, and updates bind buttons.
+     *
+     * Controller button and axis events are both handled in
+     * {@link #processControllerButtonInput(float, ControllerAction, boolean, Input)} and
+     * {@link #processControllerAxisInput(ControllerAction, Input)} accordingly.
+     *
+     * @param delta The length of the current frame.
+     */
+    private void processControllerInput(float delta) {
+        if (!isCapturingMouse()) {
+            return;
+        }
+        for (ControllerAction action : controllers.getInputQueue()) {
+            // TODO: send event to entity system
+            boolean consumed = false;
+
+            Input input = action.getInput();
+            if (input.getType() == InputType.CONTROLLER_BUTTON) {
+                processControllerButtonInput(delta, action, consumed, input);
+            } else if (input.getType() == InputType.CONTROLLER_AXIS) {
+                processControllerAxisInput(action, input);
+            }
+        }
+    }
+
+    /**
+     * Processes input actions by controller buttons, and updates bind buttons accordingly.
+     *
+     * @param delta The length of the current frame.
+     * @param action The input action to be processed.
+     * @param consumed True if sent input event has been processed/consumed by an event receiver.
+     * @param input The specific input of the controller button.
+     */
+    private void processControllerButtonInput(float delta, ControllerAction action, boolean consumed, Input input) {
+        BindableButton bind = bindsManager.getControllerBinds().get(input);
+        if (bind != null) {
+            boolean pressed = action.getState() == ButtonState.DOWN;
+            updateBindState(bind, input, pressed, delta, consumed);
+        }
+    }
+
+    /**
+     * Processes input actions by controller axis, and updates bind axis accordingly.
+     *
+     * @param action The input action to be processed.
+     * @param input The specific input of the controller axis.
+     */
+    private void processControllerAxisInput(ControllerAction action, Input input) {
+        BindableRealAxis axis = bindsManager.getControllerAxisBinds().get(input);
+        if (axis != null) {
+            ControllerInfo info = inputDeviceConfig.getController(action.getController());
+            boolean isX = action.getInput().getId() == ControllerId.X_AXIS;
+            boolean isY = action.getInput().getId() == ControllerId.Y_AXIS;
+            boolean isZ = action.getInput().getId() == ControllerId.Z_AXIS;
+            float f = (isX && info.isInvertX() || isY && info.isInvertY() || isZ && info.isInvertZ()) ? -1 : 1;
+            axis.setTargetValue(action.getAxisValue() * f);
+        }
+    }
+
+    /**
+     * Updates the bind state of a button bind based on provided input information.
+     *
+     * @param bind The button bind to be updated.
+     * @param input The specific input to be binded.
+     * @param pressed True if the button in the input is pressed, false if not.
+     * @param delta The length of the current frame.
+     * @param consumed True if the input event has been processed/consumed by an event receiver.
+     */
+    private void updateBindState(BindableButton bind, Input input, boolean pressed, float delta, boolean consumed) {
+        bind.updateBindState(
+                input,
+                pressed,
+                delta, inputEntities,
+                targetSystem.getTarget(),
+                targetSystem.getTargetBlockPosition(),
+                targetSystem.getHitPosition(),
+                targetSystem.getHitNormal(),
+                consumed,
+                time.getGameTimeInMs());
+    }
+
+    /**
+     * Simulates a single key stroke from the keyboard.
+     *
+     * Simulated key strokes: To simulate input from a keyboard, we simply have to extract the Input associated to the
+     * action and this function adds it to the keyboard's input queue.
+     *
+     * @param key The key to be simulated.
+     */
+    public void simulateSingleKeyStroke(Input key) {
+        /* TODO: Perhaps there is a better way to extract the character.
+            All the simulate functions extract keyChar by getting the first character from it's display string.
+            While it works for normal character buttons, might not work for special buttons if required later.
+        */
+        char keyChar = key.getDisplayName().charAt(0);
+        KeyboardAction action = new KeyboardAction(key, ButtonState.DOWN, keyChar);
+        simulatedKeys.add(action);
+    }
+
+    /**
+     * Simulates a repeated key stroke from the keyboard.
+     *
+     * Simulated key strokes: To simulate input from a keyboard, we simply have to extract the Input associated to the
+     * action and this function adds it to the keyboard's input queue.
+     *
+     * @param key The key to be simulated.
+     */
+    public void simulateRepeatedKeyStroke(Input key) {
+        char keyChar = key.getDisplayName().charAt(0);
+        KeyboardAction action = new KeyboardAction(key, ButtonState.REPEAT, keyChar);
+        simulatedKeys.add(action);
+    }
+
+    /**
+     * Cancels the simulation of key strokes.
+     *
+     * @param key The key to cancel the simulation of.
+     */
+    public void cancelSimulatedKeyStroke(Input key) {
+        char keyChar = key.getDisplayName().charAt(0);
+        KeyboardAction action = new KeyboardAction(key, ButtonState.UP, keyChar);
+        simulatedKeys.add(action);
+    }
+
+    /**
+     * Processes input actions by keyboard buttons, sends key events and updates bind buttons accordingly.
+     *
+     * @param delta The length of the current frame.
+     */
     private void processKeyboardInput(float delta) {
-        for (InputAction action : keyboard.getInputQueue()) {
+        Queue<KeyboardAction> keyQueue = keyboard.getInputQueue();
+        keyQueue.addAll(simulatedKeys);
+        simulatedKeys.clear();
+        for (KeyboardAction action : keyQueue) {
             boolean consumed = sendKeyEvent(action.getInput(), action.getInputChar(), action.getState(), delta);
 
             // Update bind
-            BindableButtonImpl bind = keyBinds.get(action.getInput().getId());
+            BindableButton bind = bindsManager.getKeyBinds().get(action.getInput().getId());
             if (bind != null && action.getState() != ButtonState.REPEAT) {
-                bind.updateBindState(
-                        action.getInput(),
-                        (action.getState() == ButtonState.DOWN),
-                        delta, getInputEntities(),
-                        targetSystem.getTarget(),
-                        targetSystem.getTargetBlockPosition(),
-                        targetSystem.getHitPosition(),
-                        targetSystem.getHitNormal(),
-                        consumed
-                );
+                boolean pressed = action.getState() == ButtonState.DOWN;
+                updateBindState(bind, action.getInput(), pressed, delta, consumed);
             }
         }
     }
 
+    /**
+     * Processes/Updates all bind axis.
+     *
+     * @param delta The length of the current frame.
+     */
     private void processBindAxis(float delta) {
-        for (BindableAxisImpl axis : axisBinds) {
-            axis.update(getInputEntities(), delta, targetSystem.getTarget(), targetSystem.getTargetBlockPosition(),
-
+        for (AbstractBindableAxis axis : bindsManager.getAxisBinds()) {
+            axis.update(inputEntities, delta, targetSystem.getTarget(), targetSystem.getTargetBlockPosition(),
                     targetSystem.getHitPosition(), targetSystem.getHitNormal());
         }
     }
 
+    /**
+     * Processes/Updates all bind buttons.
+     *
+     * @param delta The length of the current frame.
+     */
     private void processBindRepeats(float delta) {
-        for (BindableButtonImpl button : buttonBinds) {
-            button.update(getInputEntities(), delta, targetSystem.getTarget(), targetSystem.getTargetBlockPosition(),
-                    targetSystem.getHitPosition(), targetSystem.getHitNormal());
+        for (BindableButton button : bindsManager.getButtonBinds()) {
+            button.update(inputEntities,
+                    delta,
+                    targetSystem.getTarget(),
+                    targetSystem.getTargetBlockPosition(),
+                    targetSystem.getHitPosition(),
+                    targetSystem.getHitNormal(),
+                    time.getGameTimeInMs());
         }
     }
 
+    /**
+     * Creates and sends an input event based on a provided keyboard input.
+     *
+     * @param key The specific input to be sent.
+     * @param keyChar The character of the input key.
+     * @param state The state of the input key.
+     * @param delta The length of the current frame.
+     * @return true if the event has been consumed by an event listener, false otherwise.
+     */
     private boolean sendKeyEvent(Input key, char keyChar, ButtonState state, float delta) {
         KeyEvent event;
         switch (state) {
@@ -360,19 +443,21 @@ public class InputSystem extends BaseComponentSystem {
             default:
                 return false;
         }
-        setupTarget(event);
-        for (EntityRef entity : getInputEntities()) {
-            entity.send(event);
-            if (event.isConsumed()) {
-                break;
-            }
-        }
 
-        boolean consumed = event.isConsumed();
+        boolean consumed = send(event);
         event.reset();
         return consumed;
     }
 
+    /**
+     * Creates and sends an input event based on a provided mouse action.
+     *
+     * @param button The specific input to be sent.
+     * @param buttonDown True if the button is pressed, false if not.
+     * @param position The position of the mouse.
+     * @param delta The length of the current frame.
+     * @return True if the event has been consumed by an event listener, false otherwise.
+     */
     private boolean sendMouseEvent(MouseInput button, boolean buttonDown, Vector2i position, float delta) {
         MouseButtonEvent event;
         switch (button) {
@@ -388,33 +473,68 @@ public class InputSystem extends BaseComponentSystem {
                 event = (buttonDown) ? MouseDownButtonEvent.create(button, position, delta) : MouseUpButtonEvent.create(button, position, delta);
                 break;
         }
+        boolean consumed = send(event);
+        event.reset();
+        return consumed;
+    }
+
+    /**
+     * Creates and sends an input event based on a provided mouse wheel action.
+     *
+     * @param pos The position of the mouse.
+     * @param wheelTurns The number of times the scroll wheel has turned.
+     * @param delta The length of the current frame.
+     * @return True if the event has been consumed by an event listener, false otherwise.
+     */
+    private boolean sendMouseWheelEvent(Vector2i pos, int wheelTurns, float delta) {
+        MouseWheelEvent mouseWheelEvent = new MouseWheelEvent(pos, wheelTurns, delta);
+        return send(mouseWheelEvent);
+    }
+
+    /**
+     * Sends a provided input event to the local player's input entities.
+     *
+     * @param event The input event to be sent.
+     * @return True if the event has been consumed by an event listener, false otherwise.
+     */
+    private boolean send(InputEvent event) {
         setupTarget(event);
-        for (EntityRef entity : getInputEntities()) {
+        for (EntityRef entity : inputEntities) {
             entity.send(event);
             if (event.isConsumed()) {
                 break;
             }
         }
-        boolean consumed = event.isConsumed();
-        event.reset();
-        return consumed;
+        return event.isConsumed();
     }
 
-    private boolean sendMouseWheelEvent(Vector2i pos, int wheelTurns, float delta) {
-        MouseWheelEvent mouseWheelEvent = new MouseWheelEvent(pos, wheelTurns, delta);
-        setupTarget(mouseWheelEvent);
-        for (EntityRef entity : getInputEntities()) {
-            entity.send(mouseWheelEvent);
-            if (mouseWheelEvent.isConsumed()) {
-                break;
-            }
+    /**
+     * Sets up the target info for a specified input event.
+     *
+     * @param event The specified input event.
+     */
+    private void setupTarget(InputEvent event) {
+        if (targetSystem.isTargetAvailable()) {
+            event.setTargetInfo(targetSystem.getTarget(), targetSystem.getTargetBlockPosition(), targetSystem.getHitPosition(), targetSystem.getHitNormal());
         }
-        return mouseWheelEvent.isConsumed();
     }
 
-    private EntityRef[] getInputEntities() {
-        return new EntityRef[]{localPlayer.getClientEntity(), localPlayer.getCharacterEntity()};
+    /**
+     * Drop all pending/unprocessed input events.
+     */
+    public void drainQueues() {
+        mouse.getInputQueue();
+        keyboard.getInputQueue();
+        controllers.getInputQueue();
     }
 
+    /**
+     * API-exposed caller to {@link BindsSubsystem#getInputsForBindButton(SimpleUri)}.
+     * TODO: Restored for API reasons, may be duplicating code elsewhere. Should be reviewed.
+     * @param bindId the ID.
+     * @return a list of keyboard/mouse inputs that trigger the binding.
+     */
+    public List<Input> getInputsForBindButton(SimpleUri bindId) {
+        return bindsSubsystem.getInputsForBindButton((bindId));
+    }
 }
-

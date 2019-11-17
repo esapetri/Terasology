@@ -15,11 +15,12 @@
  */
 package org.terasology.rendering.logic;
 
-import com.bulletphysics.linearmath.Transform;
+import org.terasology.math.Transform;
 import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Maps;
 import com.google.common.collect.SetMultimap;
-
+import java.nio.FloatBuffer;
+import java.util.Arrays;
+import java.util.Set;
 import org.lwjgl.BufferUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,12 +34,10 @@ import org.terasology.entitySystem.systems.BaseComponentSystem;
 import org.terasology.entitySystem.systems.RegisterMode;
 import org.terasology.entitySystem.systems.RegisterSystem;
 import org.terasology.entitySystem.systems.RenderSystem;
-import org.terasology.logic.characters.CharacterComponent;
 import org.terasology.logic.location.LocationComponent;
 import org.terasology.logic.players.LocalPlayer;
 import org.terasology.math.AABB;
 import org.terasology.math.MatrixUtils;
-import org.terasology.math.TeraMath;
 import org.terasology.math.VecMath;
 import org.terasology.math.geom.Matrix4f;
 import org.terasology.math.geom.Quat4f;
@@ -51,21 +50,8 @@ import org.terasology.rendering.opengl.OpenGLMesh;
 import org.terasology.rendering.world.WorldRenderer;
 import org.terasology.world.WorldProvider;
 
-import java.nio.FloatBuffer;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.Set;
-
-import static org.lwjgl.opengl.GL11.glPopMatrix;
-import static org.lwjgl.opengl.GL11.glPushMatrix;
-import static org.lwjgl.opengl.GL11.glRotatef;
-import static org.lwjgl.opengl.GL11.glScalef;
-import static org.lwjgl.opengl.GL11.glTranslated;
-
 /**
  * TODO: This should be made generic (no explicit shader or mesh) and ported directly into WorldRenderer? Later note: some GelCube functionality moved to a module
- *
- * @author Immortius <immortius@gmail.com>
  */
 @RegisterSystem(RegisterMode.CLIENT)
 public class MeshRenderer extends BaseComponentSystem implements RenderSystem {
@@ -85,11 +71,6 @@ public class MeshRenderer extends BaseComponentSystem implements RenderSystem {
 
     @In
     private WorldProvider worldProvider;
-
-    private SetMultimap<Material, EntityRef> opaqueMesh = HashMultimap.create();
-    private SetMultimap<Material, EntityRef> translucentMesh = HashMultimap.create();
-    private Map<EntityRef, Material> opaqueEntities = Maps.newHashMap();
-    private Map<EntityRef, Material> translucentEntities = Maps.newHashMap();
 
     private NearestSortingList opaqueMeshSorter = new NearestSortingList();
     private NearestSortingList translucentMeshSorter = new NearestSortingList();
@@ -113,50 +94,41 @@ public class MeshRenderer extends BaseComponentSystem implements RenderSystem {
         addMesh(entity);
     }
 
-    private void addMesh(EntityRef entity) {
-        MeshComponent meshComp = entity.getComponent(MeshComponent.class);
-        // Don't render if hidden from owner (need to improve for third person)
-        if (meshComp.hideFromOwner) {
-            ClientComponent owner = network.getOwnerEntity(entity).getComponent(ClientComponent.class);
-            if (owner != null && owner.local) {
-                return;
-            }
+
+    private boolean isHidden(EntityRef entity, MeshComponent mesh) {
+        if (!mesh.hideFromOwner) {
+            return false;
         }
-        if (meshComp.material != null) {
-            if (meshComp.translucent) {
-                translucentMesh.put(meshComp.material, entity);
-                translucentEntities.put(entity, meshComp.material);
+        ClientComponent owner = network.getOwnerEntity(entity).getComponent(ClientComponent.class);
+        return (owner != null && owner.local);
+    }
+
+    private void addMesh(EntityRef entity) {
+        MeshComponent meshComponent = entity.getComponent(MeshComponent.class);
+        if (meshComponent != null && meshComponent.material != null) {
+            if (meshComponent.translucent) {
                 translucentMeshSorter.add(entity);
             } else {
-                opaqueMesh.put(meshComp.material, entity);
-                opaqueEntities.put(entity, meshComp.material);
                 opaqueMeshSorter.add(entity);
             }
         }
     }
 
-    @ReceiveEvent(components = {CharacterComponent.class, MeshComponent.class})
-    public void onLocalMesh(OnChangedComponent event, EntityRef entity) {
-        removeMesh(entity);
-        addMesh(entity);
-    }
-
-    @ReceiveEvent(components = {MeshComponent.class})
+    @ReceiveEvent(components = MeshComponent.class)
     public void onChangeMesh(OnChangedComponent event, EntityRef entity) {
         removeMesh(entity);
-        addMesh(entity);
+        if (entity.hasComponent(LocationComponent.class)) {
+            addMesh(entity);
+        }
     }
 
     private void removeMesh(EntityRef entity) {
-        Material mat = opaqueEntities.remove(entity);
-        if (mat != null) {
-            opaqueMesh.remove(mat, entity);
-            opaqueMeshSorter.remove(entity);
-        } else {
-            mat = translucentEntities.remove(entity);
-            if (mat != null) {
-                translucentMesh.remove(mat, entity);
+        MeshComponent meshComponent = entity.getComponent(MeshComponent.class);
+        if (meshComponent != null && meshComponent.material != null) {
+            if (meshComponent.translucent) {
                 translucentMeshSorter.remove(entity);
+            } else {
+                opaqueMeshSorter.remove(entity);
             }
         }
     }
@@ -169,141 +141,122 @@ public class MeshRenderer extends BaseComponentSystem implements RenderSystem {
     @Override
     public void renderAlphaBlend() {
         if (config.getRendering().isRenderNearest()) {
-            renderAlphaBlend(Arrays.asList(translucentMeshSorter.getNearest(config.getRendering().getMeshLimit())));
+            renderEntities(Arrays.asList(translucentMeshSorter.getNearest(config.getRendering().getMeshLimit())));
         } else {
-            renderAlphaBlend(translucentEntities.keySet());
+            renderEntities(translucentMeshSorter.getEntities());
         }
     }
 
-    private void renderAlphaBlend(Iterable<EntityRef> entityRefs) {
-        Vector3f cameraPosition = worldRenderer.getActiveCamera().getPosition();
-
-        for (EntityRef entity : entityRefs) {
-            MeshComponent meshComp = entity.getComponent(MeshComponent.class);
-            meshComp.material.enable();
-            LocationComponent location = entity.getComponent(LocationComponent.class);
-            if (location == null) {
-                continue;
-            }
-
-            Quat4f worldRot = location.getWorldRotation();
-            Vector3f worldPos = location.getWorldPosition();
-            float worldScale = location.getWorldScale();
-            AABB aabb = meshComp.mesh.getAABB().transform(worldRot, worldPos, worldScale);
-            if (worldRenderer.getActiveCamera().hasInSight(aabb)) {
-                glPushMatrix();
-
-                glTranslated(worldPos.x - cameraPosition.x, worldPos.y - cameraPosition.y, worldPos.z - cameraPosition.z);
-                Vector3f axis = worldRot.getAxis();
-                float angle = (float) worldRot.getAngle();
-                glRotatef(TeraMath.RAD_TO_DEG * angle, axis.getX(), axis.getY(), axis.getZ());
-                glScalef(worldScale, worldScale, worldScale);
-
-                meshComp.material.setFloat4("colorOffset", meshComp.color.rf(), meshComp.color.gf(), meshComp.color.bf(), meshComp.color.af(), true);
-                meshComp.material.setFloat("light", worldRenderer.getRenderingLightValueAt(worldPos), true);
-
-                meshComp.mesh.render();
-
-                glPopMatrix();
-            }
-        }
-    }
-
-    @Override
     public void renderOpaque() {
         if (config.getRendering().isRenderNearest()) {
-            SetMultimap<Material, EntityRef> entitiesToRender = HashMultimap.create();
-            for (EntityRef entity : Arrays.asList(opaqueMeshSorter.getNearest(config.getRendering().getMeshLimit()))) {
-                MeshComponent meshComp = entity.getComponent(MeshComponent.class);
-                if (meshComp != null && meshComp.material != null) {
-                    entitiesToRender.put(meshComp.material, entity);
-                }
-            }
-            renderOpaque(entitiesToRender);
+            renderEntities(Arrays.asList(opaqueMeshSorter.getNearest(config.getRendering().getMeshLimit())));
         } else {
-            renderOpaque(opaqueMesh);
+            renderEntities(opaqueMeshSorter.getEntities());
         }
     }
 
-    private void renderOpaque(SetMultimap<Material, EntityRef> meshByMaterial) {
+    private void renderEntities(Iterable<EntityRef> entityRefs) {
+        SetMultimap<Material, EntityRef> entitiesToRender = HashMultimap.create();
+        for (EntityRef entity : entityRefs) {
+            MeshComponent meshComponent = entity.getComponent(MeshComponent.class);
+            if (meshComponent != null && meshComponent.material != null) {
+                entitiesToRender.put(meshComponent.material, entity);
+            }
+        }
+        renderEntitiesByMaterial(entitiesToRender);
+    }
+
+    private void renderEntitiesByMaterial(SetMultimap<Material, EntityRef> meshByMaterial) {
         Vector3f cameraPosition = worldRenderer.getActiveCamera().getPosition();
 
         Quat4f worldRot = new Quat4f();
         Vector3f worldPos = new Vector3f();
-        Transform transWorldSpace = new Transform();
 
         FloatBuffer tempMatrixBuffer44 = BufferUtils.createFloatBuffer(16);
         FloatBuffer tempMatrixBuffer33 = BufferUtils.createFloatBuffer(12);
 
         for (Material material : meshByMaterial.keySet()) {
-            OpenGLMesh lastMesh = null;
-            material.enable();
-            material.setFloat("sunlight", 1.0f);
-            material.setFloat("blockLight", 1.0f);
-            material.setMatrix4("projectionMatrix", worldRenderer.getActiveCamera().getProjectionMatrix());
-            material.bindTextures();
+            if (material.isRenderable()) {
+                OpenGLMesh lastMesh = null;
+                material.enable();
+                material.setFloat("sunlight", 1.0f, true);
+                material.setFloat("blockLight", 1.0f, true);
+                material.setMatrix4("projectionMatrix", worldRenderer.getActiveCamera().getProjectionMatrix(), true);
+                material.bindTextures();
 
-            Set<EntityRef> entities = meshByMaterial.get(material);
-            lastRendered = entities.size();
-            for (EntityRef entity : entities) {
-                MeshComponent meshComp = entity.getComponent(MeshComponent.class);
-                LocationComponent location = entity.getComponent(LocationComponent.class);
+                Set<EntityRef> entities = meshByMaterial.get(material);
+                lastRendered = entities.size();
+                for (EntityRef entity : entities) {
+                    MeshComponent meshComp = entity.getComponent(MeshComponent.class);
+                    LocationComponent location = entity.getComponent(LocationComponent.class);
 
-                if (location == null || meshComp.mesh == null || !worldProvider.isBlockRelevant(location.getWorldPosition())) {
-                    continue;
-                }
-                if (meshComp.mesh.isDisposed()) {
-                    logger.error("Attempted to render disposed mesh");
-                    continue;
-                }
-
-                location.getWorldRotation(worldRot);
-                location.getWorldPosition(worldPos);
-                float worldScale = location.getWorldScale();
-
-                javax.vecmath.Matrix4f matrixWorldSpace = new javax.vecmath.Matrix4f(VecMath.to(worldRot), VecMath.to(worldPos), worldScale);
-                transWorldSpace.set(matrixWorldSpace);
-
-                Vector3f worldPositionCameraSpace = new Vector3f();
-                worldPositionCameraSpace.sub(worldPos, cameraPosition);
-                Matrix4f matrixCameraSpace = new Matrix4f(worldRot, worldPositionCameraSpace, worldScale);
-
-                AABB aabb = meshComp.mesh.getAABB().transform(transWorldSpace);
-                if (worldRenderer.getActiveCamera().hasInSight(aabb)) {
-                    if (meshComp.mesh != lastMesh) {
-                        if (lastMesh != null) {
-                            lastMesh.postRender();
-                        }
-                        lastMesh = (OpenGLMesh) meshComp.mesh;
-                        lastMesh.preRender();
+                    if (isHidden(entity, meshComp) || location == null || meshComp.mesh == null || !isRelevant(entity, location.getWorldPosition())) {
+                        continue;
                     }
-                    Matrix4f modelViewMatrix = MatrixUtils.calcModelViewMatrix(worldRenderer.getActiveCamera().getViewMatrix(), matrixCameraSpace);
-                    MatrixUtils.matrixToFloatBuffer(modelViewMatrix, tempMatrixBuffer44);
+                    if (meshComp.mesh.isDisposed()) {
+                        logger.error("Attempted to render disposed mesh");
+                        continue;
+                    }
 
-                    material.setMatrix4("worldViewMatrix", tempMatrixBuffer44, true);
+                    location.getWorldRotation(worldRot);
+                    location.getWorldPosition(worldPos);
+                    float worldScale = location.getWorldScale();
 
-                    MatrixUtils.matrixToFloatBuffer(MatrixUtils.calcNormalMatrix(modelViewMatrix), tempMatrixBuffer33);
-                    material.setMatrix3("normalMatrix", tempMatrixBuffer33, true);
+                    Transform toWorldSpace = new Transform(worldPos, worldRot, worldScale);
 
-                    material.setFloat3("colorOffset", meshComp.color.rf(), meshComp.color.gf(), meshComp.color.bf(), true);
-                    material.setFloat("sunlight", worldRenderer.getSunlightValueAt(worldPos), true);
-                    material.setFloat("blockLight", worldRenderer.getBlockLightValueAt(worldPos), true);
+                    Vector3f offsetFromCamera = new Vector3f();
+                    offsetFromCamera.sub(worldPos, cameraPosition);
+                    Matrix4f matrixCameraSpace = new Matrix4f(worldRot, offsetFromCamera, worldScale);
 
-                    lastMesh.doRender();
+                    AABB aabb = meshComp.mesh.getAABB().transform(toWorldSpace);
+                    if (worldRenderer.getActiveCamera().hasInSight(aabb)) {
+                        if (meshComp.mesh != lastMesh) {
+                            if (lastMesh != null) {
+                                lastMesh.postRender();
+                            }
+                            lastMesh = (OpenGLMesh) meshComp.mesh;
+                            lastMesh.preRender();
+                        }
+
+                        Matrix4f modelViewMatrix = MatrixUtils.calcModelViewMatrix(worldRenderer.getActiveCamera().getViewMatrix(), matrixCameraSpace);
+                        MatrixUtils.matrixToFloatBuffer(modelViewMatrix, tempMatrixBuffer44);
+                        MatrixUtils.matrixToFloatBuffer(MatrixUtils.calcNormalMatrix(modelViewMatrix), tempMatrixBuffer33);
+
+                        material.setMatrix4("projectionMatrix", worldRenderer.getActiveCamera().getProjectionMatrix(), true);
+                        material.setMatrix4("worldViewMatrix", tempMatrixBuffer44, true);
+                        material.setMatrix3("normalMatrix", tempMatrixBuffer33, true);
+
+                        material.setFloat3("colorOffset", meshComp.color.rf(), meshComp.color.gf(), meshComp.color.bf(), true);
+                        material.setFloat("sunlight", worldRenderer.getMainLightIntensityAt(worldPos), true);
+                        material.setFloat("blockLight", Math.max(worldRenderer.getBlockLightIntensityAt(worldPos), meshComp.selfLuminance), true);
+
+                        lastMesh.doRender();
+                    }
                 }
-            }
-            if (lastMesh != null) {
-                lastMesh.postRender();
+                if (lastMesh != null) {
+                    lastMesh.postRender();
+                }
             }
         }
     }
 
-    @Override
-    public void renderOverlay() {
+    /**
+     * Checks whether the entity at the given position is relevant.
+     * <p>
+     * The entity at the given position is relevant if
+     * a) the entity itself is always relevant, or
+     * b) the block at the position is relevant.
+     *
+     * @param entity   the entity to check for relevance
+     * @param position the world position the entity is located
+     * @return true if the entity itself or the block at the given position are relevant, false otherwise.
+     */
+    private boolean isRelevant(EntityRef entity, Vector3f position) {
+        return worldProvider.isBlockRelevant(position) || entity.isAlwaysRelevant();
     }
 
     @Override
-    public void renderFirstPerson() {
+    public void renderOverlay() {
     }
 
     @Override

@@ -15,13 +15,13 @@
  */
 package org.terasology.world.propagation;
 
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.world.block.Block;
 import org.terasology.world.chunks.ChunkConstants;
 import org.terasology.world.chunks.LitChunk;
 
 /**
- * @author Immortius
+ * Provides a view over a single chunk using a given propagation rule.
  */
 public class SingleChunkView implements PropagatorWorldView {
 

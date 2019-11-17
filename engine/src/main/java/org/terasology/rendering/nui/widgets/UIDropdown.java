@@ -1,11 +1,11 @@
 /*
- * Copyright 2014 MovingBlocks
+ * Copyright 2016 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,35 +16,49 @@
 package org.terasology.rendering.nui.widgets;
 
 import com.google.common.collect.Lists;
-import org.terasology.input.MouseInput;
+import org.terasology.input.Keyboard;
 import org.terasology.math.Border;
-import org.terasology.math.Rect2i;
-import org.terasology.math.Vector2i;
+import org.terasology.math.geom.Rect2i;
+import org.terasology.math.geom.Vector2i;
 import org.terasology.rendering.assets.font.Font;
+import org.terasology.rendering.nui.ActivatableWidget;
 import org.terasology.rendering.nui.BaseInteractionListener;
 import org.terasology.rendering.nui.Canvas;
-import org.terasology.rendering.nui.CoreWidget;
 import org.terasology.rendering.nui.InteractionListener;
 import org.terasology.rendering.nui.SubRegion;
+import org.terasology.rendering.nui.TabbingManager;
 import org.terasology.rendering.nui.databinding.Binding;
 import org.terasology.rendering.nui.databinding.DefaultBinding;
+import org.terasology.rendering.nui.events.NUIKeyEvent;
+import org.terasology.rendering.nui.events.NUIMouseClickEvent;
 import org.terasology.rendering.nui.itemRendering.ItemRenderer;
 import org.terasology.rendering.nui.itemRendering.ToStringTextRenderer;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * @author Immortius
+ * A dropdown widget.
+ *
+ * @param <T> the list element type
  */
-public class UIDropdown<T> extends CoreWidget {
+public class UIDropdown<T> extends ActivatableWidget {
+
+    private List<InteractionListener> optionListeners = Lists.newArrayList();
+
+    protected int highlighted;
+
     private static final String LIST = "list";
     private static final String LIST_ITEM = "list-item";
 
-    private Binding<List<T>> options = new DefaultBinding<List<T>>(Lists.<T>newArrayList());
+    private Binding<List<T>> options = new DefaultBinding<>(new ArrayList<>());
     private Binding<T> selection = new DefaultBinding<>();
+
+    private ItemRenderer<T> optionRenderer = new ToStringTextRenderer<>();
+    protected boolean opened;
     private InteractionListener mainListener = new BaseInteractionListener() {
         @Override
-        public boolean onMouseClick(MouseInput button, Vector2i pos) {
+        public boolean onMouseClick(NUIMouseClickEvent event) {
             opened = !opened;
             optionListeners.clear();
             if (opened) {
@@ -55,12 +69,9 @@ public class UIDropdown<T> extends CoreWidget {
             return true;
         }
     };
-    private List<InteractionListener> optionListeners = Lists.newArrayList();
-    private ItemRenderer<T> optionRenderer = new ToStringTextRenderer<>();
-
-    private boolean opened;
 
     public UIDropdown() {
+
     }
 
     public UIDropdown(String id) {
@@ -81,7 +92,9 @@ public class UIDropdown<T> extends CoreWidget {
             }
         }
 
-        if (opened) {
+        if (!isEnabled()) {
+            // do not open and do not add an interaction region
+        } else if (opened) {
             canvas.setPart(LIST);
             canvas.setDrawOnTop(true);
             Font font = canvas.getCurrentStyle().getFont();
@@ -94,8 +107,12 @@ public class UIDropdown<T> extends CoreWidget {
 
             int itemHeight = itemMargin.getTotalHeight() + font.getLineHeight();
             canvas.setPart(LIST_ITEM);
+
             for (int i = 0; i < optionListeners.size(); ++i) {
                 if (optionListeners.get(i).isMouseOver()) {
+                    canvas.setMode(HOVER_MODE);
+                    highlighted = i;
+                } else if (i == highlighted) {
                     canvas.setMode(HOVER_MODE);
                 } else {
                     canvas.setMode(DEFAULT_MODE);
@@ -120,7 +137,9 @@ public class UIDropdown<T> extends CoreWidget {
 
     @Override
     public String getMode() {
-        if (opened) {
+        if (!isEnabled()) {
+            return DISABLED_MODE;
+        } else if (opened || this.equals(TabbingManager.focusedWidget)) {
             return ACTIVE_MODE;
         }
         return DEFAULT_MODE;
@@ -130,16 +149,27 @@ public class UIDropdown<T> extends CoreWidget {
     public void onLoseFocus() {
         super.onLoseFocus();
         opened = false;
+        optionListeners.clear();
     }
 
     public void bindOptions(Binding<List<T>> binding) {
         options = binding;
     }
 
+    /**
+     * Get all the options from the dropdown.
+     *
+     * @return A List containing all the options.
+     */
     public List<T> getOptions() {
         return options.get();
     }
 
+    /**
+     * Set a new set of options for the dropdown.
+     *
+     * @param values A List containing the new options.
+     */
     public void setOptions(List<T> values) {
         this.options.set(values);
     }
@@ -148,30 +178,126 @@ public class UIDropdown<T> extends CoreWidget {
         this.selection = binding;
     }
 
+    /**
+     * Get the currently selected item.
+     *
+     * @return The currently selected item.
+     */
     public T getSelection() {
         return selection.get();
     }
 
+    /**
+     * Set the item from that should be selected.
+     * Note that this item does not actually have to be contained in the List of options.
+     *
+     * @param value The item to set as selected.
+     */
     public void setSelection(T value) {
         selection.set(value);
     }
 
+    /**
+     * Set the renderer to use for the options.
+     * This is used to display the options on the dropdown list and in the selection box.
+     *
+     * @param itemRenderer The new item renderer.
+     */
     public void setOptionRenderer(ItemRenderer<T> itemRenderer) {
         optionRenderer = itemRenderer;
+    }
+
+    public void setOpenedReverse(boolean selectionSet) {
+        opened = !opened;
+
+        if (!opened) {
+            if (selectionSet) {
+                setSelection(getOptions().get(highlighted));
+            }
+        }
+        if (getOptions().size() != optionListeners.size()) {
+            optionListeners.clear();
+
+            for (int i = 0; i < getOptions().size(); ++i) {
+                optionListeners.add(new ItemListener(i));
+            }
+        }
     }
 
     private class ItemListener extends BaseInteractionListener {
         private int index;
 
-        public ItemListener(int index) {
+        ItemListener(int index) {
             this.index = index;
         }
 
         @Override
-        public boolean onMouseClick(MouseInput button, Vector2i pos) {
+        public boolean onMouseClick(NUIMouseClickEvent event) {
             setSelection(getOptions().get(index));
+            highlighted = index;
             opened = false;
             return true;
         }
+    }
+
+    public void changeHighlighted(boolean increase) {
+        if (!opened) {
+            highlighted = getOptions().indexOf(getSelection());
+        }
+
+        if (increase) {
+            highlighted++;
+            if (highlighted >= getOptions().size()) {
+                highlighted = 0;
+            }
+        } else {
+            highlighted--;
+            if (highlighted < 0) {
+                highlighted = getOptions().size() - 1;
+            }
+        }
+
+        if (!opened) {
+            setSelection(getOptions().get(highlighted));
+        }
+    }
+
+    public boolean isOpened() {
+        return opened;
+    }
+
+    @Override
+    public boolean onKeyEvent(NUIKeyEvent event) {
+        if (event.isDown()) {
+            int keyId = event.getKey().getId();
+            switch (keyId) {
+                case Keyboard.KeyId.UP:
+                    this.changeHighlighted(false);
+                    return false;
+                case Keyboard.KeyId.DOWN:
+                    this.changeHighlighted(true);
+                    return false;
+                case Keyboard.KeyId.LEFT:
+                    if (opened) {
+                        setOpenedReverse(false);
+                    }
+                    return true;
+                case Keyboard.KeyId.ENTER:
+                    if (opened) {
+                        setSelection(getOptions().get(highlighted));
+                        setOpenedReverse(false);
+                    } else {
+                        setOpenedReverse(false);
+                        highlighted = getOptions().indexOf(getSelection());
+                    }
+                    return true;
+                case Keyboard.KeyId.RIGHT:
+                    if (!opened) {
+                        setOpenedReverse(false);
+                    }
+                    return true;
+            }
+        }
+        return super.onKeyEvent(event);
     }
 }

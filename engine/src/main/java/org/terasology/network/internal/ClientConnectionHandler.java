@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MovingBlocks
+ * Copyright 2016 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package org.terasology.network.internal;
 
 import com.google.common.collect.Sets;
+import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
@@ -41,10 +42,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Locale;
 import java.util.Set;
+import java.util.Timer;
 
-/**
- * @author Immortius
- */
 public class ClientConnectionHandler extends SimpleChannelUpstreamHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(ClientConnectionHandler.class);
@@ -52,7 +51,6 @@ public class ClientConnectionHandler extends SimpleChannelUpstreamHandler {
     private final JoinStatusImpl joinStatus;
     private NetworkSystemImpl networkSystem;
     private ServerImpl server;
-    private ChannelHandlerContext channelHandlerContext;
     private ModuleManager moduleManager;
 
     private Set<String> missingModules = Sets.newHashSet();
@@ -60,30 +58,93 @@ public class ClientConnectionHandler extends SimpleChannelUpstreamHandler {
     private Path tempModuleLocation;
     private BufferedOutputStream downloadingModule;
     private long lengthReceived;
+    private Timer timeoutTimer = new Timer();
+    private long timeoutPoint = System.currentTimeMillis();
+    private final long timeoutThreshold = 10000;
+    private Channel channel;
 
+    /**
+     * Initialises: network system, join status, and module manager.
+     * @param joinStatus
+     * @param networkSystem
+     */
     public ClientConnectionHandler(JoinStatusImpl joinStatus, NetworkSystemImpl networkSystem) {
         this.networkSystem = networkSystem;
         this.joinStatus = joinStatus;
+        // TODO: implement translation of errorMessage in messageReceived once context is available
+        // See https://github.com/MovingBlocks/Terasology/pull/3332#discussion_r187081375
         this.moduleManager = CoreRegistry.get(ModuleManager.class);
+    }
+
+    /**
+     * Sets timeout threshold, if client exceeds this time during connection it will automatically close the channel.
+     * @param inputChannel Socket for connections to allow I/O.
+     */
+    private void scheduleTimeout(Channel inputChannel) {
+        channel = inputChannel;
+        timeoutPoint = System.currentTimeMillis() + timeoutThreshold;
+        timeoutTimer.schedule(new java.util.TimerTask() {
+            @Override
+            public void run() {
+                synchronized (joinStatus) {
+                    if (System.currentTimeMillis() > timeoutPoint
+                            && joinStatus.getStatus() != JoinStatus.Status.COMPLETE
+                            && joinStatus.getStatus() != JoinStatus.Status.FAILED) {
+                        joinStatus.setErrorMessage("Server stopped responding.");
+                        channel.close();
+                        logger.error("Server timeout threshold of {} ms exceeded.", timeoutThreshold);
+                    }
+                }
+            }
+        }, timeoutThreshold + 200);
     }
 
     @Override
     public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) {
+        // If we timed out, don't handle anymore messages.
+        if (joinStatus.getStatus() == JoinStatus.Status.FAILED) {
+            return;
+        }
+        scheduleTimeout(ctx.getChannel());
+
+        // Handle message
         NetData.NetMessage message = (NetData.NetMessage) e.getMessage();
-        if (message.hasServerInfo()) {
-            receivedServerInfo(message.getServerInfo());
-        } else if (message.hasModuleDataHeader()) {
-            receiveModuleStart(message.getModuleDataHeader());
-        } else if (message.hasModuleData()) {
-            receiveModule(message.getModuleData());
-        } else if (message.hasJoinComplete()) {
-            completeJoin(message.getJoinComplete());
-        } else {
-            logger.error("Received unexpected message");
+        String errorMessage = message.getServerInfo().getErrorMessage();
+        if (errorMessage != null && !errorMessage.isEmpty()) {
+            synchronized (joinStatus) {
+                joinStatus.setErrorMessage(errorMessage);
+                ctx.getChannel().close();
+                return;
+            }
+        }
+
+        synchronized (joinStatus) {
+            timeoutPoint = System.currentTimeMillis() + timeoutThreshold;
+            if (message.hasServerInfo()) {
+                receivedServerInfo(ctx, message.getServerInfo());
+            } else if (message.hasModuleDataHeader()) {
+                receiveModuleStart(ctx, message.getModuleDataHeader());
+            } else if (message.hasModuleData()) {
+                receiveModule(ctx, message.getModuleData());
+            } else if (message.hasJoinComplete()) {
+                if (missingModules.size() > 0) {
+                    logger.error(
+                            "The server did not send all of the modules that were needed before ending module transmission.");
+                }
+                completeJoin(ctx, message.getJoinComplete());
+            } else {
+                logger.error("Received unexpected message");
+            }
         }
     }
 
-    private void receiveModuleStart(NetData.ModuleDataHeader moduleDataHeader) {
+    /**
+     * Attempts to receive a module from the server and push it to the client. Creates a file on the target machine and begins preparation to write to it.
+     * @param channelHandlerContext
+     * @param moduleDataHeader
+     */
+    private void receiveModuleStart(ChannelHandlerContext channelHandlerContext,
+            NetData.ModuleDataHeader moduleDataHeader) {
         if (receivingModule != null) {
             joinStatus.setErrorMessage("Module download error");
             channelHandlerContext.getChannel().close();
@@ -96,13 +157,18 @@ public class ClientConnectionHandler extends SimpleChannelUpstreamHandler {
                 channelHandlerContext.getChannel().close();
             } else {
                 String sizeString = getSizeString(moduleDataHeader.getSize());
-                joinStatus.setCurrentActivity("Downloading " + moduleDataHeader.getId() + ":" + moduleDataHeader.getVersion() + " (" + sizeString + ")");
+                joinStatus.setCurrentActivity(
+                        "Downloading " + moduleDataHeader.getId() + ":" + moduleDataHeader.getVersion() + " ("
+                                + sizeString + "," + missingModules.size() + " modules remain)");
+                logger.info("Downloading " + moduleDataHeader.getId() + ":" + moduleDataHeader.getVersion() + " ("
+                        + sizeString + "," + missingModules.size() + " modules remain)");
                 receivingModule = moduleDataHeader;
                 lengthReceived = 0;
                 try {
                     tempModuleLocation = Files.createTempFile("terasologyDownload", ".tmp");
                     tempModuleLocation.toFile().deleteOnExit();
-                    downloadingModule = new BufferedOutputStream(Files.newOutputStream(tempModuleLocation, StandardOpenOption.WRITE));
+                    downloadingModule = new BufferedOutputStream(
+                            Files.newOutputStream(tempModuleLocation, StandardOpenOption.WRITE));
                 } catch (IOException e) {
                     logger.error("Failed to write received module", e);
                     joinStatus.setErrorMessage("Module download error");
@@ -110,11 +176,18 @@ public class ClientConnectionHandler extends SimpleChannelUpstreamHandler {
                 }
             }
         } else {
-            logger.error("Received unwanted module {}:{} from server", moduleDataHeader.getId(), moduleDataHeader.getVersion());
+            logger.error("Received unwanted module {}:{} from server", moduleDataHeader.getId(),
+                    moduleDataHeader.getVersion());
             joinStatus.setErrorMessage("Module download error");
             channelHandlerContext.getChannel().close();
         }
     }
+
+    /**
+     * Converts file size to a string in either bytes, KB, or MB. Dependant on the files size.
+     * @param size Size of the file.
+     * @return String of the file size in either bytes or KB or MB.
+     */
 
     private String getSizeString(long size) {
         if (size < 1024) {
@@ -126,7 +199,12 @@ public class ClientConnectionHandler extends SimpleChannelUpstreamHandler {
         }
     }
 
-    private void receiveModule(NetData.ModuleData moduleData) {
+    /**
+     * Converts the modules data to a byte array and writes it to a file, which then is copied from the temp directory to the correct directory.
+     * @param channelHandlerContext
+     * @param moduleData The data of the module.
+     */
+    private void receiveModule(ChannelHandlerContext channelHandlerContext, NetData.ModuleData moduleData) {
         if (receivingModule == null) {
             joinStatus.setErrorMessage("Module download error");
             channelHandlerContext.getChannel().close();
@@ -158,7 +236,7 @@ public class ClientConnectionHandler extends SimpleChannelUpstreamHandler {
                     receivingModule = null;
 
                     if (missingModules.isEmpty()) {
-                        sendJoin();
+                        sendJoin(channelHandlerContext);
                     }
                 } else {
                     logger.error("Module rejected");
@@ -173,7 +251,12 @@ public class ClientConnectionHandler extends SimpleChannelUpstreamHandler {
         }
     }
 
-    private void completeJoin(NetData.JoinCompleteMessage joinComplete) {
+    /**
+     * Passes the join complete message to the client, and marks the entities joining as successful.
+     * @param channelHandlerContext
+     * @param joinComplete
+     */
+    private void completeJoin(ChannelHandlerContext channelHandlerContext, NetData.JoinCompleteMessage joinComplete) {
         logger.info("Join complete received");
         server.setClientId(joinComplete.getClientId());
 
@@ -182,7 +265,12 @@ public class ClientConnectionHandler extends SimpleChannelUpstreamHandler {
         joinStatus.setComplete();
     }
 
-    private void receivedServerInfo(NetData.ServerInfoMessage message) {
+    /**
+     * Gets the server information and passes it to the client, while also checking if all required modules have been downloaded.
+     * @param channelHandlerContext
+     * @param message Passes the server information message to the function.
+     */
+    private void receivedServerInfo(ChannelHandlerContext channelHandlerContext, NetData.ServerInfoMessage message) {
         logger.info("Received server info");
         ((EngineTime) CoreRegistry.get(Time.class)).setGameTime(message.getTime());
         this.server = new ServerImpl(networkSystem, channelHandlerContext.getChannel());
@@ -190,14 +278,15 @@ public class ClientConnectionHandler extends SimpleChannelUpstreamHandler {
 
         // Request missing modules
         for (NetData.ModuleInfo info : message.getModuleList()) {
-            if (null == moduleManager.getRegistry().getModule(new Name(info.getModuleId()), new Version(info.getModuleVersion()))) {
+            if (null == moduleManager.getRegistry().getModule(new Name(info.getModuleId()),
+                    new Version(info.getModuleVersion()))) {
                 missingModules.add(info.getModuleId().toLowerCase(Locale.ENGLISH));
             }
         }
 
         if (missingModules.isEmpty()) {
             joinStatus.setCurrentActivity("Finalizing join");
-            sendJoin();
+            sendJoin(channelHandlerContext);
         } else {
             joinStatus.setCurrentActivity("Requesting missing modules");
             NetData.NetMessage.Builder builder = NetData.NetMessage.newBuilder();
@@ -208,7 +297,11 @@ public class ClientConnectionHandler extends SimpleChannelUpstreamHandler {
         }
     }
 
-    private void sendJoin() {
+    /**
+     * Sends a join request from the client upstream to the server.
+     * @param channelHandlerContext
+     */
+    private void sendJoin(ChannelHandlerContext channelHandlerContext) {
         Config config = CoreRegistry.get(Config.class);
         NetData.JoinMessage.Builder bldr = NetData.JoinMessage.newBuilder();
         NetData.Color.Builder clrbldr = NetData.Color.newBuilder();
@@ -220,14 +313,13 @@ public class ClientConnectionHandler extends SimpleChannelUpstreamHandler {
         channelHandlerContext.getChannel().write(NetData.NetMessage.newBuilder().setJoin(bldr).build());
     }
 
-    public void channelAuthenticated(ChannelHandlerContext ctx) {
-        channelHandlerContext = ctx;
-        ctx.getChannel().write(NetData.NetMessage.newBuilder()
-                .setServerInfoRequest(NetData.ServerInfoRequest.newBuilder()).build());
-        joinStatus.setCurrentActivity("Requesting server info");
-    }
-
+    /**
+     * Gets the clients Join Status
+     * @return Returns join status.
+     */
     public JoinStatus getJoinStatus() {
-        return joinStatus;
+        synchronized (joinStatus) {
+            return joinStatus;
+        }
     }
 }

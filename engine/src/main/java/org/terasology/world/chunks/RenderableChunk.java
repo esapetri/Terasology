@@ -20,7 +20,6 @@ import org.terasology.module.sandbox.API;
 import org.terasology.rendering.primitives.ChunkMesh;
 
 /**
- * @author Immortius
  */
 @API
 public interface RenderableChunk extends LitChunk {
@@ -49,9 +48,6 @@ public interface RenderableChunk extends LitChunk {
 
     void disposeMesh();
 
-    void setAdjacentChunksReady(boolean b);
-
-    boolean areAdjacentChunksReady();
-
     boolean isReady();
+
 }

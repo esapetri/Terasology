@@ -17,6 +17,9 @@ package org.terasology.math;
 
 import org.junit.Test;
 import org.terasology.config.Config;
+import org.terasology.context.internal.ContextImpl;
+import org.terasology.context.internal.MockContext;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.registry.CoreRegistry;
 
 import static org.junit.Assert.assertEquals;
@@ -24,14 +27,15 @@ import static org.junit.Assert.assertEquals;
 public class ChunkMathTest {
 
     @Test
-    public void getEdgeRegion() {
+    public void testGetEdgeRegion() {
         Region3i region = Region3i.createFromMinAndSize(new Vector3i(16, 0, 16), new Vector3i(16, 128, 16));
         assertEquals(Region3i.createFromMinMax(new Vector3i(16, 0, 16), new Vector3i(16, 127, 31)), ChunkMath.getEdgeRegion(region, Side.LEFT));
     }
 
     @Test
-    public void regionPositions() {
-        CoreRegistry.put(Config.class, new Config());
+    public void testRegionPositions() {
+        CoreRegistry.setContext(new ContextImpl());
+        CoreRegistry.put(Config.class, new Config(new MockContext()));
 
         assertEquals(1, ChunkMath.calcChunkPos(Region3i.createFromMinMax(new Vector3i(0, 0, 0), new Vector3i(0, 0, 0))).length);
         assertEquals(1, ChunkMath.calcChunkPos(Region3i.createFromMinMax(new Vector3i(0, 0, 0), new Vector3i(31, 63, 31))).length);

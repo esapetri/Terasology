@@ -16,13 +16,15 @@
 
 package org.terasology.math;
 
+import java.math.RoundingMode;
+
 import org.terasology.math.geom.Vector3f;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.world.chunks.ChunkConstants;
 
 /**
  * Collection of math functions.
  *
- * @author Benjamin Glatzel <benjamin.glatzel@me.com>
  */
 public final class ChunkMath {
 
@@ -59,12 +61,22 @@ public final class ChunkMath {
         return (z >> chunkPowerZ);
     }
 
+    public static int calcChunkPosX(int x) {
+        return calcChunkPosX(x, ChunkConstants.CHUNK_POWER.x);
+    }
+    public static int calcChunkPosY(int y) {
+        return calcChunkPosY(y, ChunkConstants.CHUNK_POWER.y);
+    }
+    public static int calcChunkPosZ(int z) {
+        return calcChunkPosZ(z, ChunkConstants.CHUNK_POWER.z);
+    }
+
     public static Vector3i calcChunkPos(Vector3i pos, Vector3i chunkPower) {
         return calcChunkPos(pos.x, pos.y, pos.z, chunkPower);
     }
 
     public static Vector3i calcChunkPos(Vector3f pos) {
-        return calcChunkPos(new Vector3i(pos, 0.5f));
+        return calcChunkPos(new Vector3i(pos, RoundingMode.HALF_UP));
     }
 
     public static Vector3i calcChunkPos(Vector3i pos) {
@@ -130,6 +142,18 @@ public final class ChunkMath {
         return blockZ & chunkPosFilterZ;
     }
 
+    public static int calcBlockPosX(int blockX) {
+        return calcBlockPosX(blockX, ChunkConstants.INNER_CHUNK_POS_FILTER.x);
+    }
+
+    public static int calcBlockPosY(int blockY) {
+        return calcBlockPosY(blockY, ChunkConstants.INNER_CHUNK_POS_FILTER.y);
+    }
+
+    public static int calcBlockPosZ(int blockZ) {
+        return calcBlockPosZ(blockZ, ChunkConstants.INNER_CHUNK_POS_FILTER.z);
+    }
+
     public static Vector3i calcBlockPos(Vector3i worldPos) {
         return calcBlockPos(worldPos.x, worldPos.y, worldPos.z, ChunkConstants.INNER_CHUNK_POS_FILTER);
     }
@@ -159,7 +183,7 @@ public final class ChunkMath {
         Side surfaceDir = Side.inDirection(normal);
         Vector3f attachDir = surfaceDir.reverse().getVector3i().toVector3f();
         Vector3f rawDirection = new Vector3f(direction);
-        float dot = (float) rawDirection.dot(attachDir);
+        float dot = rawDirection.dot(attachDir);
         rawDirection.sub(new Vector3f(dot * attachDir.x, dot * attachDir.y, dot * attachDir.z));
         return Side.inDirection(rawDirection.x, rawDirection.y, rawDirection.z).reverse();
     }
@@ -202,6 +226,7 @@ public final class ChunkMath {
     /**
      * Populates a target array with the minimum value adjacent to each location, including the location itself.
      * TODO: this is too specific for a general class like this. Move to a new class AbstractBatchPropagator
+     *
      * @param source
      * @param target
      * @param populateMargins Whether to populate the edges of the target array
@@ -247,5 +272,22 @@ public final class ChunkMath {
             // x == dimX - 1; y == dimY - 1
             target[dimX - 1 + dimX * (dimY - 1)] = Math.min(source[dimX - 2 + dimX * (dimY - 1)], source[dimX - 1 + dimX * (dimY - 2)]);
         }
+    }
+
+    /**
+     * Works out whether the given block resides inside the given chunk.
+     *
+     * Both positions must be given as world position, not local position. In addition, the chunk position must be
+     * given in chunk coordinates, not in block coordinates.
+     *
+     * For example, using chunks of width 32, a block with x coordinate of 33 will be counted as inside a chunk with x
+     * coordinate of 1.
+     *
+     * @param blockWorldPos the block to check for
+     * @param chunkWorldPos the chunk to check in
+     * @return whether the block is inside the chunk
+     */
+    public static boolean blockInChunk(Vector3i blockWorldPos, Vector3i chunkWorldPos) {
+        return calcChunkPos(blockWorldPos).equals(chunkWorldPos);
     }
 }

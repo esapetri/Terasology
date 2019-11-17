@@ -15,38 +15,20 @@
  */
 package org.terasology.game;
 
-import org.terasology.engine.TerasologyEngine;
-import org.terasology.engine.EngineTime;
-
 /**
- * @author Immortius
  */
 public class Game {
-
-    private EngineTime time;
 
     private String name = "";
     private String seed = "";
 
-    private TerasologyEngine terasologyEngine;
-
-    public Game(TerasologyEngine terasologyEngine, EngineTime time) {
-        this.terasologyEngine = terasologyEngine;
-        this.time = time;
-    }
-
     public void load(GameManifest manifest) {
         this.name = manifest.getTitle();
         this.seed = manifest.getSeed();
-        time.setGameTime(manifest.getTime());
     }
 
     public String getName() {
         return name;
-    }
-
-    public EngineTime getTime() {
-        return time;
     }
 
     public String getSeed() {

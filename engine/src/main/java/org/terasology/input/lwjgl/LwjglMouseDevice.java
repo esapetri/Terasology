@@ -18,22 +18,35 @@ package org.terasology.input.lwjgl;
 import com.google.common.collect.Queues;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
+import org.terasology.config.Config;
+import org.terasology.config.RenderingConfig;
+import org.terasology.context.Context;
 import org.terasology.input.ButtonState;
 import org.terasology.input.InputType;
-import org.terasology.input.device.InputAction;
+import org.terasology.input.device.MouseAction;
 import org.terasology.input.device.MouseDevice;
-import org.terasology.math.Vector2i;
+import org.terasology.math.geom.Vector2i;
 
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.util.Queue;
 
 /**
- * @author Immortius
  */
-public class LwjglMouseDevice implements MouseDevice {
+public class LwjglMouseDevice implements MouseDevice, PropertyChangeListener {
+    private RenderingConfig renderingConfig;
+    private float uiScale;
+    private boolean mouseGrabbed;
+
+    public LwjglMouseDevice(Context context) {
+        this.renderingConfig = context.get(Config.class).getRendering();
+        this.uiScale = this.renderingConfig.getUiScale() / 100f;
+        this.renderingConfig.subscribe(RenderingConfig.UI_SCALE, this);
+    }
 
     @Override
     public Vector2i getPosition() {
-        return new Vector2i(Mouse.getX(), Display.getHeight() - Mouse.getY());
+        return new Vector2i(Mouse.getX() / this.uiScale, (Display.getHeight() - Mouse.getY()) / this.uiScale);
     }
 
     @Override
@@ -52,20 +65,35 @@ public class LwjglMouseDevice implements MouseDevice {
     }
 
     @Override
-    public Queue<InputAction> getInputQueue() {
-        Queue<InputAction> result = Queues.newArrayDeque();
+    public void setGrabbed(boolean newGrabbed) {
+        if (newGrabbed != mouseGrabbed) {
+            mouseGrabbed = newGrabbed;
+            Mouse.setGrabbed(newGrabbed);
+        }
+    }
+
+    @Override
+    public Queue<MouseAction> getInputQueue() {
+        Queue<MouseAction> result = Queues.newArrayDeque();
 
         while (Mouse.next()) {
             if (Mouse.getEventButton() != -1) {
                 ButtonState state = (Mouse.getEventButtonState()) ? ButtonState.DOWN : ButtonState.UP;
-                result.add(new InputAction(InputType.MOUSE_BUTTON.getInput(Mouse.getEventButton()), state, getPosition()));
+                result.add(new MouseAction(InputType.MOUSE_BUTTON.getInput(Mouse.getEventButton()), state, getPosition()));
             }
             if (Mouse.getEventDWheel() != 0) {
                 int id = (Mouse.getEventDWheel() > 0) ? 1 : -1;
-                result.add(new InputAction(InputType.MOUSE_WHEEL.getInput(id), id * Mouse.getEventDWheel() / 120, getPosition()));
+                result.add(new MouseAction(InputType.MOUSE_WHEEL.getInput(id), id * Mouse.getEventDWheel() / 120, getPosition()));
             }
         }
 
         return result;
+    }
+
+    @Override
+    public void propertyChange(PropertyChangeEvent evt) {
+        if (evt.getPropertyName().equals(RenderingConfig.UI_SCALE)) {
+            this.uiScale = this.renderingConfig.getUiScale() / 100f;
+        }
     }
 }

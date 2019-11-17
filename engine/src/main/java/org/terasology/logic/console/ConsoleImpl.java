@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MovingBlocks
+ * Copyright 2017 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,16 +17,15 @@
 package org.terasology.logic.console;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.terasology.context.Context;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.logic.console.commandSystem.ConsoleCommand;
 import org.terasology.logic.console.commandSystem.exceptions.CommandExecutionException;
@@ -34,8 +33,8 @@ import org.terasology.logic.permission.PermissionManager;
 import org.terasology.naming.Name;
 import org.terasology.network.ClientComponent;
 import org.terasology.network.NetworkSystem;
-import org.terasology.registry.CoreRegistry;
 import org.terasology.rendering.FontColor;
+import org.terasology.rendering.FontUnderline;
 import org.terasology.utilities.collection.CircularBuffer;
 
 import java.util.Arrays;
@@ -47,7 +46,6 @@ import java.util.Set;
 /**
  * The console handles commands and messages.
  *
- * @author Marcel Lehwald <marcel.lehwald@googlemail.com>
  */
 public class ConsoleImpl implements Console {
     private static final String PARAM_SPLIT_REGEX = " (?=([^\"]*\"[^\"]*\")*[^\"]*$)";
@@ -58,9 +56,15 @@ public class ConsoleImpl implements Console {
     private final CircularBuffer<Message> messageHistory = CircularBuffer.create(MAX_MESSAGE_HISTORY);
     private final CircularBuffer<String> localCommandHistory = CircularBuffer.create(MAX_COMMAND_HISTORY);
     private final Map<Name, ConsoleCommand> commandRegistry = Maps.newHashMap();
-    private final Set<ConsoleSubscriber> messageSubscribers = Sets.newSetFromMap(new MapMaker().weakKeys().<ConsoleSubscriber, Boolean>makeMap());
+    private final Set<ConsoleSubscriber> messageSubscribers = Sets.newHashSet();
 
-    private NetworkSystem networkSystem = CoreRegistry.get(NetworkSystem.class);
+    private NetworkSystem networkSystem;
+    private Context context;
+
+    public ConsoleImpl(Context context) {
+        this.networkSystem = context.get(NetworkSystem.class);
+        this.context = context;
+    }
 
     /**
      * Registers a {@link org.terasology.logic.console.commandSystem.ConsoleCommand}.
@@ -74,7 +78,7 @@ public class ConsoleImpl implements Console {
         if (commandRegistry.containsKey(commandName)) {
             logger.warn("Command with name '{}' already registered by class '{}', skipping '{}'",
                     commandName, commandRegistry.get(commandName).getSource().getClass().getCanonicalName(),
-                    command.getClass().getCanonicalName());
+                    command.getSource().getClass().getCanonicalName());
         } else {
             commandRegistry.put(commandName, command);
             logger.debug("Command '{}' successfully registered for class '{}'.", commandName,
@@ -116,11 +120,34 @@ public class ConsoleImpl implements Console {
     /**
      * Adds a message to the console
      *
+     * @param message    The message to be added, as a string.
+     * @param newLine    A boolean: True causes a newline character to be appended at the end of the message. False doesn't.
+     */
+    @Override
+    public void addMessage(String message, boolean newLine) {
+        addMessage(new Message(message, newLine));
+    }
+
+    /**
+     * Adds a message to the console
+     *
+     * @param message    The message to be added, as a string.
+     * @param type       The type of the message
+     * @param newLine    A boolean: True causes a newline character to be appended at the end of the message. False doesn't.
+     */
+    @Override
+    public void addMessage(String message, MessageType type, boolean newLine) {
+        addMessage(new Message(message, type, newLine));
+    }
+
+    /**
+     * Adds a message to the console
+     *
      * @param message The message to be added
      */
     @Override
     public void addMessage(Message message) {
-        String uncoloredText = FontColor.stripColor(message.getMessage());
+        String uncoloredText = FontUnderline.strip(FontColor.stripColor(message.getMessage()));
         logger.info("[{}] {}", message.getType(), uncoloredText);
         messageHistory.add(message);
         for (ConsoleSubscriber subscriber : messageSubscribers) {
@@ -131,6 +158,14 @@ public class ConsoleImpl implements Console {
     @Override
     public void removeMessage(Message message) {
         messageHistory.remove(message);
+    }
+
+    /**
+     * Clears the console of all previous messages.
+     */
+    @Override
+    public void clear() {
+        messageHistory.clear();
     }
 
     @Override
@@ -153,14 +188,7 @@ public class ConsoleImpl implements Console {
     public Iterable<Message> getMessages(MessageType... types) {
         final List<MessageType> allowedTypes = Arrays.asList(types);
 
-        // JAVA8: this can be simplified using Stream.filter()
-        return Collections2.filter(messageHistory, new Predicate<Message>() {
-
-            @Override
-            public boolean apply(Message input) {
-                return allowedTypes.contains(input.getType());
-            }
-        });
+        return Collections2.filter(messageHistory, input -> allowedTypes.contains(input.getType()));
     }
 
     @Override
@@ -192,7 +220,9 @@ public class ConsoleImpl implements Console {
         ClientComponent cc = callingClient.getComponent(ClientComponent.class);
 
         if (cc.local) {
-            localCommandHistory.add(rawCommand);
+            if (!rawCommand.isEmpty() && (localCommandHistory.isEmpty() || !localCommandHistory.getLast().equals(rawCommand))) {
+                localCommandHistory.add(rawCommand);
+            }
         }
 
         return execute(new Name(commandName), processedParameters, callingClient);
@@ -239,13 +269,17 @@ public class ConsoleImpl implements Console {
                 return true;
             } catch (CommandExecutionException e) {
                 Throwable cause = e.getCause();
-                String causeMessage = cause.getLocalizedMessage();
-
-                logger.trace("An error occurred while executing a command: ", e);
-
-                if (Strings.isNullOrEmpty(causeMessage)) {
-                    causeMessage = cause.toString();
+                String causeMessage;
+                if (cause != null) {
+                    causeMessage = cause.getLocalizedMessage();
+                    if (Strings.isNullOrEmpty(causeMessage)) {
+                        causeMessage = cause.toString();
+                    }
+                } else {
+                    causeMessage = e.getLocalizedMessage();
                 }
+
+                logger.error("An error occurred while executing a command", e);
 
                 if (!Strings.isNullOrEmpty(causeMessage)) {
                     callingClient.send(new ErrorMessageEvent("An error occurred while executing command '"
@@ -259,15 +293,15 @@ public class ConsoleImpl implements Console {
     private boolean clientHasPermission(EntityRef callingClient, String requiredPermission) {
         Preconditions.checkNotNull(callingClient, "The calling client must not be null!");
 
-        PermissionManager permissionManager = CoreRegistry.get(PermissionManager.class);
+        PermissionManager permissionManager = context.get(PermissionManager.class);
         boolean hasPermission = true;
 
-        if (permissionManager != null && requiredPermission != null && !requiredPermission.isEmpty()) {
+        if (permissionManager != null && requiredPermission != null
+                && !requiredPermission.equals(PermissionManager.NO_PERMISSION)) {
             hasPermission = false;
             ClientComponent clientComponent = callingClient.getComponent(ClientComponent.class);
-            EntityRef character = clientComponent.character;
 
-            if (permissionManager.hasPermission(character, requiredPermission)) {
+            if (permissionManager.hasPermission(clientComponent.clientInfo, requiredPermission)) {
                 hasPermission = true;
             }
         }

@@ -21,10 +21,19 @@ import org.terasology.world.propagation.PropagationComparison;
 import org.terasology.world.propagation.PropagationRules;
 
 /**
- * @author Immortius
+ * Defines a set of common rules for how light should propagate
+ * <p>
+ * {@inheritDoc}
  */
 public abstract class CommonLightPropagationRules implements PropagationRules {
 
+    /**
+     * Light is more permissive if the block is changed to be translucent or has an open side,
+     * otherwise is less permissive or identical.
+     * <p>
+     * {@inheritDoc}
+     */
+    @Override
     public PropagationComparison comparePropagation(Block newBlock, Block oldBlock, Side side) {
         if (newBlock.isTranslucent() && oldBlock.isTranslucent()) {
             return PropagationComparison.IDENTICAL;
@@ -49,10 +58,27 @@ public abstract class CommonLightPropagationRules implements PropagationRules {
         return PropagationComparison.IDENTICAL;
     }
 
+    /**
+     * Light can spread out of a block if
+     * - it has luminance (ie, glows),
+     * - it is translucent
+     * - or the side isn't full
+     * <p>
+     * {@inheritDoc}
+     */
+    @Override
     public boolean canSpreadOutOf(Block block, Side side) {
         return block.getLuminance() > 0 || block.isTranslucent() || !block.isFullSide(side);
     }
 
+    /**
+     * Light can spread into a block if
+     * - it is translucent,
+     * - or the side isn't ful
+     * <p>
+     * {@inheritDoc}
+     */
+    @Override
     public boolean canSpreadInto(Block block, Side side) {
         return block.isTranslucent() || !block.isFullSide(side);
     }

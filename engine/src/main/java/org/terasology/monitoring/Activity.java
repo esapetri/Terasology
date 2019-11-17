@@ -17,8 +17,8 @@ package org.terasology.monitoring;
 
 /**
  * Activity allows for the use the use of an activity in a try-with-resources block - when the block ends so too does the activity.
- * @author Immortius
  */
+@FunctionalInterface
 public interface Activity extends AutoCloseable {
 
     @Override

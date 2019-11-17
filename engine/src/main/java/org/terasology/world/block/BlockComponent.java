@@ -16,19 +16,18 @@
 package org.terasology.world.block;
 
 import org.terasology.entitySystem.Component;
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.network.Replicate;
 
 /**
  * Used for entities representing a block in the world
  *
- * @author Immortius <immortius@gmail.com>
  */
 public final class BlockComponent implements Component {
     @Replicate
-    Vector3i position = new Vector3i();
+    public Vector3i position = new Vector3i();
     @Replicate
-    Block block;
+    public Block block;
 
     public BlockComponent() {
     }
@@ -38,18 +37,34 @@ public final class BlockComponent implements Component {
         this.position.set(pos);
     }
 
+    /**
+     * @deprecated Deprecated on 21/Sep/2018, because it is error prone (no defensive copy) and needlessly verbose.
+     */
+    @Deprecated
     public Vector3i getPosition() {
         return position;
     }
 
+    /**
+     * @deprecated Deprecated on 21/Sep/2018, because it is needlessly verbose.
+     */
+    @Deprecated
     public void setPosition(Vector3i pos) {
         position.set(pos);
     }
 
+    /**
+     * @deprecated Deprecated on 21/Sep/2018, because it is error prone (no defensive copy) and needlessly verbose.
+     */
+    @Deprecated
     public void setBlock(Block block) {
         this.block = block;
     }
 
+    /**
+     * @deprecated Deprecated on 21/Sep/2018, because it is error prone (no defensive copy) and needlessly verbose.
+     */
+    @Deprecated
     public Block getBlock() {
         return block;
     }

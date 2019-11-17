@@ -16,9 +16,10 @@
 
 package org.terasology.network;
 
+import org.terasology.context.Context;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.entity.internal.EngineEntityManager;
-import org.terasology.entitySystem.metadata.EntitySystemLibrary;
+import org.terasology.entitySystem.metadata.EventLibrary;
 import org.terasology.network.exceptions.HostingFailedException;
 import org.terasology.rendering.nui.Color;
 import org.terasology.world.BlockEntityRegistry;
@@ -28,7 +29,6 @@ import org.terasology.world.chunks.remoteChunkProvider.RemoteChunkProvider;
 /**
  * Interface for the network system
  *
- * @author Immortius
  */
 // TODO: Refactor the core gameplay components like the list of players into a separate system.
 public interface NetworkSystem extends BlockRegistrationListener {
@@ -39,7 +39,7 @@ public interface NetworkSystem extends BlockRegistrationListener {
 
     void shutdown();
 
-    Client joinLocal(String name, Color color);
+    Client joinLocal(String preferredName, Color color);
 
     void update();
 
@@ -55,7 +55,7 @@ public interface NetworkSystem extends BlockRegistrationListener {
 
     void setRemoteWorldProvider(RemoteChunkProvider remoteWorldProvider);
 
-    void connectToEntitySystem(EngineEntityManager entityManager, EntitySystemLibrary library, BlockEntityRegistry blockEntityRegistry);
+    void connectToEntitySystem(EngineEntityManager entityManager, EventLibrary library, BlockEntityRegistry blockEntityRegistry);
 
     int getIncomingMessagesDelta();
 
@@ -66,4 +66,6 @@ public interface NetworkSystem extends BlockRegistrationListener {
     int getOutgoingBytesDelta();
 
     void forceDisconnect(Client client);
+
+    void setContext(Context context);
 }

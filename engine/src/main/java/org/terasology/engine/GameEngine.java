@@ -16,15 +16,32 @@
 
 package org.terasology.engine;
 
+import org.terasology.context.Context;
 import org.terasology.engine.modes.GameState;
 
 /**
  * The game engine is the core of Terasology. It maintains a stack of game states, that drive the behaviour of
  * Terasology in different modes (Main Menu, ingame, dedicated server, etc)
  *
- * @author Immortius
  */
-public interface GameEngine extends AutoCloseable {
+public interface GameEngine {
+
+    /**
+     * @return The current, fine-grained status of the engine.
+     */
+    EngineStatus getStatus();
+
+    /**
+     * Subscribe for notification of engine status changes
+     * @param subscriber
+     */
+    void subscribe(EngineStatusSubscriber subscriber);
+
+    /**
+     * Unsubscribe to notifications of engine status changes.
+     * @param subscriber
+     */
+    void unsubscribe(EngineStatusSubscriber subscriber);
 
     /**
      * Runs the engine, which will block the thread.
@@ -38,30 +55,9 @@ public interface GameEngine extends AutoCloseable {
     void shutdown();
 
     /**
-     * Cleans up the engine. Can only be called after shutdown.
-     * This method should not throw exceptions.
-     */
-    void close();
-
-    /**
-     * @return Whether the engine has been uninitialized
-     */
-    boolean isUninitialized();
-
-    /**
-     * @return Whether the engine has been initialized
-     */
-    boolean isInitialized();
-
-    /**
-     * @return Whether the engine is running
+     * @return Whether the engine is running - this is true from the point run() is called to the point shutdown is complete
      */
     boolean isRunning();
-
-    /**
-     * @return Whether the engine has been disposed
-     */
-    boolean isDisposed();
 
     /**
      * @return The current state of the engine
@@ -75,40 +71,15 @@ public interface GameEngine extends AutoCloseable {
      */
     void changeState(GameState newState);
 
-    // TODO: Move task system elsewhere? Need to support saving queued/unfinished tasks too, when the world
-    // shuts down
-
-    /**
-     * Submits a task to be run concurrent with the main thread
-     *
-     * @param name
-     * @param task
-     */
-    void submitTask(String name, Runnable task);
-
-    boolean hasPendingState();
-
-    boolean isHibernationAllowed();
-
-    void setHibernationAllowed(boolean allowed);
-
-    // TODO: This probably should be elsewhere?
-
-    /**
-     * @return Whether the game window currently has focus
-     */
-    boolean hasFocus();
-
-    /**
-     * @return Whether the game window controls if the mouse is captured.
-     */
-    boolean hasMouseFocus();
-
-    void setFocus(boolean focused);
-
     void subscribeToStateChange(StateChangeSubscriber subscriber);
 
     void unsubscribeToStateChange(StateChangeSubscriber subscriber);
 
+    boolean hasPendingState();
 
+    /**
+     * Creates a context that provides read access to the objects of the engine context and can
+     * be populated with it's own private objects.
+     */
+    Context createChildContext();
 }

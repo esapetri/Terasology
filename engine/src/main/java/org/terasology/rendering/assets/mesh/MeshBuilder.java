@@ -15,16 +15,14 @@
  */
 package org.terasology.rendering.assets.mesh;
 
-import org.terasology.asset.AssetType;
-import org.terasology.asset.AssetUri;
-import org.terasology.asset.Assets;
+import org.terasology.utilities.Assets;
+import org.terasology.assets.ResourceUrn;
 import org.terasology.math.geom.Vector2f;
 import org.terasology.math.geom.Vector3f;
 import org.terasology.module.sandbox.API;
 import org.terasology.rendering.nui.Color;
 
 /**
- * @author Immortius
  */
 public class MeshBuilder {
     private static final float[] VERTICES = {
@@ -138,16 +136,16 @@ public class MeshBuilder {
     }
 
     public Mesh build() {
-        return Assets.generateAsset(AssetType.MESH, meshData, Mesh.class);
+        return Assets.generateAsset(meshData, Mesh.class);
     }
 
-    public Mesh build(AssetUri uri) {
-        return Assets.generateAsset(uri, meshData, Mesh.class);
+    public Mesh build(ResourceUrn urn) {
+        return Assets.generateAsset(urn, meshData, Mesh.class);
     }
 
     /**
      * Add vertices, texture coordinate and indices for a box specified by offset and size.
-     * <p/>
+     * <br><br>
      * Use the texture mapper to change how texture coordinates (u and v) are applied to each vertex.
      */
     public MeshBuilder addBox(Vector3f offset, Vector3f size, float u, float v) {
@@ -157,8 +155,8 @@ public class MeshBuilder {
             addVertex(new Vector3f(offset.x + size.x * VERTICES[i * 3], offset.y + size.y * VERTICES[i * 3 + 1], offset.z + size.z * VERTICES[i * 3 + 2]));
             addTexCoord(textureMapper.map(i, u, v));
         }
-        for (int i = 0; i < INDICES.length; i++) {
-            addIndex(vertexId + INDICES[i]);
+        for (int i : INDICES) {
+            addIndex(vertexId + i);
         }
         return this;
     }

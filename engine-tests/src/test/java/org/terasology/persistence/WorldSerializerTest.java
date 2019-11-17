@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MovingBlocks
+ * Copyright 2016 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,70 +15,29 @@
  */
 package org.terasology.persistence;
 
-import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
-import org.terasology.asset.AssetManager;
-import org.terasology.asset.AssetType;
-import org.terasology.engine.SimpleUri;
-import org.terasology.engine.bootstrap.EntitySystemBuilder;
-import org.terasology.engine.module.ModuleManager;
+import org.terasology.TerasologyTestingEnvironment;
 import org.terasology.entitySystem.entity.EntityBuilder;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.entity.internal.EngineEntityManager;
-import org.terasology.entitySystem.prefab.Prefab;
-import org.terasology.entitySystem.stubs.GetterSetterComponent;
-import org.terasology.entitySystem.stubs.IntegerComponent;
-import org.terasology.entitySystem.stubs.StringComponent;
-import org.terasology.network.NetworkSystem;
 import org.terasology.persistence.serializers.PrefabSerializer;
 import org.terasology.persistence.serializers.WorldSerializer;
 import org.terasology.persistence.serializers.WorldSerializerImpl;
 import org.terasology.protobuf.EntityData;
-import org.terasology.reflection.reflect.ReflectionReflectFactory;
-import org.terasology.registry.CoreRegistry;
-import org.terasology.testUtil.ModuleManagerFactory;
-
-import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
-/**
- * @author Immortius <immortius@gmail.com>
- */
-public class WorldSerializerTest {
-
-    private static ModuleManager moduleManager;
-
-    private EngineEntityManager entityManager;
-    private WorldSerializer worldSerializer;
-
-    @BeforeClass
-    public static void setupClass() throws Exception {
-        moduleManager = ModuleManagerFactory.create();
-    }
-
-    @Before
-    public void setup() {
-
-        AssetManager assetManager = CoreRegistry.put(AssetManager.class, mock(AssetManager.class));
-        when(assetManager.listLoadedAssets(AssetType.PREFAB, Prefab.class)).thenReturn(Collections.<Prefab>emptyList());
-        EntitySystemBuilder builder = new EntitySystemBuilder();
-        entityManager = builder.build(moduleManager.getEnvironment(), mock(NetworkSystem.class), new ReflectionReflectFactory());
-        entityManager.getComponentLibrary().register(new SimpleUri("test", "gettersetter"), GetterSetterComponent.class);
-        entityManager.getComponentLibrary().register(new SimpleUri("test", "string"), StringComponent.class);
-        entityManager.getComponentLibrary().register(new SimpleUri("test", "integer"), IntegerComponent.class);
-        worldSerializer = new WorldSerializerImpl(entityManager, new PrefabSerializer(entityManager.getComponentLibrary(), entityManager.getTypeSerializerLibrary()));
-    }
+public class WorldSerializerTest extends TerasologyTestingEnvironment {
 
     @Test
     public void testNotPersistedIfFlagedOtherwise() throws Exception {
+        EngineEntityManager entityManager = context.get(EngineEntityManager.class);
         EntityBuilder entityBuilder = entityManager.newBuilder();
+        PrefabSerializer prefabSerializer = new PrefabSerializer(entityManager.getComponentLibrary(), entityManager.getTypeSerializerLibrary());
+        WorldSerializer worldSerializer = new WorldSerializerImpl(entityManager, prefabSerializer);
         entityBuilder.setPersistent(false);
         @SuppressWarnings("unused") // just used to express that an entity got created
-        EntityRef entity = entityBuilder.build();
+                EntityRef entity = entityBuilder.build();
 
         EntityData.GlobalStore worldData = worldSerializer.serializeWorld(false);
         assertEquals(0, worldData.getEntityCount());

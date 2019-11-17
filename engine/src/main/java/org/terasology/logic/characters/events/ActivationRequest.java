@@ -22,11 +22,9 @@ import org.terasology.network.NetworkEvent;
 import org.terasology.network.ServerEvent;
 
 /**
- * @author Florian <florian@fkoeberle.de>
  */
 @ServerEvent(lagCompensate = true)
 public class ActivationRequest extends NetworkEvent {
-    private EntityRef instigator;
     /**
      * The field is used to preserve the fact that an item got used, even when the item is no more at the target server.
      */
@@ -50,7 +48,7 @@ public class ActivationRequest extends NetworkEvent {
     public ActivationRequest(EntityRef instigator, boolean ownedEntityUsage, EntityRef usedOwnedEntity,
                              boolean eventWithTarget, EntityRef target, Vector3f origin, Vector3f direction,
                              Vector3f hitPosition, Vector3f hitNormal, int activationId) {
-        this.instigator = instigator;
+        super(instigator);
         this.ownedEntityUsage = ownedEntityUsage;
         this.usedOwnedEntity = usedOwnedEntity;
         this.eventWithTarget = eventWithTarget;
@@ -60,11 +58,6 @@ public class ActivationRequest extends NetworkEvent {
         this.hitNormal = hitNormal;
         this.origin = origin;
         this.activationId = activationId;
-    }
-
-    @Override
-    public EntityRef getInstigator() {
-        return instigator;
     }
 
     public boolean isOwnedEntityUsage() {

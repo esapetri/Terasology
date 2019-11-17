@@ -23,11 +23,11 @@ import org.terasology.core.world.generator.facets.BiomeFacet;
 import org.terasology.core.world.generator.facets.FloraFacet;
 import org.terasology.core.world.generator.rasterizers.FloraType;
 import org.terasology.entitySystem.Component;
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.rendering.nui.properties.Range;
-import org.terasology.utilities.procedural.FastNoise;
-import org.terasology.utilities.procedural.Noise3D;
-import org.terasology.world.biomes.Biome;
+import org.terasology.utilities.procedural.Noise;
+import org.terasology.utilities.procedural.WhiteNoise;
+import org.terasology.biomesAPI.Biome;
 import org.terasology.world.generation.ConfigurableFacetProvider;
 import org.terasology.world.generation.Facet;
 import org.terasology.world.generation.GeneratingRegion;
@@ -45,28 +45,30 @@ import com.google.common.collect.Lists;
  */
 @Produces(FloraFacet.class)
 @Requires({
-    @Facet(SeaLevelFacet.class),
-    @Facet(SurfaceHeightFacet.class),
-    @Facet(BiomeFacet.class)
+        @Facet(SeaLevelFacet.class),
+        @Facet(SurfaceHeightFacet.class),
+        @Facet(BiomeFacet.class)
 //    @Facet(value = DensityFacet.class, border = @FacetBorder(bottom = 1))
 })
 public class DefaultFloraProvider extends SurfaceObjectProvider<Biome, FloraType> implements ConfigurableFacetProvider {
 
-    private Noise3D densityNoiseGen;
+    private Noise densityNoiseGen;
 
-    private DensityConfiguration configuration = new DensityConfiguration();
+    private Configuration configuration = new Configuration();
 
     private Map<FloraType, Float> typeProbs = ImmutableMap.of(
             FloraType.GRASS, 0.85f,
             FloraType.FLOWER, 0.1f,
             FloraType.MUSHROOM, 0.05f);
 
-    private Map<CoreBiome, Float> biomeProbs = ImmutableMap.of(
-            CoreBiome.FOREST, 0.3f,
-            CoreBiome.PLAINS, 0.2f,
-            CoreBiome.MOUNTAINS, 0.2f,
-            CoreBiome.SNOW, 0.001f,
-            CoreBiome.DESERT, 0.001f);
+    private Map<CoreBiome, Float> biomeProbs = ImmutableMap.<CoreBiome, Float>builder()
+            .put(CoreBiome.FOREST, 0.3f)
+            .put(CoreBiome.PLAINS, 0.2f)
+            .put(CoreBiome.MOUNTAINS, 0.2f)
+            .put(CoreBiome.SNOW, 0.001f)
+            .put(CoreBiome.BEACH, 0.001f)
+            .put(CoreBiome.OCEAN, 0f)
+            .put(CoreBiome.DESERT, 0.001f).build();
 
     public DefaultFloraProvider() {
 
@@ -79,33 +81,49 @@ public class DefaultFloraProvider extends SurfaceObjectProvider<Biome, FloraType
             }
         }
 
+        register(CoreBiome.BEACH, FloraType.MUSHROOM, 0);
+        register(CoreBiome.BEACH, FloraType.FLOWER, 0);
         register(CoreBiome.DESERT, FloraType.MUSHROOM, 0);
         register(CoreBiome.SNOW, FloraType.MUSHROOM, 0);
+    }
+
+    /**
+     * @param configuration the default configuration to use
+     */
+    public DefaultFloraProvider(Configuration configuration) {
+        this();
+        this.configuration = configuration;
     }
 
     @Override
     public void setSeed(long seed) {
         super.setSeed(seed);
 
-        densityNoiseGen = new FastNoise(seed);
+        densityNoiseGen = new WhiteNoise(seed);
     }
 
     @Override
     public void process(GeneratingRegion region) {
         SurfaceHeightFacet surface = region.getRegionFacet(SurfaceHeightFacet.class);
         BiomeFacet biomeFacet = region.getRegionFacet(BiomeFacet.class);
-        SeaLevelFacet seaLevel = region.getRegionFacet(SeaLevelFacet.class);
 
         FloraFacet facet = new FloraFacet(region.getRegion(), region.getBorderForFacet(FloraFacet.class));
 
-        List<Predicate<Vector3i>> filters = Lists.newArrayList();
-
-        filters.add(PositionFilters.minHeight(seaLevel.getSeaLevel()));
-        filters.add(PositionFilters.probability(densityNoiseGen, configuration.density));
-
+        List<Predicate<Vector3i>> filters = getFilters(region);
         populateFacet(facet, surface, biomeFacet, filters);
 
         region.setRegionFacet(FloraFacet.class, facet);
+    }
+
+    protected List<Predicate<Vector3i>> getFilters(GeneratingRegion region) {
+        List<Predicate<Vector3i>> filters = Lists.newArrayList();
+
+        SeaLevelFacet seaLevel = region.getRegionFacet(SeaLevelFacet.class);
+        filters.add(PositionFilters.minHeight(seaLevel.getSeaLevel()));
+
+        filters.add(PositionFilters.probability(densityNoiseGen, configuration.density));
+
+        return filters;
     }
 
     @Override
@@ -120,13 +138,12 @@ public class DefaultFloraProvider extends SurfaceObjectProvider<Biome, FloraType
 
     @Override
     public void setConfiguration(Component configuration) {
-        this.configuration = (DensityConfiguration) configuration;
+        this.configuration = (Configuration) configuration;
     }
 
-    private static class DensityConfiguration implements Component {
+    public static class Configuration implements Component {
         @Range(min = 0, max = 1.0f, increment = 0.05f, precision = 2, description = "Define the overall flora density")
-        private float density = 0.4f;
-
+        public float density = 0.4f;
     }
 
 }

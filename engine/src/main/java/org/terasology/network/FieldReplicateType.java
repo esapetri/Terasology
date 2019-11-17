@@ -17,7 +17,6 @@
 package org.terasology.network;
 
 /**
- * @author Immortius
  */
 public enum FieldReplicateType {
     SERVER_TO_CLIENT(false),
@@ -27,7 +26,7 @@ public enum FieldReplicateType {
 
     private boolean replicateFromOwner;
 
-    private FieldReplicateType(boolean fromOwner) {
+    FieldReplicateType(boolean fromOwner) {
         this.replicateFromOwner = fromOwner;
     }
 

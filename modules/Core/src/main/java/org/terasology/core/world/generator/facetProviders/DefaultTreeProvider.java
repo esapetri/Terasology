@@ -23,11 +23,11 @@ import org.terasology.core.world.generator.facets.TreeFacet;
 import org.terasology.core.world.generator.trees.TreeGenerator;
 import org.terasology.core.world.generator.trees.Trees;
 import org.terasology.entitySystem.Component;
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.rendering.nui.properties.Range;
-import org.terasology.utilities.procedural.FastNoise;
-import org.terasology.utilities.procedural.Noise3D;
-import org.terasology.world.biomes.Biome;
+import org.terasology.utilities.procedural.Noise;
+import org.terasology.utilities.procedural.WhiteNoise;
+import org.terasology.biomesAPI.Biome;
 import org.terasology.world.generation.Border3D;
 import org.terasology.world.generation.ConfigurableFacetProvider;
 import org.terasology.world.generation.Facet;
@@ -52,8 +52,8 @@ import com.google.common.collect.Lists;
 })
 public class DefaultTreeProvider extends SurfaceObjectProvider<Biome, TreeGenerator> implements ConfigurableFacetProvider {
 
-    private Noise3D densityNoiseGen;
-    private TreeProviderConfiguration configuration = new TreeProviderConfiguration();
+    private Noise densityNoiseGen;
+    private Configuration configuration = new Configuration();
 
     public DefaultTreeProvider() {
         register(CoreBiome.MOUNTAINS, Trees.oakTree(), 0.04f);
@@ -74,24 +74,27 @@ public class DefaultTreeProvider extends SurfaceObjectProvider<Biome, TreeGenera
         register(CoreBiome.DESERT, Trees.cactus(), 0.04f);
     }
 
+    /**
+     * @param configuration the default configuration to use
+     */
+    public DefaultTreeProvider(Configuration configuration) {
+        this();
+        this.configuration = configuration;
+    }
+
     @Override
     public void setSeed(long seed) {
         super.setSeed(seed);
 
-        densityNoiseGen = new FastNoise(seed);
+        densityNoiseGen = new WhiteNoise(seed);
     }
 
     @Override
     public void process(GeneratingRegion region) {
         SurfaceHeightFacet surface = region.getRegionFacet(SurfaceHeightFacet.class);
         BiomeFacet biome = region.getRegionFacet(BiomeFacet.class);
-        SeaLevelFacet seaLevel = region.getRegionFacet(SeaLevelFacet.class);
 
-        List<Predicate<Vector3i>> filters = Lists.newArrayList();
-
-        filters.add(PositionFilters.minHeight(seaLevel.getSeaLevel()));
-        filters.add(PositionFilters.probability(densityNoiseGen, configuration.density * 0.1f));
-        filters.add(PositionFilters.flatness(surface, 1, 0));
+        List<Predicate<Vector3i>> filters = getFilters(region);
 
         // these value are derived from the maximum tree extents as
         // computed by the TreeTests class. Birch is the highest with 32
@@ -107,6 +110,20 @@ public class DefaultTreeProvider extends SurfaceObjectProvider<Biome, TreeGenera
         region.setRegionFacet(TreeFacet.class, facet);
     }
 
+    protected List<Predicate<Vector3i>> getFilters(GeneratingRegion region) {
+        List<Predicate<Vector3i>> filters = Lists.newArrayList();
+
+        SeaLevelFacet seaLevel = region.getRegionFacet(SeaLevelFacet.class);
+        filters.add(PositionFilters.minHeight(seaLevel.getSeaLevel()));
+
+        filters.add(PositionFilters.probability(densityNoiseGen, configuration.density * 0.05f));
+
+        SurfaceHeightFacet surface = region.getRegionFacet(SurfaceHeightFacet.class);
+        filters.add(PositionFilters.flatness(surface, 1, 0));
+
+        return filters;
+    }
+
     @Override
     public String getConfigurationName() {
         return "Trees";
@@ -119,12 +136,11 @@ public class DefaultTreeProvider extends SurfaceObjectProvider<Biome, TreeGenera
 
     @Override
     public void setConfiguration(Component configuration) {
-        this.configuration = (TreeProviderConfiguration) configuration;
+        this.configuration = (Configuration) configuration;
     }
 
-    private static class TreeProviderConfiguration implements Component {
+    public static class Configuration implements Component {
         @Range(min = 0, max = 1.0f, increment = 0.05f, precision = 2, description = "Define the overall tree density")
-        private float density = 0.4f;
-
+        public float density = 0.2f;
     }
 }

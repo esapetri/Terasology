@@ -17,11 +17,10 @@
 package org.terasology.logic.inventory;
 
 import org.terasology.entitySystem.Component;
-import org.terasology.entitySystem.Owns;
-import org.terasology.entitySystem.entity.EntityRef;
 
 
 public class PickupComponent implements Component {
-    @Owns
-    public EntityRef itemEntity = EntityRef.NULL;
+    public long timeToPickUp;
+
+    public long timeDropped;
 }

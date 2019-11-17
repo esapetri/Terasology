@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 MovingBlocks
+ * Copyright 2018 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,122 +17,198 @@ package org.terasology.rendering.nui.layers.mainMenu;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.terasology.config.Config;
-import org.terasology.registry.CoreRegistry;
+import org.terasology.assets.ResourceUrn;
 import org.terasology.engine.GameEngine;
 import org.terasology.engine.modes.StateLoading;
 import org.terasology.engine.paths.PathManager;
-import org.terasology.registry.In;
 import org.terasology.game.GameManifest;
 import org.terasology.network.NetworkMode;
-import org.terasology.rendering.nui.CoreScreenLayer;
-import org.terasology.rendering.nui.UIWidget;
-import org.terasology.rendering.nui.WidgetUtil;
+import org.terasology.registry.CoreRegistry;
+import org.terasology.rendering.nui.animation.MenuAnimationSystems;
+import org.terasology.rendering.nui.databinding.ReadOnlyBinding;
+import org.terasology.rendering.nui.layers.mainMenu.gameDetailsScreen.GameDetailsScreen;
 import org.terasology.rendering.nui.layers.mainMenu.savedGames.GameInfo;
 import org.terasology.rendering.nui.layers.mainMenu.savedGames.GameProvider;
-import org.terasology.rendering.nui.widgets.ActivateEventListener;
-import org.terasology.rendering.nui.widgets.ItemActivateEventListener;
-import org.terasology.rendering.nui.widgets.UIList;
-import org.terasology.utilities.FilesUtil;
+import org.terasology.rendering.nui.widgets.UIButton;
+import org.terasology.rendering.nui.widgets.UILabel;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
+import java.util.stream.Stream;
 
-/**
- * @author Immortius
- */
-public class SelectGameScreen extends CoreScreenLayer {
-
+public class SelectGameScreen extends SelectionScreen {
+    public static final ResourceUrn ASSET_URI = new ResourceUrn("engine:selectGameScreen");
+    private static final String REMOVE_STRING = "saved game";
     private static final Logger logger = LoggerFactory.getLogger(SelectGameScreen.class);
 
-    @In
-    private Config config;
+    private UniverseWrapper universeWrapper;
 
-    private boolean loadingAsServer;
+    // widgets
+    private UILabel gameTypeTitle;
+    private UIButton load;
+    private UIButton delete;
+    private UIButton details;
+    private UIButton close;
+    private UIButton create;
 
     @Override
     public void initialise() {
-        final UIList<GameInfo> gameList = find("gameList", UIList.class);
+        setAnimationSystem(MenuAnimationSystems.createDefaultSwipeAnimation());
 
-        refreshList(gameList);
-        gameList.subscribe(new ItemActivateEventListener<GameInfo>() {
-            @Override
-            public void onItemActivated(UIWidget widget, GameInfo item) {
-                loadGame(item);
+        initWidgets();
+
+        if (isValidScreen()) {
+
+            if (gameTypeTitle != null) {
+                gameTypeTitle.bindText(new ReadOnlyBinding<String>() {
+                    @Override
+                    public String get() {
+                        if (isLoadingAsServer()) {
+                            return translationSystem.translate("${engine:menu#select-multiplayer-game-sub-title}");
+                        } else {
+                            return translationSystem.translate("${engine:menu#select-singleplayer-game-sub-title}");
+                        }
+                    }
+                });
             }
-        });
 
-        WidgetUtil.trySubscribe(this, "create", new ActivateEventListener() {
-            @Override
-            public void onActivated(UIWidget button) {
-                CreateGameScreen createGameScreen = getManager().pushScreen("engine:createGameScreen", CreateGameScreen.class);
-                createGameScreen.setLoadingAsServer(loadingAsServer);
-            }
-        });
+            initSaveGamePathWidget(PathManager.getInstance().getSavesPath());
 
-        WidgetUtil.trySubscribe(this, "load", new ActivateEventListener() {
-            @Override
-            public void onActivated(UIWidget button) {
-                GameInfo gameInfo = gameList.getSelection();
+            getGameInfos().subscribeSelection((widget, item) -> {
+                load.setEnabled(item != null);
+                delete.setEnabled(item != null);
+                details.setEnabled(item != null);
+                updateDescription(item);
+            });
+
+            getGameInfos().subscribe((widget, item) -> loadGame(item));
+
+            load.subscribe(e -> {
+                final GameInfo gameInfo = getGameInfos().getSelection();
                 if (gameInfo != null) {
                     loadGame(gameInfo);
                 }
-            }
-        });
+            });
 
-        WidgetUtil.trySubscribe(this, "delete", new ActivateEventListener() {
-            @Override
-            public void onActivated(UIWidget button) {
-                GameInfo gameInfo = gameList.getSelection();
+            delete.subscribe(e -> {
+                TwoButtonPopup confirmationPopup = getManager().pushScreen(TwoButtonPopup.ASSET_URI, TwoButtonPopup.class);
+                confirmationPopup.setMessage(translationSystem.translate("${engine:menu#remove-confirmation-popup-title}"),
+                        translationSystem.translate("${engine:menu#remove-confirmation-popup-message}"));
+                confirmationPopup.setLeftButton(translationSystem.translate("${engine:menu#dialog-yes}"), this::removeSelectedGame);
+                confirmationPopup.setRightButton(translationSystem.translate("${engine:menu#dialog-no}"), () -> {
+                });
+            });
+
+            final NewGameScreen newGameScreen = getManager().createScreen(NewGameScreen.ASSET_URI, NewGameScreen.class);
+            create.subscribe(e -> {
+                newGameScreen.setUniverseWrapper(universeWrapper);
+                triggerForwardAnimation(newGameScreen);
+            });
+
+            close.subscribe(e -> triggerBackAnimation());
+
+            details.subscribe(e -> {
+                final GameInfo gameInfo = getGameInfos().getSelection();
                 if (gameInfo != null) {
-                    Path world = PathManager.getInstance().getSavePath(gameInfo.getManifest().getTitle());
-                    try {
-                        FilesUtil.recursiveDelete(world);
-                        gameList.getList().remove(gameInfo);
-                        gameList.setSelection(null);
-                    } catch (Exception e) {
-                        logger.error("Failed to delete saved game", e);
-                        getManager().pushScreen(MessagePopup.ASSET_URI, MessagePopup.class).setMessage("Error Deleting Game", e.getMessage());
-                    }
+                    final GameDetailsScreen detailsScreen = getManager().createScreen(GameDetailsScreen.ASSET_URI, GameDetailsScreen.class);
+                    detailsScreen.setGameInfo(gameInfo);
+                    detailsScreen.setPreviews(previewSlideshow.getImages());
+                    getManager().pushScreen(detailsScreen);
                 }
-            }
-        });
+            });
+        }
+    }
 
-        WidgetUtil.trySubscribe(this, "close", new ActivateEventListener() {
-            @Override
-            public void onActivated(UIWidget button) {
-                getManager().popScreen();
-            }
-        });
+    private void removeSelectedGame() {
+        final Path world = PathManager.getInstance().getSavePath(getGameInfos().getSelection().getManifest().getTitle());
+        remove(getGameInfos(), world, REMOVE_STRING);
     }
 
     @Override
-    public boolean isLowerLayerVisible() {
-        return false;
+    public void onOpened() {
+        super.onOpened();
+
+        if (isValidScreen()) {
+            if (GameProvider.isSavesFolderEmpty()) {
+                final NewGameScreen newGameScreen = getManager().createScreen(NewGameScreen.ASSET_URI, NewGameScreen.class);
+                newGameScreen.setUniverseWrapper(universeWrapper);
+                triggerForwardAnimation(newGameScreen);
+            }
+
+            if (isLoadingAsServer() && !super.config.getPlayer().hasEnteredUsername()) {
+                getManager().pushScreen(EnterUsernamePopup.ASSET_URI, EnterUsernamePopup.class);
+            }
+
+            refreshGameInfoList(GameProvider.getSavedGames());
+        } else {
+            final MessagePopup popup = getManager().createScreen(MessagePopup.ASSET_URI, MessagePopup.class);
+            popup.setMessage(translationSystem.translate("${engine:menu#game-details-errors-message-title}"), translationSystem.translate("${engine:menu#game-details-errors-message-body}"));
+            popup.subscribeButton(e -> triggerBackAnimation());
+            getManager().pushScreen(popup);
+            // disable child widgets
+            setEnabled(false);
+        }
     }
 
     private void loadGame(GameInfo item) {
+        if (isLoadingAsServer()) {
+            Path blacklistPath = PathManager.getInstance().getHomePath().resolve("blacklist.json");
+            Path whitelistPath = PathManager.getInstance().getHomePath().resolve("whitelist.json");
+            if (!Files.exists(blacklistPath)) {
+                try {
+                    Files.createFile(blacklistPath);
+                } catch (IOException e) {
+                    logger.error("IO Exception on blacklist generation", e);
+                }
+            }
+            if (!Files.exists(whitelistPath)) {
+                try {
+                    Files.createFile(whitelistPath);
+                } catch (IOException e) {
+                    logger.error("IO Exception on whitelist generation", e);
+                }
+            }
+        }
         try {
-            GameManifest manifest = item.getManifest();
-
+            final GameManifest manifest = item.getManifest();
             config.getWorldGeneration().setDefaultSeed(manifest.getSeed());
             config.getWorldGeneration().setWorldTitle(manifest.getTitle());
-            CoreRegistry.get(GameEngine.class).changeState(new StateLoading(manifest, (loadingAsServer) ? NetworkMode.DEDICATED_SERVER : NetworkMode.NONE));
+            CoreRegistry.get(GameEngine.class).changeState(new StateLoading(manifest, (isLoadingAsServer()) ? NetworkMode.DEDICATED_SERVER : NetworkMode.NONE));
         } catch (Exception e) {
             logger.error("Failed to load saved game", e);
             getManager().pushScreen(MessagePopup.ASSET_URI, MessagePopup.class).setMessage("Error Loading Game", e.getMessage());
         }
     }
 
+    @Override
+    protected void initWidgets() {
+        super.initWidgets();
+        load = find("load", UIButton.class);
+        delete = find("delete", UIButton.class);
+        close = find("close", UIButton.class);
+        details = find("details", UIButton.class);
+        create = find("create", UIButton.class);
+        gameTypeTitle = find("gameTypeTitle", UILabel.class);
+    }
+
     public boolean isLoadingAsServer() {
-        return loadingAsServer;
+        return universeWrapper.getLoadingAsServer();
     }
 
-    public void setLoadingAsServer(boolean loadingAsServer) {
-        this.loadingAsServer = loadingAsServer;
+    public void setUniverseWrapper(UniverseWrapper wrapper) {
+        this.universeWrapper = wrapper;
     }
 
-    private void refreshList(UIList<GameInfo> gameList) {
-        gameList.setList(GameProvider.getSavedGames());
+    @Override
+    protected boolean isValidScreen() {
+        if (Stream.of(load, delete, close, details, create, gameTypeTitle)
+                .anyMatch(Objects::isNull) ||
+                !super.isValidScreen()) {
+            logger.error("Can't initialize screen correctly. At least one widget was missed!");
+            return false;
+        }
+        return true;
     }
-
 }

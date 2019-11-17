@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MovingBlocks
+ * Copyright 2018 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.terasology.world.block.internal;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.HashMultimap;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
 import gnu.trove.iterator.TObjectShortIterator;
 import gnu.trove.map.TObjectShortMap;
@@ -30,57 +27,40 @@ import gnu.trove.map.hash.TObjectShortHashMap;
 import gnu.trove.map.hash.TShortObjectHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.terasology.asset.AssetManager;
-import org.terasology.asset.Assets;
-import org.terasology.engine.module.ModuleManager;
-import org.terasology.entitySystem.entity.EntityRef;
-import org.terasology.module.Module;
-import org.terasology.module.ModuleEnvironment;
-import org.terasology.naming.Name;
-import org.terasology.persistence.ModuleContext;
-import org.terasology.registry.CoreRegistry;
+import org.terasology.assets.ResourceUrn;
+import org.terasology.assets.management.AssetManager;
 import org.terasology.world.block.Block;
 import org.terasology.world.block.BlockManager;
-import org.terasology.world.block.BlockSounds;
 import org.terasology.world.block.BlockUri;
+import org.terasology.world.block.BlockUriParseException;
 import org.terasology.world.block.family.BlockFamily;
-import org.terasology.world.block.family.BlockFamilyFactoryRegistry;
-import org.terasology.world.block.loader.BlockLoader;
-import org.terasology.world.block.loader.BlockSoundsFactory;
-import org.terasology.world.block.loader.BlockSoundsLoader;
-import org.terasology.world.block.loader.FreeformFamily;
-import org.terasology.world.block.loader.WorldAtlas;
+import org.terasology.world.block.loader.BlockFamilyDefinition;
+import org.terasology.world.block.shapes.BlockShape;
+import org.terasology.world.block.tiles.WorldAtlas;
 
-import java.util.Iterator;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
-/**
- * @author Immortius
- */
 public class BlockManagerImpl extends BlockManager {
 
     private static final Logger logger = LoggerFactory.getLogger(BlockManagerImpl.class);
-    private static final int NUM_WAVING_TEXTURES = 16;
 
     // This is the id we assign to blocks whose mappings are missing. This shouldn't happen, but in case it does
     // we set them to the last id (don't want to use 0 as they would override air)
     private static final short UNKNOWN_ID = (short) 65535;
     private static final int MAX_ID = 65534;
+    private static final ResourceUrn CUBE_SHAPE_URN = new ResourceUrn("engine:cube");
 
-    private ModuleEnvironment environment;
+    private AssetManager assetManager;
 
-    /* Families */
-    private final Set<BlockUri> freeformBlockUris = Sets.newHashSet();
-    private final SetMultimap<String, BlockUri> categoryLookup = HashMultimap.create();
-    private final Map<BlockUri, BlockFamily> availableFamilies = Maps.newHashMap();
-
-    /* Block Sounds */
-    private final Map<String, BlockSounds> blockSounds = Maps.newHashMap();
+    private BlockBuilder blockBuilder;
 
     private ReentrantLock lock = new ReentrantLock();
 
@@ -88,84 +68,78 @@ public class BlockManagerImpl extends BlockManager {
 
     private Set<BlockRegistrationListener> listeners = Sets.newLinkedHashSet();
 
-    private BlockLoader blockLoader;
 
     private boolean generateNewIds;
-    private int nextId = 1;
+    private AtomicInteger nextId = new AtomicInteger(1);
 
-    public BlockManagerImpl(WorldAtlas atlas, BlockFamilyFactoryRegistry blockFamilyFactoryRegistry) {
-        this(atlas, Lists.<String>newArrayList(), Maps.<String, Short>newHashMap(), true, blockFamilyFactoryRegistry);
+    // Cache this for performance reasons because a lookup by BlockURI happens the first time a block is set when getting the previous block.
+    // This causes performance problems eventually down the line when it then uses the ResourceUrn's hashcode to do a lookup into the block map.
+    private Block airBlock;
+
+    public BlockManagerImpl(WorldAtlas atlas, AssetManager assetManager) {
+        this(atlas, assetManager, true);
     }
 
     public BlockManagerImpl(WorldAtlas atlas,
-                            List<String> registeredBlockFamilies,
-                            Map<String, Short> knownBlockMappings,
-                            boolean generateNewIds,
-                            BlockFamilyFactoryRegistry blockFamilyFactoryRegistry) {
+                            AssetManager assetManager,
+                            boolean generateNewIds) {
         this.generateNewIds = generateNewIds;
-        this.environment = CoreRegistry.get(ModuleManager.class).getEnvironment();
-        BlockSoundsLoader blockSoundsLoader = new BlockSoundsLoader(new BlockSoundsFactory());
-        for (BlockSounds sounds : blockSoundsLoader.loadBlockSoundsDefinitions()) {
-            if (blockSounds.put(sounds.getUri(), sounds) != null) {
-                logger.warn("Duplicate block sounds definition with URI {}", sounds.getUri());
-            } else {
-                logger.info("Registered Block Sounds {}", sounds.getUri());
-            }
-        }
+        this.assetManager = assetManager;
+        this.blockBuilder = new BlockBuilder(atlas);
+    }
 
-        blockLoader = new BlockLoader(this, CoreRegistry.get(AssetManager.class), blockFamilyFactoryRegistry, atlas);
-        BlockLoader.LoadBlockDefinitionResults blockDefinitions = blockLoader.loadBlockDefinitions();
-        addBlockFamily(getAirFamily(), true);
-        for (BlockFamily family : blockDefinitions.families) {
-            addBlockFamily(family, false);
-        }
-        for (FreeformFamily freeformFamily : blockDefinitions.shapelessDefinitions) {
-            addFreeformBlockFamily(freeformFamily.uri, freeformFamily.categories);
-        }
+    public void initialise(List<String> registeredBlockFamilies,
+                           Map<String, Short> knownBlockMappings) {
+
         if (knownBlockMappings.size() >= MAX_ID) {
-            nextId = UNKNOWN_ID;
+            nextId.set(UNKNOWN_ID);
         } else if (knownBlockMappings.size() > 0) {
-            nextId = (short) knownBlockMappings.size();
+            nextId.set(knownBlockMappings.values().stream().max(Short::compareTo).orElse((short) 0) + 1);
         }
+        registeredBlockInfo.set(new RegisteredState());
 
         for (String rawFamilyUri : registeredBlockFamilies) {
-            BlockUri familyUri = new BlockUri(rawFamilyUri);
-            BlockFamily family;
-            if (isFreeformFamily(familyUri)) {
-                family = blockLoader.loadWithShape(familyUri);
-            } else {
-                family = getAvailableBlockFamily(familyUri);
-            }
-            if (family != null) {
-                for (Block block : family.getBlocks()) {
-                    Short id = knownBlockMappings.get(block.getURI().toString());
-                    if (id != null) {
-                        block.setId(id);
-                    } else {
-                        logger.error("Missing id for block {} in provided family {}", block.getURI(), family.getURI());
-                        if (generateNewIds) {
-                            block.setId(getNextId());
+            try {
+                BlockUri familyUri = new BlockUri(rawFamilyUri);
+                Optional<BlockFamily> family = loadFamily(familyUri);
+                if (family.isPresent()) {
+                    for (Block block : family.get().getBlocks()) {
+                        Short id = knownBlockMappings.get(block.getURI().toString());
+                        if (id != null) {
+                            block.setId(id);
                         } else {
-                            block.setId(UNKNOWN_ID);
+                            logger.error("Missing id for block {} in provided family {}", block.getURI(), family.get().getURI());
+                            if (generateNewIds) {
+                                block.setId(getNextId());
+                            } else {
+                                block.setId(UNKNOWN_ID);
+                            }
                         }
                     }
+                    registerFamily(family.get());
                 }
-                registerFamily(family);
-            } else {
-                logger.error("Family not available: {}", rawFamilyUri);
+            } catch (BlockUriParseException e) {
+                logger.error("Failed to parse block family, skipping", e);
             }
         }
     }
 
     public void dispose() {
-        getAir().setEntity(EntityRef.NULL);
+
     }
 
     private short getNextId() {
-        if (nextId > MAX_ID) {
+        if (nextId.get() > MAX_ID) {
             return UNKNOWN_ID;
         }
-        return (short) nextId++;
+        return (short) nextId.getAndIncrement();
+    }
+
+    private Block getAirBlock() {
+        if (airBlock == null) {
+            airBlock = getBlock(AIR_ID);
+        }
+        return airBlock;
     }
 
     public void subscribe(BlockRegistrationListener listener) {
@@ -177,53 +151,29 @@ public class BlockManagerImpl extends BlockManager {
     }
 
     public void receiveFamilyRegistration(BlockUri familyUri, Map<String, Integer> registration) {
-        BlockFamily family;
-        if (isFreeformFamily(familyUri)) {
-            family = blockLoader.loadWithShape(familyUri);
-        } else {
-            family = getAvailableBlockFamily(familyUri);
-        }
-        if (family != null) {
-            for (Block block : family.getBlocks()) {
-                Integer id = registration.get(block.getURI().toString());
-                if (id != null) {
-                    block.setId((short) id.intValue());
-                } else {
-                    logger.error("Missing id for block {} in registered family {}", block.getURI(), familyUri);
-                    block.setId(UNKNOWN_ID);
+        Optional<BlockFamily> family = loadFamily(familyUri);
+        if (family.isPresent()) {
+            lock.lock();
+            try {
+                for (Block block : family.get().getBlocks()) {
+                    Integer id = registration.get(block.getURI().toString());
+                    if (id != null) {
+                        block.setId((short) id.intValue());
+                    } else {
+                        logger.error("Missing id for block {} in registered family {}", block.getURI(), familyUri);
+                        block.setId(UNKNOWN_ID);
+                    }
                 }
+                registerFamily(family.get());
+            } finally {
+                lock.unlock();
             }
-            registerFamily(family);
-        } else {
-            logger.error("Block family not available: {}", familyUri);
-        }
-    }
-
-    /**
-     * @param family
-     * @param andRegister Immediately registers the family - it is expected that the blocks have been given ids.
-     */
-    @VisibleForTesting
-    public void addBlockFamily(BlockFamily family, boolean andRegister) {
-        for (String category : family.getCategories()) {
-            categoryLookup.put(category, family.getURI());
-        }
-        availableFamilies.put(family.getURI(), family);
-        if (andRegister) {
-            registerFamily(family);
-        }
-    }
-
-    @VisibleForTesting
-    public void addFreeformBlockFamily(BlockUri family, Iterable<String> categories) {
-        freeformBlockUris.add(family);
-        for (String category : categories) {
-            categoryLookup.put(category, family);
         }
     }
 
     @VisibleForTesting
     protected void registerFamily(BlockFamily family) {
+        Preconditions.checkNotNull(family);
         logger.info("Registered {}", family);
         lock.lock();
         try {
@@ -247,68 +197,9 @@ public class BlockManagerImpl extends BlockManager {
             newState.blocksById.put(block.getId(), block);
             newState.idByUri.put(block.getURI(), block.getId());
         } else {
-            logger.info("Failed to register block {} - no id", block, block.getId());
+            logger.info("Failed to register block {} - no id", block);
         }
         newState.blocksByUri.put(block.getURI(), block);
-    }
-
-    /**
-     * Retrieve all {@code BlockUri}s that match the given string.
-     * <p/>
-     * In order to resolve the {@code BlockUri}s, every package is searched for the given uri pattern.
-     *
-     * @param uri the uri pattern to match
-     * @return a list of matching block uris
-     */
-    @Override
-    public List<BlockUri> resolveAllBlockFamilyUri(String uri) {
-        List<BlockUri> matches = Lists.newArrayList();
-        BlockUri straightUri = new BlockUri(uri);
-        if (straightUri.isValid()) {
-            if (hasBlockFamily(straightUri)) {
-                matches.add(straightUri);
-            }
-        } else {
-            for (Name moduleId : Assets.listModules()) {
-                BlockUri modUri = new BlockUri(moduleId, new Name(uri));
-                if (hasBlockFamily(modUri)) {
-                    matches.add(modUri);
-                }
-            }
-        }
-        return matches;
-    }
-
-    @Override
-    public BlockUri resolveBlockFamilyUri(String uri) {
-        List<BlockUri> matches = resolveAllBlockFamilyUri(uri);
-        switch (matches.size()) {
-            case 0:
-                logger.warn("Failed to resolve block family '{}'", uri);
-                return null;
-            case 1:
-                return matches.get(0);
-            default:
-                Module context = ModuleContext.getContext();
-                if (context != null) {
-                    Set<Name> dependencies = environment.getDependencyNamesOf(context.getId());
-                    Iterator<BlockUri> iterator = matches.iterator();
-                    while (iterator.hasNext()) {
-                        BlockUri possibleUri = iterator.next();
-                        if (context.getId().equals(possibleUri.getModuleName())) {
-                            return possibleUri;
-                        }
-                        if (!dependencies.contains(possibleUri.getModuleName())) {
-                            iterator.remove();
-                        }
-                    }
-                    if (matches.size() == 1) {
-                        return matches.get(0);
-                    }
-                }
-                logger.warn("Failed to resolve block family '{}' - too many valid matches {}", uri, matches);
-                return null;
-        }
     }
 
     @Override
@@ -323,72 +214,96 @@ public class BlockManagerImpl extends BlockManager {
     }
 
     @Override
-    public Iterable<BlockUri> getBlockFamiliesWithCategory(String category) {
-        return categoryLookup.get(category.toLowerCase(Locale.ENGLISH));
-    }
-
-    @Override
-    public Iterable<String> getBlockCategories() {
-        return categoryLookup.keySet();
-    }
-
-    @Override
-    public BlockSounds getBlockSounds(String uri) {
-        return blockSounds.get(uri);
-    }
-
-    @Override
-    public BlockSounds getDefaultBlockSounds() {
-        BlockSounds sounds = getBlockSounds(BlockSounds.DEFAULT_ID);
-        if (sounds == null) {
-            throw new IllegalStateException("Default block sounds are missing from engine module: "
-                    + BlockSounds.DEFAULT_ID);
-        }
-        return sounds;
-    }
-
-    @Override
     public BlockFamily getBlockFamily(String uri) {
-        BlockUri blockUri = resolveBlockFamilyUri(uri);
-        if (blockUri != null) {
-            return getBlockFamily(blockUri);
+        if (!uri.contains(":")) {
+            Set<ResourceUrn> resourceUrns = assetManager.resolve(uri, BlockFamilyDefinition.class);
+            if (resourceUrns.size() == 1) {
+                return getBlockFamily(new BlockUri(resourceUrns.iterator().next()));
+            } else {
+                if (resourceUrns.size() > 0) {
+                    logger.error("Failed to resolve block family '{}', too many options - {}", uri, resourceUrns);
+                } else {
+                    logger.error("Failed to resolve block family '{}'", uri);
+                }
+            }
+        } else {
+            try {
+                BlockUri blockUri = new BlockUri(uri);
+                return getBlockFamily(blockUri);
+            } catch (BlockUriParseException e) {
+                logger.error("Failed to resolve block family '{}', invalid uri", uri);
+            }
         }
-        return null;
+        return getBlockFamily(AIR_ID);
     }
 
     @Override
     public BlockFamily getBlockFamily(BlockUri uri) {
+        if (uri.getShapeUrn().isPresent() && uri.getShapeUrn().get().equals(CUBE_SHAPE_URN)) {
+            return getBlockFamily(uri.getShapelessUri());
+        }
         BlockFamily family = registeredBlockInfo.get().registeredFamilyByUri.get(uri);
         if (family == null && generateNewIds) {
-            if (isFreeformFamily(uri.getRootFamilyUri())) {
-                family = blockLoader.loadWithShape(uri);
-            } else {
-                family = getAvailableBlockFamily(uri);
-            }
-            if (family != null) {
+            Optional<BlockFamily> newFamily = loadFamily(uri);
+            if (newFamily.isPresent()) {
                 lock.lock();
                 try {
-                    for (Block block : family.getBlocks()) {
+                    for (Block block : newFamily.get().getBlocks()) {
                         block.setId(getNextId());
                     }
-                    registerFamily(family);
+                    registerFamily(newFamily.get());
+
+                } catch (Exception ex) {
+                    // A family can fail to register if the block is missing uri or list of categories,
+                    // but can fail to register if the family throws an error for any reason
+                    logger.error("Failed to register block familiy '{}'", newFamily, ex);
                 } finally {
                     lock.unlock();
                 }
-            } else {
-                logger.warn("Unable to resolve block family {}", uri);
+                return newFamily.get();
             }
         }
         return family;
     }
 
+    private Optional<BlockFamily> loadFamily(BlockUri uri) {
+        Optional<BlockFamilyDefinition> familyDef = assetManager.getAsset(uri.getBlockFamilyDefinitionUrn(), BlockFamilyDefinition.class);
+        if (familyDef.isPresent() && familyDef.get().isLoadable()) {
+            if (familyDef.get().isFreeform()) {
+                ResourceUrn shapeUrn;
+                if (uri.getShapeUrn().isPresent()) {
+                    shapeUrn = uri.getShapeUrn().get();
+                } else {
+                    shapeUrn = CUBE_SHAPE_URN;
+                }
+                Optional<BlockShape> shape = assetManager.getAsset(shapeUrn, BlockShape.class);
+                if (shape.isPresent()) {
+                    return Optional.of(familyDef.get().createFamily(shape.get(), blockBuilder));
+                }
+            } else if (!familyDef.get().isFreeform()) {
+                return Optional.of(familyDef.get().createFamily(blockBuilder));
+            }
+        } else {
+            logger.error("Family not available: {}", uri);
+        }
+        return Optional.empty();
+    }
+
     @Override
     public Block getBlock(String uri) {
-        return getBlock(new BlockUri(uri));
+        try {
+            return getBlock(new BlockUri(uri));
+        } catch (BlockUriParseException e) {
+            logger.error("Attempt to fetch block with illegal uri '{}'", uri);
+            return getAirBlock();
+        }
     }
 
     @Override
     public Block getBlock(BlockUri uri) {
+        if (uri.getShapeUrn().isPresent() && uri.getShapeUrn().get().equals(CUBE_SHAPE_URN)) {
+            return getBlock(uri.getShapelessUri());
+        }
         Block block = registeredBlockInfo.get().blocksByUri.get(uri);
         if (block == null) {
             // Check if partially registered by getting the block family
@@ -397,7 +312,7 @@ public class BlockManagerImpl extends BlockManager {
                 block = family.getBlockFor(uri);
             }
             if (block == null) {
-                return getAir();
+                return getAirBlock();
             }
         }
         return block;
@@ -407,44 +322,19 @@ public class BlockManagerImpl extends BlockManager {
     public Block getBlock(short id) {
         Block result = registeredBlockInfo.get().blocksById.get(id);
         if (result == null) {
-            return getAir();
+            return getAirBlock();
         }
         return result;
     }
 
     @Override
-    public Iterable<BlockUri> listRegisteredBlockUris() {
-        return registeredBlockInfo.get().registeredFamilyByUri.keySet();
+    public Collection<BlockUri> listRegisteredBlockUris() {
+        return Collections.unmodifiableCollection(registeredBlockInfo.get().registeredFamilyByUri.keySet());
     }
 
     @Override
-    public Iterable<BlockFamily> listRegisteredBlockFamilies() {
-        return registeredBlockInfo.get().registeredFamilyByUri.values();
-    }
-
-    @Override
-    public Iterable<BlockUri> listFreeformBlockUris() {
-        return freeformBlockUris;
-    }
-
-    @Override
-    public boolean isFreeformFamily(BlockUri familyUri) {
-        return freeformBlockUris.contains(familyUri.getRootFamilyUri());
-    }
-
-    @Override
-    public Iterable<BlockFamily> listAvailableBlockFamilies() {
-        return availableFamilies.values();
-    }
-
-    @Override
-    public BlockFamily getAvailableBlockFamily(BlockUri uri) {
-        return availableFamilies.get(uri);
-    }
-
-    @Override
-    public Iterable<BlockUri> listAvailableBlockUris() {
-        return availableFamilies.keySet();
+    public Collection<BlockFamily> listRegisteredBlockFamilies() {
+        return Collections.unmodifiableCollection(registeredBlockInfo.get().registeredFamilyByUri.values());
     }
 
     @Override
@@ -453,15 +343,7 @@ public class BlockManagerImpl extends BlockManager {
     }
 
     @Override
-    public boolean hasBlockFamily(BlockUri uri) {
-        if (registeredBlockInfo.get().registeredFamilyByUri.containsKey(uri) || availableFamilies.containsKey(uri) || freeformBlockUris.contains(uri)) {
-            return true;
-        }
-        return uri.hasShape() && Assets.get(uri.getShapeUri()) != null && freeformBlockUris.contains(uri.getRootFamilyUri());
-    }
-
-    @Override
-    public Iterable<Block> listRegisteredBlocks() {
+    public Collection<Block> listRegisteredBlocks() {
         return ImmutableList.copyOf(registeredBlockInfo.get().blocksById.valueCollection());
     }
 
@@ -473,19 +355,18 @@ public class BlockManagerImpl extends BlockManager {
         private final TShortObjectMap<Block> blocksById;
         private final TObjectShortMap<BlockUri> idByUri;
 
-        public RegisteredState() {
+        RegisteredState() {
             this.registeredFamilyByUri = Maps.newHashMap();
             this.blocksByUri = Maps.newHashMap();
             this.blocksById = new TShortObjectHashMap<>();
             this.idByUri = new TObjectShortHashMap<>();
         }
 
-        public RegisteredState(RegisteredState oldState) {
+        RegisteredState(RegisteredState oldState) {
             this.registeredFamilyByUri = Maps.newHashMap(oldState.registeredFamilyByUri);
             this.blocksByUri = Maps.newHashMap(oldState.blocksByUri);
             this.blocksById = new TShortObjectHashMap<>(oldState.blocksById);
             this.idByUri = new TObjectShortHashMap<>(oldState.idByUri);
         }
     }
-
 }

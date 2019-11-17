@@ -1,11 +1,11 @@
 /*
- * Copyright 2013 MovingBlocks
+ * Copyright 2017 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,30 +15,33 @@
  */
 package org.terasology.logic.behavior.asset;
 
-import org.terasology.asset.AbstractAsset;
-import org.terasology.asset.AssetUri;
-import org.terasology.logic.behavior.nui.RenderableNode;
-import org.terasology.logic.behavior.tree.Node;
-
-import java.util.List;
+import org.terasology.assets.Asset;
+import org.terasology.assets.AssetType;
+import org.terasology.assets.ResourceUrn;
+import org.terasology.logic.behavior.core.BehaviorNode;
+import org.terasology.module.sandbox.API;
 
 /**
- * Behavior tree asset. Can be loaded and saved into json.
- * <p/>
- * This asset keeps track of the tree of Nodes and the associated RenderableNodes. If there are no RenderableNodes,
- * the helper class will generate and layout some.
+ * Behavior tree asset. Can be loaded and saved into json. Actors should never run the nodes behind a asset directly.
+ * Instead, use a runner which operates on copies, so actors can share one tree asset.
  *
- * @author synopia
  */
-public class BehaviorTree extends AbstractAsset<BehaviorTreeData> {
+@API
+public class BehaviorTree extends Asset<BehaviorTreeData> {
     private BehaviorTreeData data;
 
-    public BehaviorTree(AssetUri uri, BehaviorTreeData data) {
-        super(uri);
-        this.data = data;
+    /**
+     * The constructor for an asset. It is suggested that implementing classes provide a constructor taking both the urn, and an initial AssetData to load.
+     *
+     * @param urn       The urn identifying the asset.
+     * @param assetType The asset type this asset belongs to.
+     */
+    public BehaviorTree(ResourceUrn urn, AssetType<?, BehaviorTreeData> assetType, BehaviorTreeData data) {
+        super(urn, assetType);
+        reload(data);
     }
 
-    public Node getRoot() {
+    public BehaviorNode getRoot() {
         return data.getRoot();
     }
 
@@ -46,40 +49,14 @@ public class BehaviorTree extends AbstractAsset<BehaviorTreeData> {
         return data;
     }
 
-    public RenderableNode getRenderableNode(Node node) {
-        return data.getRenderableNode(node);
-    }
-
-    public List<RenderableNode> getRenderableNodes() {
-        if (!data.hasRenderable()) {
-            data.createRenderable();
-            layout(null);
-        }
-        return data.getRenderableNodes();
-    }
-
-    public void layout(RenderableNode start) {
-        data.layout(start);
-    }
-
     @Override
     public String toString() {
-        return getURI().getAssetName().toString();
+        return getUrn().toString();
     }
 
     @Override
-    protected void onReload(BehaviorTreeData newData) {
+    protected void doReload(BehaviorTreeData newData) {
         this.data = newData;
     }
 
-    @Override
-    protected void onDispose() {
-        this.data = null;
     }
-
-    public RenderableNode createNode(Node node) {
-        RenderableNode renderable = data.createRenderable(node);
-        data.layout(renderable);
-        return renderable;
-    }
-}

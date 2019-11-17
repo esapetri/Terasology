@@ -15,14 +15,17 @@
  */
 package org.terasology.world.chunks.internal;
 
+import java.util.List;
+
 import gnu.trove.list.TIntList;
 import gnu.trove.map.TShortObjectMap;
-import org.terasology.math.Vector3i;
+
+import org.terasology.entitySystem.entity.EntityStore;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.persistence.ChunkStore;
 import org.terasology.world.chunks.Chunk;
 
 /**
- * @author Immortius
  */
 public class ReadyChunkInfo {
     private Vector3i pos;
@@ -30,20 +33,35 @@ public class ReadyChunkInfo {
     private ChunkStore chunkStore;
     private Chunk chunk;
     private boolean newChunk;
+    private List<EntityStore> entities;
 
-    public ReadyChunkInfo(Chunk chunk, TShortObjectMap<TIntList> blockPositionMapppings) {
+    public static ReadyChunkInfo createForNewChunk(Chunk chunk, TShortObjectMap<TIntList> blockPositionMapppings, List<EntityStore> entities) {
+        return new ReadyChunkInfo(chunk, blockPositionMapppings, entities);
+    }
+
+    public static ReadyChunkInfo createForRestoredChunk(Chunk chunk, TShortObjectMap<TIntList> blockPositionMapppings, ChunkStore chunkStore, List<EntityStore> entities) {
+        return new ReadyChunkInfo(chunk, blockPositionMapppings, chunkStore, entities);
+    }
+
+    public ReadyChunkInfo(Chunk chunk, TShortObjectMap<TIntList> blockPositionMapppings, List<EntityStore> entities) {
         this.pos = chunk.getPosition();
         this.blockPositionMapppings = blockPositionMapppings;
         this.newChunk = true;
         this.chunk = chunk;
+        this.entities = entities;
     }
 
-    public ReadyChunkInfo(Chunk chunk, TShortObjectMap<TIntList> blockPositionMapppings, ChunkStore chunkStore) {
+    public ReadyChunkInfo(Chunk chunk, TShortObjectMap<TIntList> blockPositionMapppings, ChunkStore chunkStore, List<EntityStore> entities) {
         this.pos = chunk.getPosition();
         this.blockPositionMapppings = blockPositionMapppings;
         this.chunkStore = chunkStore;
         this.newChunk = chunkStore == null;
         this.chunk = chunk;
+        this.entities = entities;
+    }
+
+    public List<EntityStore> getEntities() {
+        return entities;
     }
 
     public Vector3i getPos() {

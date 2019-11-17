@@ -39,18 +39,37 @@ group = 'org.terasology.facades'
 
 dependencies {
     compile project(':engine')
+
+    /* TODO: Consider whether we can move the CR dependency back here from the engine, where it is referenced from the main menu
+    // Dependency on CrashReporter, conditionally either from source or via binary
+    File wouldBeSrcPath = new File(rootDir, 'libs/CrashReporter')
+    println "Scanning for source CrashReporter at: " + wouldBeSrcPath.getAbsolutePath()
+
+    if (wouldBeSrcPath.exists()) {
+        println "*** Identified CrashReporter source, using that"
+        //compile ':libs:CrashReporter:cr-terasology'
+
+        def targetProject = findProject(':libs:CrashReporter:cr-terasology')
+        println "Found the project? " + targetProject
+        //compile targetProject
+
+        compile project(':libs:CrashReporter:cr-terasology')
+    } else {
+        println "*** Setting a CrashReporter binary dependency, not present as source"
+        compile group: 'org.terasology.crashreporter', name: 'cr-terasology', version: '4.0.0'
+    }
+    */
 }
 
 // Instructions for packaging a jar file for the PC facade
 jar {
     manifest {
         //TODO: Maybe later add the engine's version number into here?
-        def manifestClasspath = "$subDirLibs/" + configurations.runtime.collect { it.getName() }.join(" $subDirLibs/")
+        def manifestClasspath = configurations.runtime.collect { it.getName() }.join(" ")
         attributes("Main-Class": mainClassName)
         attributes("Class-Path" : manifestClasspath)
         attributes("Implementation-Title": "Terasology-" + project.name)
         attributes("Implementation-Version": env.BUILD_NUMBER + ", " + env.GIT_BRANCH + ", " + env.BUILD_ID)
-        attributes("SplashScreen-Image": "splash.jpg")
     }
 }
 
@@ -61,7 +80,7 @@ configurations {
     }
 }
 
-task runPC(type:JavaExec) {
+task game(type:JavaExec) {
     description = "Run 'Terasology' to play the game as a standard PC application"
 
     // Dependencies: natives + all modules & the PC facade itself (which will trigger the engine)
@@ -74,7 +93,28 @@ task runPC(type:JavaExec) {
     workingDir = rootDir
     String[] runArgs = ["-homedir"]
     args runArgs
-    jvmArgs "-splash:${sourceSets.main.output.resourcesDir}/splash.jpg"
+
+    // Classpath: PC itself, engine classes, engine dependencies. Not modules or natives since the engine finds those
+    classpath sourceSets.main.output.classesDir
+    classpath sourceSets.main.output.resourcesDir
+    classpath project(':engine').sourceSets.main.output.classesDir
+    classpath project(':engine').configurations.runtime
+}
+
+task debug(type:JavaExec) {
+    description = "Run 'Terasology' to play the game as a standard PC application (in debug mode)"
+
+    // Dependencies: natives + all modules & the PC facade itself (which will trigger the engine)
+    dependsOn rootProject.extractNatives
+    dependsOn rootProject.moduleClasses
+    dependsOn classes
+
+    // Run arguments
+    jvmArgs = ["-Xdebug", "-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=1044"]
+    main = mainClassName
+    workingDir = rootDir
+    String[] runArgs = ["-homedir"]
+    args runArgs
 
     // Classpath: PC itself, engine classes, engine dependencies. Not modules or natives since the engine finds those
     classpath sourceSets.main.output.classesDir
@@ -87,7 +127,7 @@ task runPC(type:JavaExec) {
 // TODO: This is not the Gradle Way. Needs more declared output-fu to determine up-to-date instead of the if
 task setupServerConfig() << {
     description "Parses parameters passed via Gradle and writes them to the local run-from-source server dir's config.cfg"
-    
+
     def json = new JsonBuilder()
 
     def serverRoot = rootProject.file(localServerDataPath);
@@ -139,7 +179,7 @@ task setupServerModules(type: Sync) << {
 }
 
 // TODO: Make a task to reset server / game data
-task startServer(type:JavaExec) {
+task server(type:JavaExec) {
     description "Starts a headless multiplayer server with data stored in [project-root]/$localServerDataPath"
 
     // Dependencies: natives + all modules & the PC facade itself (which will trigger the engine)
@@ -173,11 +213,20 @@ task createVersionFile(type: Copy) {
     filter(FixCrLfFilter, eol:FixCrLfFilter.CrLf.newInstance("crlf"))
 }
 
+// TODO: This could probably be done more Gradley (engine project resource dir instead of direct path?) and with some variables
+task copyCreditsFile(type: Copy) {
+    description "Copies the credits file into the engine's resource dir where it'll be read at runtime"
+    from "$rootDir/docs"
+    into "$rootDir/engine/src/main/resources"
+    include "Credits.md"
+}
+
 // Main application dist target. Does NOT include any modules.
 task distApp (type: Sync) {
     description = "Creates an application package for distribution"
 
     dependsOn createVersionFile
+    dependsOn copyCreditsFile
     dependsOn rootProject.extractNatives
     dependsOn jar
 
@@ -192,34 +241,25 @@ task distApp (type: Sync) {
     from ("$rootDir/NOTICE") {
         filter(FixCrLfFilter, eol:FixCrLfFilter.CrLf.newInstance("crlf"))
     }
-    from ("$buildDir/libs") {
-        include "*.jar"
-        rename {
-            'Terasology.jar'
-        }
-    }
     from('launchScripts') {
         exclude('TeraEd.exe')
     }
-	
-    // launch4j requires the splash screen to also exist next to the exe
-    from("${sourceSets.main.output.resourcesDir}/splash.jpg")
 
     from("$buildDir/$versionFileName") {}
 
     into(subDirLibs) {
         from configurations.runtime
         from project(':engine').jar
+        from ("$buildDir/libs") {
+            include "*.jar"
+            rename {
+                'Terasology.jar'
+            }
+        }
     }
     into(dirNatives) {
         from "$rootDir/$dirNatives"
     }
-}
-
-// This is a TEMPORARY tweak to make "changing" dependencies always ('0') check for newer snapshots available
-// TODO: Remove this when versioning and promotion works fully, then we shouldn't care about snapshots normally anyway
-configurations.all {
-    resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
 }
 
 // Distribute modules - only grabs Core in Jenkins but locally will grab any present. "Distros" now handle Jenkins packs

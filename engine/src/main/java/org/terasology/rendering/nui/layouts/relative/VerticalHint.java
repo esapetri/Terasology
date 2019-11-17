@@ -15,12 +15,13 @@
  */
 package org.terasology.rendering.nui.layouts.relative;
 
+import org.terasology.rendering.nui.LayoutConfig;
 import org.terasology.rendering.nui.VerticalAlign;
 
 /**
- * @author Immortius
  */
 public class VerticalHint {
+    @LayoutConfig
     private int height;
 
     private VerticalInfo positionTop;

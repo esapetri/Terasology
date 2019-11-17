@@ -16,23 +16,26 @@
 package org.terasology.entitySystem.metadata;
 
 import com.google.common.base.Predicates;
-import org.terasology.reflection.metadata.ClassMetadata;
-import org.terasology.reflection.copy.CopyStrategy;
-import org.terasology.reflection.copy.CopyStrategyLibrary;
-import org.terasology.reflection.reflect.InaccessibleFieldException;
-import org.terasology.reflection.reflect.ReflectFactory;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import org.terasology.engine.SimpleUri;
 import org.terasology.entitySystem.Component;
 import org.terasology.network.Replicate;
+import org.terasology.reflection.copy.CopyStrategy;
+import org.terasology.reflection.copy.CopyStrategyLibrary;
+import org.terasology.reflection.metadata.ClassMetadata;
+import org.terasology.reflection.reflect.InaccessibleFieldException;
+import org.terasology.reflection.reflect.ReflectFactory;
 import org.terasology.world.block.ForceBlockActive;
 import org.terasology.world.block.RequiresBlockLifecycleEvents;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.util.List;
 
 /**
  * Metadata on a component class and its fields.
  *
- * @author Immortius
  */
 public class ComponentMetadata<T extends Component> extends ClassMetadata<T, ComponentFieldMetadata<T, ?>> {
 
@@ -42,6 +45,7 @@ public class ComponentMetadata<T extends Component> extends ClassMetadata<T, Com
     private boolean forceBlockActive;
     private boolean retainUnalteredOnBlockChange;
     private boolean blockLifecycleEventsRequired;
+    private List<Annotation> annotations;
 
     /**
      * @param uri            The uri to identify the component with.
@@ -71,8 +75,11 @@ public class ComponentMetadata<T extends Component> extends ClassMetadata<T, Com
                 referenceOwner = true;
             }
         }
+
+        annotations = Lists.newArrayList(type.getAnnotations());
     }
 
+    @Override
     protected <U> ComponentFieldMetadata<T, U> createField(Field field, CopyStrategy<U> copyStrategy, ReflectFactory factory) throws InaccessibleFieldException {
         return new ComponentFieldMetadata<>(this, field, copyStrategy, factory, false);
     }
@@ -117,5 +124,9 @@ public class ComponentMetadata<T extends Component> extends ClassMetadata<T, Com
      */
     public boolean isBlockLifecycleEventsRequired() {
         return blockLifecycleEventsRequired;
+    }
+
+    public T getAnnotation(final Class<T> type) {
+        return Iterables.getOnlyElement(Iterables.filter(annotations, type), null);
     }
 }

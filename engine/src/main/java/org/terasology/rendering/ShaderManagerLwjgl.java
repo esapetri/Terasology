@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MovingBlocks
+ * Copyright 2017 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package org.terasology.rendering;
 
+import com.google.common.collect.Sets;
 import org.lwjgl.LWJGLUtil;
 import org.lwjgl.Sys;
 import org.lwjgl.opengl.GL11;
@@ -22,49 +23,32 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL20;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.terasology.asset.AssetManager;
-import org.terasology.asset.AssetType;
-import org.terasology.asset.AssetUri;
-import org.terasology.asset.Assets;
+import org.terasology.utilities.Assets;
+import org.terasology.assets.ResourceUrn;
+import org.terasology.assets.management.AssetManager;
 import org.terasology.registry.CoreRegistry;
 import org.terasology.rendering.assets.material.Material;
 import org.terasology.rendering.assets.material.MaterialData;
 import org.terasology.rendering.assets.shader.Shader;
 import org.terasology.rendering.assets.texture.Texture;
 import org.terasology.rendering.opengl.GLSLMaterial;
-import org.terasology.rendering.shader.ShaderParameters;
-import org.terasology.rendering.shader.ShaderParametersBlock;
-import org.terasology.rendering.shader.ShaderParametersChunk;
-import org.terasology.rendering.shader.ShaderParametersCombine;
-import org.terasology.rendering.shader.ShaderParametersDebug;
-import org.terasology.rendering.shader.ShaderParametersDefault;
-import org.terasology.rendering.shader.ShaderParametersHdr;
-import org.terasology.rendering.shader.ShaderParametersLightBufferPass;
-import org.terasology.rendering.shader.ShaderParametersLightGeometryPass;
-import org.terasology.rendering.shader.ShaderParametersLightShaft;
-import org.terasology.rendering.shader.ShaderParametersOcDistortion;
-import org.terasology.rendering.shader.ShaderParametersParticle;
-import org.terasology.rendering.shader.ShaderParametersPost;
-import org.terasology.rendering.shader.ShaderParametersPrePost;
-import org.terasology.rendering.shader.ShaderParametersSSAO;
-import org.terasology.rendering.shader.ShaderParametersShadowMap;
-import org.terasology.rendering.shader.ShaderParametersSky;
-import org.terasology.rendering.shader.ShaderParametersSobel;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import java.util.Optional;
+import java.util.Set;
+
+import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Provides support for loading and applying shaders.
- *
- * @author Benjamin Glatzel <benjamin.glatzel@me.com>
  */
 public class ShaderManagerLwjgl implements ShaderManager {
-
     private static final Logger logger = LoggerFactory.getLogger(ShaderManagerLwjgl.class);
 
     private GLSLMaterial activeMaterial;
     private GLSLMaterial defaultShaderProgram;
     private GLSLMaterial defaultTexturedShaderProgram;
+
+    private Set<GLSLMaterial> progamaticShaders = Sets.newHashSet();
 
     public ShaderManagerLwjgl() {
         logger.info("Loading Terasology shader manager...");
@@ -84,7 +68,7 @@ public class ShaderManagerLwjgl implements ShaderManager {
         // GL_NUM_EXTENSIONS and glGetStringi(GL_EXTENSIONS, idx)
         String[] exts = extStr.split(" ");
         if (exts.length > 0) {
-            StringBuilder bldr = new StringBuilder(exts[0]); 
+            StringBuilder bldr = new StringBuilder(exts[0]);
             for (int i = 1; i < exts.length; i++) {
                 if (i % extsPerLine == 0) {
                     logger.info("EXTENSIONS: {}", bldr.toString());
@@ -92,7 +76,7 @@ public class ShaderManagerLwjgl implements ShaderManager {
                 } else {
                     bldr.append(" ");
                 }
-                bldr.append(exts[i]); 
+                bldr.append(exts[i]);
             }
             if (bldr.length() > 0) {
                 logger.info("EXTENSIONS: {}", bldr.toString());
@@ -102,31 +86,27 @@ public class ShaderManagerLwjgl implements ShaderManager {
 
     @Override
     public void initShaders() {
-        defaultShaderProgram = prepareAndStoreShaderProgramInstance("default", new ShaderParametersDefault());
-        defaultTexturedShaderProgram = prepareAndStoreShaderProgramInstance("defaultTextured", new ShaderParametersDefault());
+        defaultShaderProgram = addShaderProgram("default");
+        defaultTexturedShaderProgram = addShaderProgram("defaultTextured");
 
         // TODO: Find a better way to do this
-        prepareAndStoreShaderProgramInstance("post", new ShaderParametersPost());
-        prepareAndStoreShaderProgramInstance("ssao", new ShaderParametersSSAO());
-        prepareAndStoreShaderProgramInstance("lightshaft", new ShaderParametersLightShaft());
-        prepareAndStoreShaderProgramInstance("sobel", new ShaderParametersSobel());
-        prepareAndStoreShaderProgramInstance("prePost", new ShaderParametersPrePost());
-        prepareAndStoreShaderProgramInstance("combine", new ShaderParametersCombine());
-        prepareAndStoreShaderProgramInstance("highp", new ShaderParametersDefault());
-        prepareAndStoreShaderProgramInstance("blur", new ShaderParametersDefault());
-        prepareAndStoreShaderProgramInstance("down", new ShaderParametersDefault());
-        prepareAndStoreShaderProgramInstance("hdr", new ShaderParametersHdr());
-        prepareAndStoreShaderProgramInstance("sky", new ShaderParametersSky());
-        prepareAndStoreShaderProgramInstance("chunk", new ShaderParametersChunk());
-        prepareAndStoreShaderProgramInstance("particle", new ShaderParametersParticle());
-        prepareAndStoreShaderProgramInstance("block", new ShaderParametersBlock());
-        prepareAndStoreShaderProgramInstance("shadowMap", new ShaderParametersShadowMap());
-        prepareAndStoreShaderProgramInstance("debug", new ShaderParametersDebug());
-        prepareAndStoreShaderProgramInstance("ocDistortion", new ShaderParametersOcDistortion());
-        prepareAndStoreShaderProgramInstance("lightBufferPass", new ShaderParametersLightBufferPass());
-        prepareAndStoreShaderProgramInstance("lightGeometryPass", new ShaderParametersLightGeometryPass());
-        prepareAndStoreShaderProgramInstance("simple", new ShaderParametersDefault());
-        prepareAndStoreShaderProgramInstance("ssaoBlur", new ShaderParametersDefault());
+        addShaderProgram("post");
+        addShaderProgram("ssao");
+        addShaderProgram("lightShafts");
+        addShaderProgram("sobel");
+        addShaderProgram("initialPost");
+        addShaderProgram("prePostComposite");
+        addShaderProgram("highPass");
+        addShaderProgram("blur");
+        addShaderProgram("downSampler");
+        addShaderProgram("toneMapping");
+        addShaderProgram("sky");
+        addShaderProgram("chunk");
+        addShaderProgram("particle");
+        addShaderProgram("shadowMap");
+        addShaderProgram("lightBufferPass");
+        addShaderProgram("lightGeometryPass");
+        addShaderProgram("ssaoBlur");
     }
 
     @Override
@@ -156,24 +136,22 @@ public class ShaderManagerLwjgl implements ShaderManager {
 
     @Override
     public void recompileAllShaders() {
-        for (Shader shader : CoreRegistry.get(AssetManager.class).listLoadedAssets(AssetType.SHADER, Shader.class)) {
-            shader.recompile();
-        }
+        AssetManager assetManager = CoreRegistry.get(AssetManager.class);
+        assetManager.getLoadedAssets(Shader.class).forEach(Shader::recompile);
 
-        for (Material material : CoreRegistry.get(AssetManager.class).listLoadedAssets(AssetType.MATERIAL, Material.class)) {
-            material.recompile();
-        }
+        assetManager.getLoadedAssets(Material.class).forEach(Material::recompile);
 
         activeMaterial = null;
     }
 
-    private GLSLMaterial prepareAndStoreShaderProgramInstance(String title, ShaderParameters params) {
+    // TODO: discuss having a `public removeShaderProgram`, to dispose shader programs no longer in use by any node
+    public GLSLMaterial addShaderProgram(String title) {
         String uri = "engine:" + title;
-        Shader shader = Assets.getShader(uri);
-        checkNotNull(shader, "Failed to resolve %s", uri);
-        shader.recompile();
-        GLSLMaterial material = Assets.generateAsset(new AssetUri(AssetType.MATERIAL, "engine:prog." + title), new MaterialData(shader), GLSLMaterial.class);
-        material.setShaderParameters(params);
+        Optional<? extends Shader> shader = Assets.getShader(uri);
+        checkState(shader.isPresent(), "Failed to resolve %s", uri);
+        shader.get().recompile();
+        GLSLMaterial material = (GLSLMaterial) Assets.generateAsset(new ResourceUrn("engine:prog." + title), new MaterialData(shader.get()), Material.class);
+        progamaticShaders.add(material);
 
         return material;
     }
@@ -199,5 +177,4 @@ public class ShaderManagerLwjgl implements ShaderManager {
         GL20.glUseProgram(0);
         activeMaterial = null;
     }
-
 }

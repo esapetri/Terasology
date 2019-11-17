@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MovingBlocks
+ * Copyright 2017 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import org.terasology.entitySystem.entity.EntityRef;
  * The component that marks an entity as being a Client Entity (essentially, a player) and ties them to a
  * client info entity (for replicated information) and character entity (their body).
  *
- * @author Immortius
  */
 public class ClientComponent implements Component {
     public boolean local;
@@ -33,4 +32,6 @@ public class ClientComponent implements Component {
 
     @Replicate
     public EntityRef character = EntityRef.NULL;
+
+    public EntityRef camera = EntityRef.NULL;
 }

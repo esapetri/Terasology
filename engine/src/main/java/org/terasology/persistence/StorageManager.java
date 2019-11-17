@@ -15,7 +15,7 @@
  */
 package org.terasology.persistence;
 
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.network.Client;
 import org.terasology.world.chunks.Chunk;
 
@@ -25,7 +25,6 @@ import java.io.IOException;
  * The entity store manager handles the storing and retrieval of stores of entities (and other data). In particular
  * it keeps track of their existence and the external references of each store, which can be invalidated.
  *
- * @author Immortius
  */
 public interface StorageManager {
 

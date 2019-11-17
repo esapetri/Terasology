@@ -17,16 +17,16 @@ package org.terasology.persistence.internal;
 
 import org.terasology.engine.TerasologyConstants;
 import org.terasology.game.GameManifest;
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 
 import java.nio.file.Path;
 
 /**
- * @author Florian <florian@fkoeberle.de>
  */
 public class StoragePathProvider {
     private static final String PLAYERS_PATH = "players";
     private static final String WORLDS_PATH = "worlds";
+    private static final String PREVIEWS_PATH = "previews";
     private static final String PLAYER_STORE_EXTENSION = ".player";
     private static final String GLOBAL_ENTITY_STORE = "global.dat";
     private static final String UNFINISHED_SAVE_TRANSACTION = "unfinished-save-transaction";
@@ -36,6 +36,7 @@ public class StoragePathProvider {
     private final Path storagePathDirectory;
     private final Path playersPath;
     private final Path worldsPath;
+    private final Path previewsPath;
     private Path worldPath;
     private Path globalEntityStorePath;
     private Path unfinishedSaveTransactionPath;
@@ -46,6 +47,7 @@ public class StoragePathProvider {
         this.storagePathDirectory = storagePathDirectory;
         this.playersPath = storagePathDirectory.resolve(PLAYERS_PATH);
         this.worldsPath = storagePathDirectory.resolve(WORLDS_PATH);
+        this.previewsPath = storagePathDirectory.resolve(PREVIEWS_PATH);
         this.worldPath = worldsPath.resolve(TerasologyConstants.MAIN_WORLD);
         this.globalEntityStorePath = storagePathDirectory.resolve(GLOBAL_ENTITY_STORE);
         this.unfinishedSaveTransactionPath = storagePathDirectory.resolve(UNFINISHED_SAVE_TRANSACTION);
@@ -64,6 +66,10 @@ public class StoragePathProvider {
 
     public Path getWorldsPath() {
         return worldsPath;
+    }
+
+    public Path getPreviewsPath() {
+        return previewsPath;
     }
 
     public Path getPlayerFilePath(String playerId) {
@@ -110,7 +116,7 @@ public class StoragePathProvider {
 
     public Vector3i getChunkZipPosition(Vector3i chunkPos) {
         Vector3i result = new Vector3i(chunkPos);
-        result.divide(CHUNK_ZIP_DIM);
+        result.div(CHUNK_ZIP_DIM);
         if (chunkPos.x < 0) {
             result.x -= 1;
         }

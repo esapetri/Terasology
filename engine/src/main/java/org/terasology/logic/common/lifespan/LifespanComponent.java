@@ -22,12 +22,13 @@ import org.terasology.network.Replicate;
 /**
  * Component describes the lifespan of an entity. When the lifespan ends the entity is destroyed.
  *
- * @author Immortius
  */
 public class LifespanComponent implements Component {
     // Lifespan in seconds
     @Replicate
     public float lifespan = 5;
+    @Replicate
+    public long deathTime;
 
     public LifespanComponent() {
     }

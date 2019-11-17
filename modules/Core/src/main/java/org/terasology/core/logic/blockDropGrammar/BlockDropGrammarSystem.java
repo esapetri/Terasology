@@ -25,7 +25,7 @@ import org.terasology.entitySystem.systems.RegisterSystem;
 import org.terasology.logic.health.DoDestroyEvent;
 import org.terasology.logic.inventory.InventoryManager;
 import org.terasology.logic.inventory.ItemComponent;
-import org.terasology.logic.inventory.PickupBuilder;
+import org.terasology.logic.inventory.events.DropItemEvent;
 import org.terasology.logic.location.LocationComponent;
 import org.terasology.math.geom.Vector3f;
 import org.terasology.physics.events.ImpulseEvent;
@@ -40,7 +40,6 @@ import org.terasology.world.block.items.BlockItemFactory;
 import java.util.List;
 
 /**
- * @author Marcin Sciesinski <marcins78@gmail.com>
  */
 @RegisterSystem(RegisterMode.AUTHORITY)
 public class BlockDropGrammarSystem extends BaseComponentSystem {
@@ -52,13 +51,11 @@ public class BlockDropGrammarSystem extends BaseComponentSystem {
     private InventoryManager inventoryManager;
 
     private BlockItemFactory blockItemFactory;
-    private PickupBuilder pickupBuilder;
     private Random random;
 
     @Override
     public void initialise() {
         blockItemFactory = new BlockItemFactory(entityManager);
-        pickupBuilder = new PickupBuilder(entityManager);
         random = new FastRandom();
     }
 
@@ -152,9 +149,9 @@ public class BlockDropGrammarSystem extends BaseComponentSystem {
     }
 
     private void createDrop(EntityRef item, Vector3f location, boolean applyMovement) {
-        EntityRef pickup = pickupBuilder.createPickupFor(item, location, 60, true);
+        item.send(new DropItemEvent(location));
         if (applyMovement) {
-            pickup.send(new ImpulseEvent(random.nextVector3f(30.0f)));
+            item.send(new ImpulseEvent(random.nextVector3f(30.0f)));
         }
     }
 
@@ -164,7 +161,7 @@ public class BlockDropGrammarSystem extends BaseComponentSystem {
         private int count;
         private String resultDrop;
 
-        public DropParser(Random rnd, String drop) {
+        DropParser(Random rnd, String drop) {
             this.rnd = rnd;
             this.drop = drop;
         }

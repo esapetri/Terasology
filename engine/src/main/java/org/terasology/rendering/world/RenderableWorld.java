@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 MovingBlocks
+ * Copyright 2016 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,15 +16,18 @@
 package org.terasology.rendering.world;
 
 import org.terasology.math.Region3i;
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
+import org.terasology.rendering.cameras.Camera;
+import org.terasology.rendering.world.viewDistance.ViewDistance;
 import org.terasology.world.chunks.ChunkProvider;
 
 /**
- * Created by manu on 24.12.2014.
+ *
  */
 public interface RenderableWorld {
 
     void onChunkLoaded(Vector3i chunkPosition);
+
     void onChunkUnloaded(Vector3i chunkPosition);
 
     boolean pregenerateChunks();
@@ -32,9 +35,11 @@ public interface RenderableWorld {
     void update();
 
     boolean updateChunksInProximity(Region3i renderableRegion);
+
     boolean updateChunksInProximity(ViewDistance viewDistance);
 
     void generateVBOs();
+
     int queueVisibleChunks(boolean isFirstRenderingStageForCurrentFrame);
 
     void dispose();
@@ -42,5 +47,8 @@ public interface RenderableWorld {
     RenderQueuesHelper getRenderQueues();
 
     String getMetrics();
+
     ChunkProvider getChunkProvider();
+
+    void setShadowMapCamera(Camera camera);
 }

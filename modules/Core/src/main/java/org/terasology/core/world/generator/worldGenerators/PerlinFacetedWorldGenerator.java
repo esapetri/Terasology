@@ -17,7 +17,8 @@ package org.terasology.core.world.generator.worldGenerators;
 
 import org.terasology.core.world.generator.facetProviders.BiomeProvider;
 import org.terasology.core.world.generator.facetProviders.DefaultFloraProvider;
-import org.terasology.core.world.generator.facetProviders.EnsureSpawnableChunkZeroProvider;
+import org.terasology.core.world.generator.facetProviders.DefaultTreeProvider;
+import org.terasology.core.world.generator.facetProviders.PlateauProvider;
 import org.terasology.core.world.generator.facetProviders.PerlinBaseSurfaceProvider;
 import org.terasology.core.world.generator.facetProviders.PerlinHillsAndMountainsProvider;
 import org.terasology.core.world.generator.facetProviders.PerlinHumidityProvider;
@@ -26,31 +27,47 @@ import org.terasology.core.world.generator.facetProviders.PerlinRiverProvider;
 import org.terasology.core.world.generator.facetProviders.PerlinSurfaceTemperatureProvider;
 import org.terasology.core.world.generator.facetProviders.SeaLevelProvider;
 import org.terasology.core.world.generator.facetProviders.SurfaceToDensityProvider;
-import org.terasology.core.world.generator.facetProviders.DefaultTreeProvider;
-import org.terasology.core.world.generator.facetProviders.World2dPreviewProvider;
 import org.terasology.core.world.generator.rasterizers.FloraRasterizer;
 import org.terasology.core.world.generator.rasterizers.SolidRasterizer;
 import org.terasology.core.world.generator.rasterizers.TreeRasterizer;
 import org.terasology.engine.SimpleUri;
+import org.terasology.entitySystem.entity.EntityRef;
+import org.terasology.logic.spawner.FixedSpawner;
+import org.terasology.math.geom.ImmutableVector2i;
+import org.terasology.math.geom.Vector3f;
+import org.terasology.registry.In;
 import org.terasology.world.generation.BaseFacetedWorldGenerator;
 import org.terasology.world.generation.WorldBuilder;
 import org.terasology.world.generator.RegisterWorldGenerator;
+import org.terasology.world.generator.plugin.WorldGeneratorPluginLibrary;
 
 /**
- * @author Immortius
  */
-@RegisterWorldGenerator(id = "facetedperlin", displayName = "Perlin", description = "Faceted world generator")
+@RegisterWorldGenerator(id = "facetedperlin", displayName = "Perlin", description = "Faceted world generator using perlin")
 public class PerlinFacetedWorldGenerator extends BaseFacetedWorldGenerator {
+
+    private final FixedSpawner spawner = new FixedSpawner(0, 0);
+
+    @In
+    private WorldGeneratorPluginLibrary worldGeneratorPluginLibrary;
 
     public PerlinFacetedWorldGenerator(SimpleUri uri) {
         super(uri);
     }
 
     @Override
-    protected WorldBuilder createWorld(long seed) {
-        return new WorldBuilder(seed)
-                .addProvider(new World2dPreviewProvider())
-                .addProvider(new SeaLevelProvider())
+    public Vector3f getSpawnPosition(EntityRef entity) {
+        return spawner.getSpawnPosition(getWorld(), entity);
+    }
+
+    @Override
+    protected WorldBuilder createWorld() {
+        int seaLevel = 32;
+        ImmutableVector2i spawnPos = new ImmutableVector2i(0, 0); // as used by the spawner
+
+        return new WorldBuilder(worldGeneratorPluginLibrary)
+                .setSeaLevel(seaLevel)
+                .addProvider(new SeaLevelProvider(seaLevel))
                 .addProvider(new PerlinHumidityProvider())
                 .addProvider(new PerlinSurfaceTemperatureProvider())
                 .addProvider(new PerlinBaseSurfaceProvider())
@@ -61,7 +78,7 @@ public class PerlinFacetedWorldGenerator extends BaseFacetedWorldGenerator {
                 .addProvider(new SurfaceToDensityProvider())
                 .addProvider(new DefaultFloraProvider())
                 .addProvider(new DefaultTreeProvider())
-                .addProvider(new EnsureSpawnableChunkZeroProvider())
+                .addProvider(new PlateauProvider(spawnPos, seaLevel + 4, 10, 30))
                         //.addRasterizer(new GroundRasterizer(blockManager))
                 .addRasterizer(new SolidRasterizer())
                 .addPlugins()

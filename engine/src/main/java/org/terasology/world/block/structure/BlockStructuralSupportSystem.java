@@ -23,11 +23,8 @@ import org.terasology.entitySystem.prefab.PrefabManager;
 import org.terasology.entitySystem.systems.BaseComponentSystem;
 import org.terasology.entitySystem.systems.RegisterSystem;
 import org.terasology.logic.health.DestroyEvent;
-import org.terasology.logic.inventory.InventoryComponent;
-import org.terasology.logic.inventory.InventoryManager;
-import org.terasology.logic.inventory.PickupBuilder;
 import org.terasology.math.Side;
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.monitoring.PerformanceMonitor;
 import org.terasology.registry.In;
 import org.terasology.registry.Share;
@@ -44,20 +41,16 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * @author Marcin Sciesinski <marcins78@gmail.com>
  */
 @RegisterSystem
 @Share(BlockStructuralSupportRegistry.class)
 public class BlockStructuralSupportSystem extends BaseComponentSystem implements BlockStructuralSupportRegistry {
-    public static final int GATHERING_INVENTORY_SLOT_COUNT = 20;
     @In
     private WorldProvider worldProvider;
     @In
     private BlockEntityRegistry blockEntityRegistry;
     @In
     private EntityManager entityManager;
-    @In
-    private InventoryManager inventoryManager;
     @In
     private PrefabManager prefabManager;
 
@@ -88,32 +81,8 @@ public class BlockStructuralSupportSystem extends BaseComponentSystem implements
     public void checkForSupportRemoved(OnChangedBlock event, EntityRef entity) {
         PerformanceMonitor.startActivity("StructuralCheck");
         try {
-            boolean initialEvent = !midDestruction;
-
-            if (initialEvent) {
-                midDestruction = true;
-                gatheringEntity = entityManager.create();
-                gatheringEntity.addComponent(new InventoryComponent(GATHERING_INVENTORY_SLOT_COUNT));
-            }
-            try {
-                for (Side side : Side.values()) {
-                    validateSupportForBlockOnSide(event.getBlockPosition(), side);
-                }
-
-                if (initialEvent) {
-                    PickupBuilder pickupBuilder = new PickupBuilder(entityManager);
-                    for (int i = 0; i < GATHERING_INVENTORY_SLOT_COUNT; i++) {
-                        EntityRef item = inventoryManager.getItemInSlot(gatheringEntity, i);
-                        if (item.exists()) {
-                            pickupBuilder.createPickupFor(item, event.getBlockPosition().toVector3f(), 60, true);
-                        }
-                    }
-                }
-            } finally {
-                if (initialEvent) {
-                    midDestruction = false;
-                    gatheringEntity.destroy();
-                }
+            for (Side side : Side.getAllSides()) {
+                validateSupportForBlockOnSide(event.getBlockPosition(), side);
             }
         } finally {
             PerformanceMonitor.endActivity();
@@ -141,7 +110,6 @@ public class BlockStructuralSupportSystem extends BaseComponentSystem implements
 
             for (BlockStructuralSupport support : supports) {
                 if (support.shouldBeRemovedDueToChange(blockPosition, sideReverse)) {
-                    System.out.println("Removing block due to: " + support.getClass());
                     blockEntityRegistry.getBlockEntityAt(blockPosition).send(new DestroyEvent(gatheringEntity,
                             EntityRef.NULL, prefabManager.getPrefab("engine:supportRemovedDamage")));
                     break;

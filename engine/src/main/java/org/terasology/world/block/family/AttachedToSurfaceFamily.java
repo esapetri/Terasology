@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MovingBlocks
+ * Copyright 2018 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,45 +16,74 @@
 package org.terasology.world.block.family;
 
 import com.google.common.collect.Maps;
+import org.terasology.math.Pitch;
+import org.terasology.math.Rotation;
 import org.terasology.math.Side;
-import org.terasology.math.Vector3i;
-import org.terasology.world.BlockEntityRegistry;
-import org.terasology.world.WorldProvider;
+import org.terasology.math.geom.Vector3i;
+import org.terasology.naming.Name;
 import org.terasology.world.block.Block;
+import org.terasology.world.block.BlockBuilderHelper;
 import org.terasology.world.block.BlockUri;
+import org.terasology.world.block.loader.BlockFamilyDefinition;
+import org.terasology.world.block.shapes.BlockShape;
 
+import java.util.Locale;
 import java.util.Map;
 
-/**
- * @author Immortius <immortius@gmail.com>
- */
+@RegisterBlockFamily("attachedToSurface")
+@BlockSections({"front", "left", "right", "back", "top", "bottom"})
+@MultiSections({
+        @MultiSection(name = "all", coversSection = "front", appliesToSections = {"front", "left", "right", "back", "top", "bottom"}),
+        @MultiSection(name = "topBottom", coversSection = "top", appliesToSections = {"top", "bottom"}),
+        @MultiSection(name = "sides", coversSection = "front", appliesToSections = {"front", "left", "right", "back"})})
 public class AttachedToSurfaceFamily extends AbstractBlockFamily {
+
+
     private Map<Side, Block> blocks = Maps.newEnumMap(Side.class);
     private Block archetype;
 
-    /**
-     * @param uri    The uri for the block group.
-     * @param blocks The set of blocks that make up the group. Front, Back, Left and Right must be provided - the rest is ignored.
-     */
-    public AttachedToSurfaceFamily(BlockUri uri, Map<Side, Block> blocks, Iterable<String> categories) {
-        super(uri, categories);
-        for (Side side : Side.values()) {
-            Block block = blocks.get(side);
-            if (block != null) {
-                this.blocks.put(side, block);
-                block.setBlockFamily(this);
-                block.setUri(new BlockUri(uri, side.name()));
+    public AttachedToSurfaceFamily(BlockFamilyDefinition definition, BlockShape shape, BlockBuilderHelper blockBuilder) {
+        super(definition, shape, blockBuilder);
+        throw new UnsupportedOperationException("Freeform blocks not supported");
+    }
+
+    public AttachedToSurfaceFamily(BlockFamilyDefinition definition, BlockBuilderHelper blockBuilder) {
+        super(definition, blockBuilder);
+
+        Map<Side, Block> blockMap = Maps.newEnumMap(Side.class);
+        if (definition.getData().hasSection("top")) {
+            Block block = blockBuilder.constructSimpleBlock(definition, "top", new BlockUri(definition.getUrn(), new Name(Side.TOP.name())), this);
+            block.setRotation(Rotation.rotate(Pitch.CLOCKWISE_270));
+            blockMap.put(Side.TOP, block);
+        }
+        if (definition.getData().hasSection("front")) {
+            for (Rotation rot : Rotation.horizontalRotations()) {
+                Side side = rot.rotate(Side.FRONT);
+                blockMap.put(side, blockBuilder.constructTransformedBlock(definition, side.toString().toLowerCase(Locale.ENGLISH), rot,
+                        new BlockUri(definition.getUrn(), new Name(side.name())), this));
             }
         }
-        if (this.blocks.containsKey(Side.TOP)) {
-            archetype = this.blocks.get(Side.TOP);
+        if (definition.getData().hasSection("bottom")) {
+            Block block = blockBuilder.constructSimpleBlock(definition, "bottom", new BlockUri(definition.getUrn(), new Name(Side.BOTTOM.name())), this);
+            block.setRotation(Rotation.rotate(Pitch.CLOCKWISE_90));
+            blockMap.put(Side.BOTTOM, block);
+        }
+
+        for (Side side : Side.getAllSides()) {
+            Block block = blockMap.get(side);
+            if (block != null) {
+                blocks.put(side, block);
+            }
+        }
+        if (blocks.containsKey(Side.TOP)) {
+            archetype = blocks.get(Side.TOP);
         } else {
-            archetype = this.blocks.get(Side.FRONT);
+            archetype = blocks.get(Side.FRONT);
         }
     }
 
     @Override
-    public Block getBlockForPlacement(WorldProvider worldProvider, BlockEntityRegistry blockEntityRegistry, Vector3i location, Side attachmentSide, Side direction) {
+    public Block getBlockForPlacement(Vector3i location, Side attachmentSide, Side direction) {
         return blocks.get(attachmentSide);
     }
 
@@ -67,7 +96,7 @@ public class AttachedToSurfaceFamily extends AbstractBlockFamily {
     public Block getBlockFor(BlockUri blockUri) {
         if (getURI().equals(blockUri.getFamilyUri())) {
             try {
-                Side side = Side.valueOf(blockUri.getIdentifier().toUpperCase());
+                Side side = Side.valueOf(blockUri.getIdentifier().toString().toUpperCase(Locale.ENGLISH));
                 return blocks.get(side);
             } catch (IllegalArgumentException e) {
                 return null;
@@ -89,4 +118,5 @@ public class AttachedToSurfaceFamily extends AbstractBlockFamily {
         }
         return null;
     }
+
 }

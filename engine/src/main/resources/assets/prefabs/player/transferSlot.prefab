@@ -1,9 +1,0 @@
-{
-    "Inventory" : {
-        "itemSlots": [0]
-    },
-    "Network" : {
-        "replicateMode" : "OWNER"
-    }
-
-}

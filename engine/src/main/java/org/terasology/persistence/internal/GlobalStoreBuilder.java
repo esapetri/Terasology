@@ -30,15 +30,13 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * @author Immortius
- * @author Florian <florian@fkoeberle.de>
  */
 final class GlobalStoreBuilder {
 
     private final long nextEntityId;
     private final PrefabSerializer prefabSerializer;
 
-    public GlobalStoreBuilder(EngineEntityManager entityManager, PrefabSerializer prefabSerializer) {
+    GlobalStoreBuilder(EngineEntityManager entityManager, PrefabSerializer prefabSerializer) {
         this.nextEntityId = entityManager.getNextId();
         this.prefabSerializer = prefabSerializer;
     }
@@ -59,7 +57,9 @@ final class GlobalStoreBuilder {
         Set<Prefab> prefabsRequiredForEntityStorage = new HashSet<>();
         for (EntityRef entityRef : entityManager.getAllEntities()) {
             Prefab prefab = entityRef.getParentPrefab();
-            prefabsRequiredForEntityStorage.add(prefab);
+            if (prefab != null) {
+                prefabsRequiredForEntityStorage.add(prefab);
+            }
         }
         for (Prefab prefab: prefabsRequiredForEntityStorage) {
             store.addPrefab(prefabSerializer.serialize(prefab));

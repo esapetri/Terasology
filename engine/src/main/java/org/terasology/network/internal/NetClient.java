@@ -23,11 +23,9 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Queues;
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
-
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
-
 import org.jboss.netty.channel.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +34,7 @@ import org.terasology.entitySystem.Component;
 import org.terasology.entitySystem.entity.EntityManager;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.event.Event;
-import org.terasology.entitySystem.metadata.EntitySystemLibrary;
+import org.terasology.entitySystem.metadata.EventLibrary;
 import org.terasology.entitySystem.metadata.EventMetadata;
 import org.terasology.entitySystem.metadata.NetworkEventType;
 import org.terasology.identity.PublicIdentityCertificate;
@@ -44,8 +42,7 @@ import org.terasology.logic.characters.PredictionSystem;
 import org.terasology.logic.common.DisplayNameComponent;
 import org.terasology.logic.location.LocationComponent;
 import org.terasology.math.ChunkMath;
-import org.terasology.math.TeraMath;
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.network.Client;
 import org.terasology.network.ClientComponent;
 import org.terasology.network.ColorComponent;
@@ -60,16 +57,15 @@ import org.terasology.protobuf.EntityData;
 import org.terasology.protobuf.NetData;
 import org.terasology.registry.CoreRegistry;
 import org.terasology.rendering.nui.Color;
-import org.terasology.rendering.world.ViewDistance;
+import org.terasology.rendering.world.viewDistance.ViewDistance;
 import org.terasology.world.WorldChangeListener;
 import org.terasology.world.WorldProvider;
-import org.terasology.world.biomes.Biome;
-import org.terasology.world.biomes.BiomeManager;
 import org.terasology.world.block.Block;
 import org.terasology.world.block.BlockComponent;
 import org.terasology.world.block.family.BlockFamily;
 import org.terasology.world.chunks.Chunk;
 
+import java.math.RoundingMode;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -81,7 +77,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * A remote client.
  *
- * @author Immortius
  */
 public class NetClient extends AbstractClient implements WorldChangeListener {
     private static final Logger logger = LoggerFactory.getLogger(NetClient.class);
@@ -92,9 +87,8 @@ public class NetClient extends AbstractClient implements WorldChangeListener {
     private Channel channel;
     private NetworkEntitySerializer entitySerializer;
     private EventSerializer eventSerializer;
-    private EntitySystemLibrary entitySystemLibrary;
+    private EventLibrary eventLibrary;
     private NetMetricSource metricSource;
-    private BiomeManager biomeManager;
 
     // Relevance
     private Set<Vector3i> relevantChunks = Sets.newHashSet();
@@ -108,7 +102,7 @@ public class NetClient extends AbstractClient implements WorldChangeListener {
     private SetMultimap<Integer, Class<? extends Component>> addedComponents = LinkedHashMultimap.create();
     private SetMultimap<Integer, Class<? extends Component>> removedComponents = LinkedHashMultimap.create();
 
-    private String name = "Unknown";
+    private String preferredName = "Player";
     private long lastReceivedTime;
     private ViewDistance viewDistance = ViewDistance.NEAR;
     private float chunkSendCounter = 1.0f;
@@ -119,9 +113,9 @@ public class NetClient extends AbstractClient implements WorldChangeListener {
 
     // Outgoing messages
     private BlockingQueue<NetData.BlockChangeMessage> queuedOutgoingBlockChanges = Queues.newLinkedBlockingQueue();
-    private BlockingQueue<NetData.BiomeChangeMessage> queuedOutgoingBiomeChanges = Queues.newLinkedBlockingQueue();
+    private BlockingQueue<NetData.ExtraDataChangeMessage> queuedOutgoingExtraDataChanges = Queues.newLinkedBlockingQueue();
     private List<NetData.EventMessage> queuedOutgoingEvents = Lists.newArrayList();
-    private List<BlockFamily> newlyRegisteredFamilies = Lists.newArrayList();
+    private final List<BlockFamily> newlyRegisteredFamilies = Lists.newArrayList();
 
     private Map<Vector3i, Chunk> readyChunks = Maps.newLinkedHashMap();
     private Set<Vector3i> invalidatedChunks = Sets.newLinkedHashSet();
@@ -137,13 +131,18 @@ public class NetClient extends AbstractClient implements WorldChangeListener {
     private AtomicInteger sentBytes = new AtomicInteger();
     private Color color;
 
+    /**
+     * Sets up a new net client with metrics, time, identity, and a world provider.
+     * @param channel
+     * @param networkSystem
+     * @param identity Publice certificate for the client.
+     */
     public NetClient(Channel channel, NetworkSystemImpl networkSystem, PublicIdentityCertificate identity) {
         this.channel = channel;
         metricSource = (NetMetricSource) channel.getPipeline().get(MetricRecordingHandler.NAME);
         this.networkSystem = networkSystem;
         this.time = CoreRegistry.get(Time.class);
         this.identity = identity;
-        this.biomeManager = CoreRegistry.get(BiomeManager.class);
         WorldProvider worldProvider = CoreRegistry.get(WorldProvider.class);
         if (worldProvider != null) {
             worldProvider.registerListener(this);
@@ -159,7 +158,7 @@ public class NetClient extends AbstractClient implements WorldChangeListener {
                 return displayInfo.name;
             }
         }
-        return name;
+        return "Unknown Player";
     }
 
     @Override
@@ -193,16 +192,11 @@ public class NetClient extends AbstractClient implements WorldChangeListener {
 
     }
 
-    public void setName(String name) {
-        this.name = name;
-        ClientComponent client = getEntity().getComponent(ClientComponent.class);
-        if (client != null) {
-            DisplayNameComponent displayInfo = client.clientInfo.getComponent(DisplayNameComponent.class);
-            if (displayInfo != null) {
-                displayInfo.name = name;
-                client.clientInfo.saveComponent(displayInfo);
-            }
-        }
+    /**
+     * @param preferredName the name the player would like to use.
+     */
+    public void setPreferredName(String preferredName) {
+        this.preferredName = preferredName;
     }
 
     @Override
@@ -237,15 +231,17 @@ public class NetClient extends AbstractClient implements WorldChangeListener {
     }
 
     private void sendRegisteredBlocks(NetData.NetMessage.Builder message) {
-        for (BlockFamily family : newlyRegisteredFamilies) {
-            NetData.BlockFamilyRegisteredMessage.Builder blockRegMessage = NetData.BlockFamilyRegisteredMessage.newBuilder();
-            for (Block block : family.getBlocks()) {
-                blockRegMessage.addBlockUri(block.getURI().toString());
-                blockRegMessage.addBlockId(block.getId());
+        synchronized (newlyRegisteredFamilies) {
+            for (BlockFamily family : newlyRegisteredFamilies) {
+                NetData.BlockFamilyRegisteredMessage.Builder blockRegMessage = NetData.BlockFamilyRegisteredMessage.newBuilder();
+                for (Block block : family.getBlocks()) {
+                    blockRegMessage.addBlockUri(block.getURI().toString());
+                    blockRegMessage.addBlockId(block.getId());
+                }
+                message.addBlockFamilyRegistered(blockRegMessage);
             }
-            message.addBlockFamilyRegistered(blockRegMessage);
+            newlyRegisteredFamilies.clear();
         }
-        newlyRegisteredFamilies.clear();
     }
 
     private void sendNewChunks(NetData.NetMessage.Builder message) {
@@ -256,7 +252,7 @@ public class NetClient extends AbstractClient implements WorldChangeListener {
                 Vector3i center = new Vector3i();
                 LocationComponent loc = getEntity().getComponent(ClientComponent.class).character.getComponent(LocationComponent.class);
                 if (loc != null) {
-                    center.set(ChunkMath.calcChunkPos(new Vector3i(loc.getWorldPosition(), 0.5f)));
+                    center.set(ChunkMath.calcChunkPos(new Vector3i(loc.getWorldPosition(), RoundingMode.HALF_UP)));
                 }
                 Vector3i pos = null;
                 int distance = Integer.MAX_VALUE;
@@ -332,12 +328,12 @@ public class NetClient extends AbstractClient implements WorldChangeListener {
     }
 
     public void connected(EntityManager entityManager, NetworkEntitySerializer newEntitySerializer,
-                          EventSerializer newEventSerializer, EntitySystemLibrary newSystemLibrary) {
+                          EventSerializer newEventSerializer, EventLibrary newEventLibrary) {
         this.entitySerializer = newEntitySerializer;
         this.eventSerializer = newEventSerializer;
-        this.entitySystemLibrary = newSystemLibrary;
+        this.eventLibrary = newEventLibrary;
 
-        createEntity(name, color, entityManager);
+        createEntity(preferredName, color, entityManager);
     }
 
     @Override
@@ -345,9 +341,9 @@ public class NetClient extends AbstractClient implements WorldChangeListener {
         try {
             BlockComponent blockComp = target.getComponent(BlockComponent.class);
             if (blockComp != null) {
-                if (relevantChunks.contains(ChunkMath.calcChunkPos(blockComp.getPosition()))) {
+                if (relevantChunks.contains(ChunkMath.calcChunkPos(blockComp.position))) {
                     queuedOutgoingEvents.add(NetData.EventMessage.newBuilder()
-                            .setTargetBlockPos(NetMessageUtil.convert(blockComp.getPosition()))
+                            .setTargetBlockPos(NetMessageUtil.convert(blockComp.position))
                             .setEvent(eventSerializer.serialize(event)).build());
                 }
             } else {
@@ -406,12 +402,13 @@ public class NetClient extends AbstractClient implements WorldChangeListener {
     }
 
     @Override
-    public void onBiomeChanged(Vector3i pos, Biome newBiome, Biome originalBiome) {
+    public void onExtraDataChanged(int i, Vector3i pos, int newData, int oldData) {
         Vector3i chunkPos = ChunkMath.calcChunkPos(pos);
         if (relevantChunks.contains(chunkPos)) {
-            queuedOutgoingBiomeChanges.add(NetData.BiomeChangeMessage.newBuilder()
+            queuedOutgoingExtraDataChanges.add(NetData.ExtraDataChangeMessage.newBuilder()
+                    .setIndex(i)
                     .setPos(NetMessageUtil.convert(pos))
-                    .setNewBiome(biomeManager.getBiomeShortId(newBiome))
+                    .setNewData(newData)
                     .build());
         }
     }
@@ -433,10 +430,10 @@ public class NetClient extends AbstractClient implements WorldChangeListener {
         List<NetData.BlockChangeMessage> blockChanges = Lists.newArrayListWithExpectedSize(queuedOutgoingBlockChanges.size());
         queuedOutgoingBlockChanges.drainTo(blockChanges);
         message.addAllBlockChange(blockChanges);
-
-        List<NetData.BiomeChangeMessage> biomeChanges = Lists.newArrayListWithExpectedSize(queuedOutgoingBiomeChanges.size());
-        queuedOutgoingBiomeChanges.drainTo(biomeChanges);
-        message.addAllBiomeChange(biomeChanges);
+        
+        List<NetData.ExtraDataChangeMessage> extraDataChanges = Lists.newArrayListWithExpectedSize(queuedOutgoingExtraDataChanges.size());
+        queuedOutgoingExtraDataChanges.drainTo(extraDataChanges);
+        message.addAllExtraDataChange(extraDataChanges);
 
         message.addAllEvent(queuedOutgoingEvents);
         queuedOutgoingEvents.clear();
@@ -482,7 +479,6 @@ public class NetClient extends AbstractClient implements WorldChangeListener {
     }
 
     private void sendInitialEntities(NetData.NetMessage.Builder message) {
-        TIntIterator initialIterator = netInitial.iterator();
         int[] initial = netInitial.toArray();
         netInitial.clear();
         Arrays.sort(initial);
@@ -499,7 +495,7 @@ public class NetClient extends AbstractClient implements WorldChangeListener {
             NetData.CreateEntityMessage.Builder createMessage = NetData.CreateEntityMessage.newBuilder().setEntity(entityData);
             BlockComponent blockComponent = entity.getComponent(BlockComponent.class);
             if (blockComponent != null) {
-                createMessage.setBlockPos(NetMessageUtil.convert(blockComponent.getPosition()));
+                createMessage.setBlockPos(NetMessageUtil.convert(blockComponent.position));
             }
             message.addCreateEntity(createMessage);
         }
@@ -512,7 +508,7 @@ public class NetClient extends AbstractClient implements WorldChangeListener {
         for (NetData.EventMessage eventMessage : message.getEventList()) {
             try {
                 Event event = eventSerializer.deserialize(eventMessage.getEvent());
-                EventMetadata<?> metadata = entitySystemLibrary.getEventLibrary().getMetadata(event.getClass());
+                EventMetadata<?> metadata = eventLibrary.getMetadata(event.getClass());
                 if (metadata.getNetworkEventType() != NetworkEventType.SERVER) {
                     logger.warn("Received non-server event '{}' from client '{}'", metadata, getName());
                     continue;
@@ -556,11 +552,14 @@ public class NetClient extends AbstractClient implements WorldChangeListener {
         return metricSource;
     }
 
+    @Override
     public void setViewDistanceMode(ViewDistance distanceMode) {
         this.viewDistance = distanceMode;
     }
 
     public void blockFamilyRegistered(BlockFamily family) {
-        newlyRegisteredFamilies.add(family);
+        synchronized (newlyRegisteredFamilies) {
+            newlyRegisteredFamilies.add(family);
+        }
     }
 }

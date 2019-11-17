@@ -22,7 +22,7 @@ import org.terasology.logic.delay.DelayManager;
 import org.terasology.logic.delay.DelayedActionTriggeredEvent;
 import org.terasology.logic.health.DestroyEvent;
 import org.terasology.math.Side;
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.registry.CoreRegistry;
 import org.terasology.world.BlockEntityRegistry;
 import org.terasology.world.WorldProvider;
@@ -63,7 +63,7 @@ public class SideBlockSupportRequired implements BlockStructuralSupport {
     @ReceiveEvent
     public void checkForSupport(DelayedActionTriggeredEvent event, EntityRef entity, BlockComponent block, SideBlockSupportRequiredComponent supportRequired) {
         if (event.getActionId().equals(SUPPORT_CHECK_ACTION_ID)) {
-            if (!isSufficientlySupported(block.getPosition(), null, Collections.<Vector3i, Block>emptyMap(), supportRequired)) {
+            if (!isSufficientlySupported(block.position, null, Collections.<Vector3i, Block>emptyMap(), supportRequired)) {
                 PrefabManager prefabManager = CoreRegistry.get(PrefabManager.class);
                 entity.send(new DestroyEvent(entity, EntityRef.NULL, prefabManager.getPrefab("engine:supportRemovedDamage")));
             }

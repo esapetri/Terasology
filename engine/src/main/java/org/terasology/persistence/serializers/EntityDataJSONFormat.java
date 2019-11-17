@@ -43,13 +43,12 @@ import java.util.Map;
 
 /**
  * Converts between the EntityData types and JSON.
- * <p/>
+ * <br><br>
  * This means that serialization between JSON and Entities/Prefabs is a two step process, with EntityData as an
  * intermediate step - it was done this way because it is much simpler to write gson handlers for the small number of
  * EntityData types than to dynamically build handlers for every component type (and have gson properly handle missing
  * types). This can be revisited in the future.
  *
- * @author Immortius <immortius@gmail.com>
  */
 // TODO: More javadoc
 public final class EntityDataJSONFormat {
@@ -94,6 +93,7 @@ public final class EntityDataJSONFormat {
                 .registerTypeAdapter(EntityData.Component.class, new ComponentHandler())
                 .registerTypeAdapter(EntityData.Component.Builder.class, new ComponentBuilderHandler())
                 .registerTypeAdapter(EntityData.Value.class, new ValueHandler())
+                .serializeSpecialFloatingPointValues()
                 .create();
     }
 
@@ -364,8 +364,8 @@ public final class EntityDataJSONFormat {
                 for (JsonElement element : jsonArray) {
                     if (element.isJsonArray()) {
                         value.addValue((EntityData.Value) context.deserialize(element, EntityData.Value.class));
-                    } else if (json.isJsonObject()) {
-                        extractMap(json, context, value);
+                    } else if (element.isJsonObject()) {
+                        value.addValue((EntityData.Value) context.deserialize(element, EntityData.Value.class));
                     } else if (element.isJsonPrimitive()) {
                         extractPrimitive(value, element);
                         if (element.getAsJsonPrimitive().isNumber()) {
@@ -377,7 +377,10 @@ public final class EntityDataJSONFormat {
                         }
                     }
                 }
-                value.setBytes(ByteString.copyFrom(byteList.toArray()));
+
+                if (byteList.size() > 0) {
+                    value.setBytes(ByteString.copyFrom(byteList.toArray()));
+                }
             }
             return value.build();
         }

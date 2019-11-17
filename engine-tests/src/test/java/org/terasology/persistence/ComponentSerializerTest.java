@@ -16,12 +16,14 @@
 package org.terasology.persistence;
 
 import com.google.common.collect.ImmutableMap;
-
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.reflections.Reflections;
+import org.terasology.context.Context;
+import org.terasology.context.internal.ContextImpl;
 import org.terasology.engine.SimpleUri;
-import org.terasology.engine.bootstrap.EntitySystemBuilder;
+import org.terasology.engine.bootstrap.EntitySystemSetupUtil;
 import org.terasology.engine.module.ModuleManager;
 import org.terasology.entitySystem.Component;
 import org.terasology.entitySystem.entity.internal.EngineEntityManager;
@@ -33,28 +35,23 @@ import org.terasology.math.geom.Quat4f;
 import org.terasology.math.geom.Vector3f;
 import org.terasology.network.NetworkSystem;
 import org.terasology.persistence.serializers.ComponentSerializer;
-import org.terasology.persistence.typeHandling.TypeSerializationLibrary;
+import org.terasology.persistence.typeHandling.TypeHandlerLibrary;
 import org.terasology.persistence.typeHandling.mathTypes.Quat4fTypeHandler;
 import org.terasology.persistence.typeHandling.mathTypes.Vector3fTypeHandler;
 import org.terasology.protobuf.EntityData;
-import org.terasology.reflection.copy.CopyStrategyLibrary;
-import org.terasology.reflection.reflect.ReflectFactory;
-import org.terasology.reflection.reflect.ReflectionReflectFactory;
+import org.terasology.recording.RecordAndReplayCurrentStatus;
+import org.terasology.registry.CoreRegistry;
 import org.terasology.testUtil.ModuleManagerFactory;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 import static org.mockito.Mockito.mock;
 
 /**
- * @author Immortius
  */
 public class ComponentSerializerTest {
     private static ModuleManager moduleManager;
     private ComponentSerializer componentSerializer;
-    private ReflectFactory reflectFactory = new ReflectionReflectFactory();
-    private CopyStrategyLibrary copyStrategyLibrary = new CopyStrategyLibrary(reflectFactory);
+    private Context context;
 
     @BeforeClass
     public static void setupClass() throws Exception {
@@ -63,13 +60,22 @@ public class ComponentSerializerTest {
 
     @Before
     public void setup() {
-        TypeSerializationLibrary serializationLibrary = new TypeSerializationLibrary(reflectFactory, copyStrategyLibrary);
-        serializationLibrary.add(Vector3f.class, new Vector3fTypeHandler());
-        serializationLibrary.add(Quat4f.class, new Quat4fTypeHandler());
+        context = new ContextImpl();
+        context.put(RecordAndReplayCurrentStatus.class, new RecordAndReplayCurrentStatus());
+        context.put(ModuleManager.class, moduleManager);
+        CoreRegistry.setContext(context);
+
+        Reflections reflections = new Reflections(getClass().getClassLoader());
+        TypeHandlerLibrary serializationLibrary = new TypeHandlerLibrary(reflections);
+
+        serializationLibrary.addTypeHandler(Vector3f.class, new Vector3fTypeHandler());
+        serializationLibrary.addTypeHandler(Quat4f.class, new Quat4fTypeHandler());
 
         NetworkSystem networkSystem = mock(NetworkSystem.class);
-        EntitySystemBuilder builder = new EntitySystemBuilder();
-        EngineEntityManager entityManager = builder.build(moduleManager.getEnvironment(), networkSystem, new ReflectionReflectFactory());
+        context.put(NetworkSystem.class, networkSystem);
+        EntitySystemSetupUtil.addReflectionBasedLibraries(context);
+        EntitySystemSetupUtil.addEntityManagementRelatedClasses(context);
+        EngineEntityManager entityManager = context.get(EngineEntityManager.class);
         entityManager.getComponentLibrary().register(new SimpleUri("test", "gettersetter"), GetterSetterComponent.class);
         entityManager.getComponentLibrary().register(new SimpleUri("test", "string"), StringComponent.class);
         entityManager.getComponentLibrary().register(new SimpleUri("test", "integer"), IntegerComponent.class);
@@ -138,6 +144,6 @@ public class ComponentSerializerTest {
         EntityData.Component compData = EntityData.Component.newBuilder().setTypeIndex(1).addField(EntityData.NameValue.newBuilder().setName("value")).build();
         StringComponent original = new StringComponent("test");
         componentSerializer.deserializeOnto(original, compData);
-        assertEquals("test", original.value);
+        assertEquals(null, original.value);
     }
 }

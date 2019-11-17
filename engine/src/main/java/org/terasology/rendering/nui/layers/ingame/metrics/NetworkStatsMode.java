@@ -22,7 +22,6 @@ import org.terasology.network.NetworkSystem;
 import org.terasology.registry.CoreRegistry;
 
 /**
- * @author Immortius
  */
 final class NetworkStatsMode extends MetricsMode {
     private long lastTime;
@@ -31,8 +30,8 @@ final class NetworkStatsMode extends MetricsMode {
     private String lastMetric;
 
 
-    public NetworkStatsMode() {
-        super("Network");
+    NetworkStatsMode() {
+        super("\n- Network -");
         lastMetric = getName();
         time = CoreRegistry.get(Time.class);
         networkSystem = CoreRegistry.get(NetworkSystem.class);

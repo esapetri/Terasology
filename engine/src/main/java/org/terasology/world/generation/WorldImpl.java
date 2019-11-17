@@ -15,32 +15,34 @@
  */
 package org.terasology.world.generation;
 
+import com.google.common.collect.ListMultimap;
+import com.google.common.collect.Sets;
+import org.terasology.math.Region3i;
+import org.terasology.world.chunks.CoreChunk;
+
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.terasology.math.Region3i;
-import org.terasology.world.chunks.CoreChunk;
-
-import com.google.common.collect.ListMultimap;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-
 /**
- * @author Immortius
  */
 public class WorldImpl implements World {
     private final ListMultimap<Class<? extends WorldFacet>, FacetProvider> facetProviderChains;
     private final List<WorldRasterizer> worldRasterizers;
+    private final List<EntityProvider> entityProviders;
     private final Map<Class<? extends WorldFacet>, Border3D> borders;
     private final int seaLevel;
 
     public WorldImpl(ListMultimap<Class<? extends WorldFacet>, FacetProvider> facetProviderChains,
                      List<WorldRasterizer> worldRasterizers,
+                     List<EntityProvider> entityProviders,
                      Map<Class<? extends WorldFacet>, Border3D> borders,
                      int seaLevel) {
         this.facetProviderChains = facetProviderChains;
         this.worldRasterizers = worldRasterizers;
+        this.entityProviders = entityProviders;
         this.borders = borders;
         this.seaLevel = seaLevel;
     }
@@ -56,25 +58,14 @@ public class WorldImpl implements World {
     }
 
     @Override
-    public void rasterizeChunk(CoreChunk chunk) {
+    public void rasterizeChunk(CoreChunk chunk, EntityBuffer buffer) {
         Region chunkRegion = getWorldData(chunk.getRegion());
         for (WorldRasterizer rasterizer : worldRasterizers) {
             rasterizer.generateChunk(chunk, chunkRegion);
         }
-    }
-
-    @Override
-    public Map<String, Class<? extends WorldFacet>> getNamedFacets() {
-        Map<String, Class<? extends WorldFacet>> facets = Maps.newHashMap();
-
-        for (Class<? extends WorldFacet> facetClass : facetProviderChains.keySet()) {
-            FacetName facetName = facetClass.getAnnotation(FacetName.class);
-            if (facetName != null && !facets.containsKey(facetName.value())) {
-                facets.put(facetName.value(), facetClass);
-            }
+        for (EntityProvider entityProvider : entityProviders) {
+            entityProvider.process(chunkRegion, buffer);
         }
-
-        return facets;
     }
 
     @Override
@@ -84,8 +75,13 @@ public class WorldImpl implements World {
 
     @Override
     public void initialize() {
-        for (WorldRasterizer rasterizer : worldRasterizers) {
-            rasterizer.initialize();
-        }
+        // throw them all in a set to remove duplicates
+        Collection<FacetProvider> facetProviders = new LinkedHashSet<>(facetProviderChains.values());
+
+        facetProviders.forEach(FacetProvider::initialize);
+
+        worldRasterizers.forEach(WorldRasterizer::initialize);
+
+        entityProviders.forEach(EntityProvider::initialize);
     }
 }

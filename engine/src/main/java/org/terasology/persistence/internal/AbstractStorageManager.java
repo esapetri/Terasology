@@ -16,6 +16,7 @@
 
 package org.terasology.persistence.internal;
 
+import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.terasology.entitySystem.entity.EntityRef;
@@ -23,7 +24,7 @@ import org.terasology.entitySystem.entity.internal.EngineEntityManager;
 import org.terasology.entitySystem.entity.internal.OwnershipHelper;
 import org.terasology.logic.location.LocationComponent;
 import org.terasology.math.AABB;
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.module.ModuleEnvironment;
 import org.terasology.network.ClientComponent;
 import org.terasology.persistence.ChunkStore;
@@ -31,9 +32,9 @@ import org.terasology.persistence.PlayerStore;
 import org.terasology.persistence.StorageManager;
 import org.terasology.persistence.serializers.PrefabSerializer;
 import org.terasology.protobuf.EntityData;
+import org.terasology.world.block.BlockManager;
 import org.terasology.world.chunks.Chunk;
-
-import com.google.common.collect.Lists;
+import org.terasology.world.chunks.blockdata.ExtraBlockDataManager;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
@@ -51,15 +52,14 @@ import java.util.zip.GZIPInputStream;
  * An abstract implementation of {@link StorageManager} that is able
  * to read from a data store.
  *
- * @author Immortius
- * @author Florian <florian@fkoeberle.de>
- * @author Martin Steiger
  */
 public abstract class AbstractStorageManager implements StorageManager {
 
     private static final Logger logger = LoggerFactory.getLogger(AbstractStorageManager.class);
 
     private final StoragePathProvider storagePathProvider;
+    private final BlockManager blockManager;
+    private final ExtraBlockDataManager extraDataManager;
 
     private final ModuleEnvironment environment;
     private final EngineEntityManager entityManager;
@@ -68,11 +68,14 @@ public abstract class AbstractStorageManager implements StorageManager {
 
     private boolean storeChunksInZips = true;
 
-    public AbstractStorageManager(Path savePath, ModuleEnvironment environment, EngineEntityManager entityManager, boolean storeChunksInZips) {
+    public AbstractStorageManager(Path savePath, ModuleEnvironment environment, EngineEntityManager entityManager,
+                                  BlockManager blockManager, ExtraBlockDataManager extraDataManager, boolean storeChunksInZips) {
         this.entityManager = entityManager;
         this.environment = environment;
         this.storeChunksInZips = storeChunksInZips;
         this.prefabSerializer = new PrefabSerializer(entityManager.getComponentLibrary(), entityManager.getTypeSerializerLibrary());
+        this.blockManager = blockManager;
+        this.extraDataManager = extraDataManager;
 
         this.storagePathProvider = new StoragePathProvider(savePath);
         this.helper = new OwnershipHelper(entityManager.getComponentLibrary());
@@ -94,9 +97,9 @@ public abstract class AbstractStorageManager implements StorageManager {
     public PlayerStore loadPlayerStore(String playerId) {
         EntityData.PlayerStore store = loadPlayerStoreData(playerId);
         if (store != null) {
-            return new PlayerStoreInternal(playerId, store, this, entityManager);
+            return new PlayerStoreInternal(playerId, store, entityManager);
         }
-        return new PlayerStoreInternal(playerId, this, entityManager);
+        return new PlayerStoreInternal(playerId, entityManager);
     }
 
     @Override
@@ -107,7 +110,7 @@ public abstract class AbstractStorageManager implements StorageManager {
             ByteArrayInputStream bais = new ByteArrayInputStream(chunkData);
             try (GZIPInputStream gzipIn = new GZIPInputStream(bais)) {
                 EntityData.ChunkStore storeData = EntityData.ChunkStore.parseFrom(gzipIn);
-                store = new ChunkStoreInternal(storeData, this, entityManager);
+                store = new ChunkStoreInternal(storeData, entityManager, blockManager, extraDataManager);
             } catch (IOException e) {
                 logger.error("Failed to read existing saved chunk {}", chunkPos);
             }

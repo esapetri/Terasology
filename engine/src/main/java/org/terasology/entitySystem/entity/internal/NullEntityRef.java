@@ -15,18 +15,17 @@
  */
 package org.terasology.entitySystem.entity.internal;
 
-import org.terasology.asset.AssetUri;
 import org.terasology.entitySystem.Component;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.event.Event;
 import org.terasology.entitySystem.prefab.Prefab;
 
 import java.util.Collections;
+import java.util.List;
 
 /**
  * Null entity implementation - acts the same as an empty entity, except you cannot add anything to it.
  *
- * @author Immortius <immortius@gmail.com>
  */
 public final class NullEntityRef extends EntityRef {
     private static NullEntityRef instance = new NullEntityRef();
@@ -55,6 +54,16 @@ public final class NullEntityRef extends EntityRef {
 
     @Override
     public boolean hasComponent(Class<? extends Component> component) {
+        return false;
+    }
+
+    @Override
+    public boolean hasAnyComponents(List<Class<? extends Component>> filterComponents) {
+        return false;
+    }
+
+    @Override
+    public boolean hasAllComponents(List<Class<? extends Component>> filterComponents) {
         return false;
     }
 
@@ -101,10 +110,6 @@ public final class NullEntityRef extends EntityRef {
     }
 
     @Override
-    public void setPersistent(boolean persistent) {
-    }
-
-    @Override
     public boolean isAlwaysRelevant() {
         return false;
     }
@@ -126,12 +131,6 @@ public final class NullEntityRef extends EntityRef {
     public Prefab getParentPrefab() {
         return null;
     }
-
-    @Override
-    public AssetUri getPrefabURI() {
-        return null;
-    }
-
 
     @Override
     public String toString() {

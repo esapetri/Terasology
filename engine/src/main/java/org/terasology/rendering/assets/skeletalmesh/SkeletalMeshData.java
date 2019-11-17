@@ -15,15 +15,13 @@
  */
 package org.terasology.rendering.assets.skeletalmesh;
 
-import org.terasology.math.QuaternionUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
-
-import org.terasology.asset.AssetData;
+import org.terasology.assets.AssetData;
+import org.terasology.math.AABB;
 import org.terasology.math.geom.Quat4f;
 import org.terasology.math.geom.Vector2f;
 import org.terasology.math.geom.Vector3f;
@@ -33,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * @author Immortius
  */
 public class SkeletalMeshData implements AssetData {
 
@@ -45,8 +42,10 @@ public class SkeletalMeshData implements AssetData {
     private TIntList vertexStartWeights = new TIntArrayList();
     private TIntList vertexWeightCounts = new TIntArrayList();
     private TIntList indices = new TIntArrayList();
+    private AABB staticAABB;
 
-    public SkeletalMeshData(List<Bone> bones, List<BoneWeight> weights, List<Vector2f> uvs, TIntList vertexStartWeights, TIntList vertexWeightCounts, TIntList indices) {
+    public SkeletalMeshData(List<Bone> bones, List<BoneWeight> weights, List<Vector2f> uvs, TIntList vertexStartWeights,
+                            TIntList vertexWeightCounts, TIntList indices, AABB staticAABB) {
         for (Bone bone : bones) {
             if (bone.getParent() == null) {
                 rootBone = bone;
@@ -59,9 +58,12 @@ public class SkeletalMeshData implements AssetData {
         this.vertexStartWeights.addAll(vertexStartWeights);
         this.vertexWeightCounts.addAll(vertexWeightCounts);
         this.indices.addAll(indices);
+        this.staticAABB = staticAABB;
 
         calculateNormals();
     }
+
+
 
     public Collection<Bone> getBones() {
         return bones;
@@ -99,7 +101,7 @@ public class SkeletalMeshData implements AssetData {
                 int weightIndex = vertexStartWeights.get(i) + weightIndexOffset;
                 BoneWeight weight = weights.get(weightIndex);
 
-                Vector3f current = QuaternionUtil.quatRotate(boneRotations.get(weight.getBoneIndex()), weight.getPosition(), new Vector3f());
+                Vector3f current = boneRotations.get(weight.getBoneIndex()).rotate(weight.getPosition(), new Vector3f());
                 current.add(bonePositions.get(weight.getBoneIndex()));
                 current.scale(weight.getBias());
                 vertexPos.add(current);
@@ -117,7 +119,7 @@ public class SkeletalMeshData implements AssetData {
                 int weightIndex = vertexStartWeights.get(i) + weightIndexOffset;
                 BoneWeight weight = weights.get(weightIndex);
 
-                Vector3f current = QuaternionUtil.quatRotate(boneRotations.get(weight.getBoneIndex()), weight.getNormal(), new Vector3f());
+                Vector3f current = boneRotations.get(weight.getBoneIndex()).rotate(weight.getNormal(), new Vector3f());
                 current.scale(weight.getBias());
                 vertexNorm.add(current);
             }
@@ -142,6 +144,10 @@ public class SkeletalMeshData implements AssetData {
         return uvs;
     }
 
+    public AABB getStaticAABB() {
+        return staticAABB;
+    }
+
     private void calculateNormals() {
         // TODO: Better algorithm (take into account triangle size and angles
         List<Vector3f> vertices = getBindPoseVertexPositions();
@@ -164,9 +170,7 @@ public class SkeletalMeshData implements AssetData {
             normals.get(indices.get(i * 3 + 2)).add(norm);
         }
 
-        for (Vector3f normal : normals) {
-            normal.normalize();
-        }
+        normals.forEach(Vector3f::normalize);
 
         Quat4f inverseRot = new Quat4f();
         for (int vertIndex = 0; vertIndex < vertices.size(); ++vertIndex) {
@@ -174,7 +178,7 @@ public class SkeletalMeshData implements AssetData {
             for (int weightIndex = 0; weightIndex < vertexWeightCounts.get(vertIndex); ++weightIndex) {
                 BoneWeight weight = weights.get(weightIndex + vertexStartWeights.get(vertIndex));
                 inverseRot.inverse(bones.get(weight.getBoneIndex()).getObjectRotation());
-                QuaternionUtil.quatRotate(inverseRot, normal, norm);
+                inverseRot.rotate(normal, norm);
                 weight.setNormal(norm);
             }
         }

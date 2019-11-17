@@ -15,12 +15,11 @@
  */
 package org.terasology.core.world.generator.facetProviders;
 
-import org.terasology.math.Rect2i;
+import org.terasology.math.geom.Rect2i;
 import org.terasology.math.geom.Vector2f;
-import org.terasology.utilities.procedural.BrownianNoise3D;
-import org.terasology.utilities.procedural.Noise3DTo2DAdapter;
+import org.terasology.utilities.procedural.BrownianNoise;
 import org.terasology.utilities.procedural.PerlinNoise;
-import org.terasology.utilities.procedural.SubSampledNoise2D;
+import org.terasology.utilities.procedural.SubSampledNoise;
 import org.terasology.world.generation.Border3D;
 import org.terasology.world.generation.Facet;
 import org.terasology.world.generation.FacetProvider;
@@ -31,18 +30,20 @@ import org.terasology.world.generation.facets.SeaLevelFacet;
 import org.terasology.world.generation.facets.SurfaceHeightFacet;
 
 /**
- * @author Immortius
+ * @deprecated Prefer using {@link SimplexBaseSurfaceProvider}.
  */
+@Deprecated
 @Produces(SurfaceHeightFacet.class)
 @Requires(@Facet(SeaLevelFacet.class))
 public class PerlinBaseSurfaceProvider implements FacetProvider {
     private static final int SAMPLE_RATE = 4;
 
-    private SubSampledNoise2D surfaceNoise;
+    private SubSampledNoise surfaceNoise;
 
     @Override
     public void setSeed(long seed) {
-        surfaceNoise = new SubSampledNoise2D(new Noise3DTo2DAdapter(new BrownianNoise3D(new PerlinNoise(seed), 8)), new Vector2f(0.004f, 0.004f), SAMPLE_RATE);
+        BrownianNoise source = new BrownianNoise(new PerlinNoise(seed), 8);
+        surfaceNoise = new SubSampledNoise(source, new Vector2f(0.004f, 0.004f), SAMPLE_RATE);
     }
 
     @Override
@@ -55,7 +56,7 @@ public class PerlinBaseSurfaceProvider implements FacetProvider {
         float[] noise = surfaceNoise.noise(processRegion);
 
         for (int i = 0; i < noise.length; ++i) {
-            noise[i] = seaLevel + seaLevel * ((noise[i] + 1f) / 2f);
+            noise[i] = seaLevel + seaLevel * ((noise[i] * 2.11f + 1f) / 2f);
         }
 
         facet.set(noise);

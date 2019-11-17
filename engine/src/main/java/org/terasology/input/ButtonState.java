@@ -17,7 +17,6 @@
 package org.terasology.input;
 
 /**
- * @author Immortius
  */
 public enum ButtonState {
     DOWN(true),
@@ -26,7 +25,7 @@ public enum ButtonState {
 
     private boolean down;
 
-    private ButtonState(boolean down) {
+    ButtonState(boolean down) {
         this.down = down;
     }
 

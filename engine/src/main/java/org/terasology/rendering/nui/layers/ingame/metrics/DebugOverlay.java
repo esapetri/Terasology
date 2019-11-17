@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 MovingBlocks
+ * Copyright 2017 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,44 +15,34 @@
  */
 package org.terasology.rendering.nui.layers.ingame.metrics;
 
-import com.google.common.collect.Lists;
-
 import org.terasology.config.Config;
-import org.terasology.engine.GameEngine;
 import org.terasology.engine.Time;
 import org.terasology.entitySystem.entity.EntityManager;
 import org.terasology.input.cameraTarget.CameraTargetSystem;
-import org.terasology.logic.characters.CharacterComponent;
 import org.terasology.logic.players.LocalPlayer;
 import org.terasology.math.ChunkMath;
-import org.terasology.math.TeraMath;
-import org.terasology.math.Vector3i;
 import org.terasology.math.geom.Vector3f;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.monitoring.PerformanceMonitor;
 import org.terasology.persistence.StorageManager;
-import org.terasology.registry.CoreRegistry;
 import org.terasology.registry.In;
 import org.terasology.rendering.nui.CoreScreenLayer;
 import org.terasology.rendering.nui.databinding.ReadOnlyBinding;
 import org.terasology.rendering.nui.widgets.UILabel;
 import org.terasology.rendering.primitives.ChunkTessellator;
 import org.terasology.world.WorldProvider;
-import org.terasology.world.biomes.Biome;
-import org.terasology.world.biomes.BiomeManager;
 
-import java.util.List;
 import java.util.Locale;
 
 /**
- * @author Immortius
+ * Displays the content of the MetricsMode instances provided by the {@link DebugMetricsSystem}.
+ *
+ * See the {@link #toggleMetricsMode()} method to iterate through the MetricsMode instances available for display.
  */
 public class DebugOverlay extends CoreScreenLayer {
 
     @In
     private Config config;
-
-    @In
-    private GameEngine engine;
 
     @In
     private CameraTargetSystem cameraTarget;
@@ -69,11 +59,10 @@ public class DebugOverlay extends CoreScreenLayer {
     @In
     private WorldProvider worldProvider;
 
-    private List<MetricsMode> metricsModes = Lists.newArrayList(new NullMetricsMode(), new RunningMeansMode(), new SpikesMode(),
-            new AllocationsMode(), new RunningThreadsMode(), new WorldRendererMode(), new NetworkStatsMode());
-    private int currentMode;
-    private UILabel metricsLabel;
+    @In
+    private DebugMetricsSystem debugMetricsSystem;
 
+    private UILabel metricsLabel;
 
     @In
     private StorageManager storageManager;
@@ -94,7 +83,7 @@ public class DebugOverlay extends CoreScreenLayer {
                 @Override
                 public String get() {
                     double memoryUsage = ((double) Runtime.getRuntime().totalMemory() - (double) Runtime.getRuntime().freeMemory()) / 1048576.0;
-                    return String.format("fps: %.2f, mem usage: %.2f MB, total mem: %.2f MB, max mem: %.2f MB",
+                    return String.format("FPS: %.2f, Memory Usage: %.2f MB, Total Memory: %.2f MB, Max Memory: %.2f MB",
                             time.getFps(), memoryUsage, Runtime.getRuntime().totalMemory() / 1048576.0, Runtime.getRuntime().maxMemory() / 1048576.0);
                 }
             });
@@ -116,10 +105,13 @@ public class DebugOverlay extends CoreScreenLayer {
                 @Override
                 public String get() {
                     Vector3f pos = localPlayer.getPosition();
-                    CharacterComponent character = localPlayer.getCharacterEntity().getComponent(CharacterComponent.class);
-                    float yaw = (character != null) ? character.yaw : 0;
                     Vector3i chunkPos = ChunkMath.calcChunkPos((int) pos.x, (int) pos.y, (int) pos.z);
-                    return String.format(Locale.US, "Pos (%.2f, %.2f, %.2f), Chunk (%d, %d, %d), Yaw %.2f", pos.x, pos.y, pos.z, chunkPos.x, chunkPos.y, chunkPos.z, yaw);
+                    Vector3f rotation = localPlayer.getViewDirection();
+                    Vector3f cameraPos = localPlayer.getViewPosition();
+                    return String.format(Locale.US, "Position: (%.2f, %.2f, %.2f), Chunk (%d, %d, %d), Eye (%.2f, %.2f, %.2f), Rot (%.2f, %.2f, %.2f)", pos.x, pos.y, pos.z,
+                            chunkPos.x, chunkPos.y, chunkPos.z,
+                            cameraPos.x, cameraPos.y, cameraPos.z,
+                            rotation.x, rotation.y, rotation.z);
                 }
             });
         }
@@ -129,19 +121,24 @@ public class DebugOverlay extends CoreScreenLayer {
             debugLine4.bindText(new ReadOnlyBinding<String>() {
                 @Override
                 public String get() {
-                    String biomeId = "unavailable";
-                    Vector3i blockPos = new Vector3i(localPlayer.getPosition());
-                    if (worldProvider.isBlockRelevant(blockPos)) {
-                        Biome biome = worldProvider.getBiome(blockPos);
-                        biomeId = CoreRegistry.get(BiomeManager.class).getBiomeId(biome);
-                    }
-                    return String.format("total vus: %s | worldTime: %.3f | biome: %s",
+                    return String.format("Total VUs: %s, World Time: %.3f, Time Dilation: %.1f",
                             ChunkTessellator.getVertexArrayUpdateCount(),
                             worldProvider.getTime().getDays() - 0.0005f,    // use floor instead of rounding up
-                            biomeId);
+                            time.getGameTimeDilation());
                 }
             });
         }
+
+        UILabel debugInfo = find("debugInfo", UILabel.class);
+        if (debugInfo != null) {
+            debugInfo.bindText(new ReadOnlyBinding<String>() {
+                @Override
+                public String get() {
+                    return String.format("[H] : Debug Documentation");
+                }
+            });
+        }
+
         UILabel saveStatusLabel = find("saveStatusLabel", UILabel.class);
         // clients do not have a storage manager
         if (saveStatusLabel != null && storageManager != null) {
@@ -161,14 +158,50 @@ public class DebugOverlay extends CoreScreenLayer {
             );
         }
 
+        UILabel wireframeMode = find("wireframeMode", UILabel.class);
+
+        if (wireframeMode != null) {
+            wireframeMode.bindText(new ReadOnlyBinding<String>() {
+                @Override
+                public String get() {
+                    return "WIREFRAME MODE";
+                }
+            });
+            wireframeMode.bindVisible(
+                    new ReadOnlyBinding<Boolean>() {
+                        @Override
+                        public Boolean get() {
+                            return config.getRendering().getDebug().isWireframe();
+                        }
+                    }
+            );
+        }
+
+        UILabel chunkRenderMode = find("chunkBBRenderMode", UILabel.class);
+
+        if (chunkRenderMode != null) {
+            chunkRenderMode.bindText(new ReadOnlyBinding<String>() {
+                @Override
+                public String get() {
+                    return "CHUNK BOUNDING BOX RENDER MODE";
+                }
+            });
+            chunkRenderMode.bindVisible(
+                    new ReadOnlyBinding<Boolean>() {
+                        @Override
+                        public Boolean get() {
+                            return config.getRendering().getDebug().isRenderChunkBoundingBoxes();
+                        }
+                    }
+            );
+        }
+
         metricsLabel = find("metrics", UILabel.class);
     }
 
     @Override
     public void update(float delta) {
-        if (metricsLabel != null) {
-            metricsLabel.setText(metricsModes.get(currentMode).getMetrics());
-        }
+        metricsLabel.setText(debugMetricsSystem.getCurrentMode().getMetrics());
     }
 
     @Override
@@ -177,15 +210,17 @@ public class DebugOverlay extends CoreScreenLayer {
     }
 
     @Override
-    public boolean isEscapeToCloseAllowed() {
+    protected boolean isEscapeToCloseAllowed() {
         return false;
     }
 
+    /**
+     * Moves forward through the MetricsMode instances and displays the content of the next available one.
+     */
     public void toggleMetricsMode() {
-        currentMode = (currentMode + 1) % metricsModes.size();
-        while (!metricsModes.get(currentMode).isAvailable()) {
-            currentMode = (currentMode + 1) % metricsModes.size();
-        }
-        PerformanceMonitor.setEnabled(metricsModes.get(currentMode).isPerformanceManagerMode());
+        MetricsMode mode = debugMetricsSystem.toggle();
+        PerformanceMonitor.setEnabled(mode.isPerformanceManagerMode());
     }
+
+
 }

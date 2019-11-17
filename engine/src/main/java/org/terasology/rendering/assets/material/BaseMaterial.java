@@ -15,8 +15,8 @@
  */
 package org.terasology.rendering.assets.material;
 
-import org.terasology.asset.AbstractAsset;
-import org.terasology.asset.AssetUri;
+import org.terasology.assets.AssetType;
+import org.terasology.assets.ResourceUrn;
 import org.terasology.math.geom.Matrix3f;
 import org.terasology.math.geom.Matrix4f;
 import org.terasology.math.geom.Vector2f;
@@ -28,58 +28,76 @@ import org.terasology.rendering.cameras.Camera;
 
 import java.nio.FloatBuffer;
 
-public abstract class BaseMaterial extends AbstractAsset<MaterialData> implements Material {
+public abstract class BaseMaterial extends Material {
 
-    public BaseMaterial(AssetUri uri) {
-        super(uri);
+    protected BaseMaterial(ResourceUrn urn, AssetType<?, MaterialData> assetType) {
+        super(urn, assetType);
     }
 
-    protected abstract void onReload(MaterialData data);
-
-    protected abstract void onDispose();
-
+    @Override
     public abstract void recompile();
 
+    @Override
     public abstract void enable();
 
+    @Override
     public abstract void setFloat(String name, float f, boolean currentOnly);
 
+    @Override
     public abstract void setFloat1(String name, FloatBuffer buffer, boolean currentOnly);
 
+    @Override
     public abstract void setFloat2(String name, float f1, float f2, boolean currentOnly);
 
+    @Override
     public abstract void setFloat2(String name, FloatBuffer buffer, boolean currentOnly);
 
+    @Override
     public abstract void setFloat3(String name, float f1, float f2, float f3, boolean currentOnly);
 
+    @Override
     public abstract void setFloat3(String name, FloatBuffer buffer, boolean currentOnly);
 
+    @Override
     public abstract void setFloat4(String name, float f1, float f2, float f3, float f4, boolean currentOnly);
 
+    @Override
     public abstract void setFloat4(String name, FloatBuffer buffer, boolean currentOnly);
 
+    @Override
     public abstract void setInt(String name, int i, boolean currentOnly);
 
+    @Override
     public abstract void setBoolean(String name, boolean value, boolean currentOnly);
 
+    @Override
     public abstract void setMatrix3(String name, Matrix3f matrix, boolean currentOnly);
 
+    @Override
     public abstract void setMatrix3(String name, FloatBuffer buffer, boolean currentOnly);
 
+    @Override
     public abstract void setMatrix4(String name, Matrix4f matrix, boolean currentOnly);
 
+    @Override
     public abstract void setMatrix4(String name, FloatBuffer buffer, boolean currentOnly);
 
+    @Override
     public abstract void setTexture(String name, Texture texture);
 
+    @Override
     public abstract boolean supportsFeature(ShaderProgramFeature feature);
 
+    @Override
     public abstract void activateFeature(ShaderProgramFeature feature);
 
+    @Override
     public abstract void deactivateFeature(ShaderProgramFeature feature);
 
+    @Override
     public abstract void deactivateFeatures(ShaderProgramFeature... features);
 
+    @Override
     public abstract void bindTextures();
 
     @Override
@@ -122,6 +140,7 @@ public abstract class BaseMaterial extends AbstractAsset<MaterialData> implement
         setFloat3(name, value.x, value.y, value.z);
     }
 
+    @Override
     public void setFloat3(String name, Vector3f value, boolean currentOnly) {
         setFloat3(name, value.x, value.y, value.z, currentOnly);
     }
@@ -183,9 +202,9 @@ public abstract class BaseMaterial extends AbstractAsset<MaterialData> implement
 
     @Override
     public void setCamera(Camera camera) {
-        setMatrix4("viewMatrix", camera.getViewMatrix());
-        setMatrix4("projMatrix", camera.getProjectionMatrix());
-        setMatrix4("viewProjMatrix", camera.getViewProjectionMatrix());
-        setMatrix4("invProjMatrix", camera.getInverseProjectionMatrix());
+        setMatrix4("viewMatrix", camera.getViewMatrix(), true);
+        setMatrix4("projMatrix", camera.getProjectionMatrix(), true);
+        setMatrix4("viewProjMatrix", camera.getViewProjectionMatrix(), true);
+        setMatrix4("invProjMatrix", camera.getInverseProjectionMatrix(), true);
     }
 }

@@ -37,20 +37,19 @@ import java.util.Set;
 
 /**
  * A library of copy strategies.
- * <p/>
+ * <br><br>
  * This library is should be initialised by registering strategies for a number of core types.  Then as strategies are requested for unknown types,
  * new strategies are generated for those types.
  * The library knows how to generate strategies for Lists, Sets, Maps and types marked with the MappedContainer annotation.
  * If there is any trouble generating a strategy for a type, or it is unknown and generation is not appropriate for the type, a default strategy of returning the value
  * to be copied unaltered is returned.
  *
- * @author Immortius
  */
 public class CopyStrategyLibrary {
     private static final Logger logger = LoggerFactory.getLogger(CopyStrategyLibrary.class);
 
     private Map<Class<?>, CopyStrategy<?>> strategies = Maps.newHashMap();
-    private CopyStrategy<?> defaultStrategy = new ReturnAsIsStrategy();
+    private CopyStrategy<?> defaultStrategy = new ReturnAsIsStrategy<>();
     private ReflectFactory reflectFactory;
 
     public CopyStrategyLibrary(ReflectFactory reflectFactory) {
@@ -85,7 +84,7 @@ public class CopyStrategyLibrary {
 
     // TODO: Consider CopyStrategyFactory system for Collections and similar
     public CopyStrategy<?> getStrategy(Type genericType) {
-        Class<?> typeClass = ReflectionUtil.getClassOfType(genericType);
+        Class<?> typeClass = ReflectionUtil.getRawType(genericType);
         if (typeClass == null) {
             logger.error("Cannot obtain class for type {}, using default strategy", genericType);
             return defaultStrategy;

@@ -15,7 +15,6 @@
  */
 package org.terasology.rendering.logic;
 
-import org.terasology.entitySystem.Component;
 import org.terasology.network.Replicate;
 import org.terasology.rendering.assets.material.Material;
 import org.terasology.rendering.assets.mesh.Mesh;
@@ -23,10 +22,9 @@ import org.terasology.rendering.nui.Color;
 import org.terasology.world.block.ForceBlockActive;
 
 /**
- * @author Immortius <immortius@gmail.com>
  */
 @ForceBlockActive
-public final class MeshComponent implements Component {
+public final class MeshComponent implements VisualComponent {
 
     @Replicate
     public Mesh mesh;
@@ -36,6 +34,10 @@ public final class MeshComponent implements Component {
     // TODO: This should be a setting on the material
     @Replicate
     public boolean translucent;
+
+    // Use this for the mesh to light itself.  Useful for held lights where the point light is inside the mesh.
+    @Replicate
+    public float selfLuminance;
 
     public boolean hideFromOwner;
 

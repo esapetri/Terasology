@@ -15,54 +15,28 @@
  */
 package org.terasology.persistence.typeHandling;
 
-import com.google.common.collect.Lists;
-
-import java.util.Collection;
-import java.util.List;
+import java.util.Optional;
 
 /**
- * @author Immortius
  */
-public abstract class StringRepresentationTypeHandler<T> implements TypeHandler<T> {
+public abstract class StringRepresentationTypeHandler<T> extends TypeHandler<T> {
 
     public abstract String getAsString(T item);
 
     public abstract T getFromString(String representation);
 
     @Override
-    public PersistedData serialize(T value, SerializationContext context) {
-        return context.create(getAsString(value));
+    public PersistedData serializeNonNull(T value, PersistedDataSerializer serializer) {
+        String stringValue = getAsString(value);
+        return serializer.serialize(stringValue);
     }
 
     @Override
-    public T deserialize(PersistedData data, DeserializationContext context) {
-        return getFromString(data.getAsString());
-    }
-
-    @Override
-    public PersistedData serializeCollection(Collection<T> value, SerializationContext context) {
-        String[] result = new String[value.size()];
-        int index = 0;
-        for (T item : value) {
-            if (item != null) {
-                result[index++] = getAsString(item);
-            } else {
-                result[index++] = "";
-            }
+    public Optional<T> deserialize(PersistedData data) {
+        if (data.isString()) {
+            return Optional.ofNullable(getFromString(data.getAsString()));
         }
-        return context.create(result);
+        return Optional.empty();
     }
 
-    @Override
-    public List<T> deserializeCollection(PersistedData data, DeserializationContext context) {
-        List<T> result = Lists.newArrayList();
-        for (String item : data.getAsArray().getAsStringArray()) {
-            if (item == null || item.isEmpty()) {
-                result.add(null);
-            } else {
-                result.add(getFromString(item));
-            }
-        }
-        return result;
-    }
 }

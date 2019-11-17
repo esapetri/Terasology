@@ -15,20 +15,20 @@
  */
 package org.terasology.persistence.internal;
 
-import org.terasology.asset.AssetUri;
 import org.terasology.entitySystem.Component;
 import org.terasology.entitySystem.entity.EntityManager;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.event.Event;
 import org.terasology.entitySystem.prefab.Prefab;
 
+import java.util.List;
+
 /**
  * The class represents a future entity ref that has yet to be bound to an entity manager.
- *
+ * <p>
  * Currently it gets used by the StorageManager to create entity refs on the main thread for storage off the main
  * thread. During the storage the entities will be bound to the entity manager that is private the the saving thread.
  *
- * @author Florian <florian@fkoeberle.de>
  */
 public class DelayedEntityRef extends EntityRef {
     private final long id;
@@ -89,11 +89,6 @@ public class DelayedEntityRef extends EntityRef {
     }
 
     @Override
-    public void setPersistent(boolean persistent) {
-        getEntityRef().setPersistent(persistent);
-    }
-
-    @Override
     public boolean isAlwaysRelevant() {
         return getEntityRef().isAlwaysRelevant();
     }
@@ -119,11 +114,6 @@ public class DelayedEntityRef extends EntityRef {
     }
 
     @Override
-    public AssetUri getPrefabURI() {
-        return getEntityRef().getPrefabURI();
-    }
-
-    @Override
     public String toFullDescription() {
         return getEntityRef().toFullDescription();
     }
@@ -146,6 +136,16 @@ public class DelayedEntityRef extends EntityRef {
     @Override
     public boolean hasComponent(Class<? extends Component> component) {
         return getEntityRef().hasComponent(component);
+    }
+
+    @Override
+    public boolean hasAnyComponents(List<Class<? extends Component>> filterComponents) {
+        return getEntityRef().hasAnyComponents(filterComponents);
+    }
+
+    @Override
+    public boolean hasAllComponents(List<Class<? extends Component>> filterComponents) {
+        return getEntityRef().hasAllComponents(filterComponents);
     }
 
     @Override

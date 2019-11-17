@@ -23,9 +23,8 @@ import org.terasology.input.Keyboard;
 import org.terasology.input.RegisterBindButton;
 
 /**
- * @author Immortius
  */
-@RegisterBindButton(id = "decreaseViewDistance", description = "Decrease View Distance", mode = ActivateMode.PRESS, category = "general")
+@RegisterBindButton(id = "decreaseViewDistance", description = "${engine:menu#binding-decrease-view-distance}", mode = ActivateMode.PRESS, category = "general")
 @DefaultBinding(type = InputType.KEY, id = Keyboard.KeyId.END)
 public class DecreaseViewDistanceButton extends BindButtonEvent {
 }

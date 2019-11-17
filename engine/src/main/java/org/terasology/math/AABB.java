@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MovingBlocks
+ * Copyright 2018 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,30 +16,24 @@
 
 package org.terasology.math;
 
+import com.google.common.base.Objects;
 import gnu.trove.list.TFloatList;
+import org.terasology.math.geom.Matrix3f;
+import org.terasology.math.geom.Quat4f;
+import org.terasology.math.geom.Vector3d;
+import org.terasology.math.geom.Vector3f;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import javax.vecmath.Matrix4f;
-
-import org.terasology.math.geom.Quat4f;
-import org.terasology.math.geom.Vector3d;
-import org.terasology.math.geom.Vector3f;
-
-import com.bulletphysics.linearmath.AabbUtil2;
-import com.bulletphysics.linearmath.Transform;
-import com.google.common.base.Objects;
-
 /**
- * An axis-aligned bounding box. Provides basic support for inclusion
- * and intersection tests.
- *
- * @author Benjamin Glatzel <benjamin.glatzel@me.com>
+ * An axis-aligned bounding box. Provides basic support for inclusion and intersection tests.
  */
 public final class AABB {
 
+    public static final float DEFAULT_MARGIN = 0.01f;
+    public static final float HALVING_FACTOR = 0.5f;
     private final Vector3f min;
     private final Vector3f max;
 
@@ -50,10 +44,24 @@ public final class AABB {
         this.max = max;
     }
 
+    /**
+     * Creates a new AABB from the given minimum and maximum points, both inclusive.
+     *
+     * @param min The minimum of the AABB.
+     * @param max The maximum of the AABB.
+     * @return The created AABB.
+     */
     public static AABB createMinMax(Vector3f min, Vector3f max) {
         return new AABB(new Vector3f(min), new Vector3f(max));
     }
 
+    /**
+     * Creates a new AABB with the given center and extents.
+     *
+     * @param center The center of the AABB.
+     * @param extent The extent of the AABB.
+     * @return The created AABB.
+     */
     public static AABB createCenterExtent(Vector3f center, Vector3f extent) {
         Vector3f min = new Vector3f(center);
         min.sub(extent);
@@ -62,14 +70,19 @@ public final class AABB {
         return new AABB(min, max);
     }
 
+    /**
+     * Creates an empty AABB that does not contain any points.
+     *
+     * @return The created AABB.
+     */
     public static AABB createEmpty() {
         return new AABB(new Vector3f(), new Vector3f());
     }
 
     /**
-     * Creates a new AABB that encapsulates a set of AABBs
+     * Creates a new AABB that encapsulates a set of AABBs.
      *
-     * @param others
+     * @param others The other AABBs that'll define the extents of the new one.
      */
     public static AABB createEncompassing(Iterable<AABB> others) {
         Vector3f min;
@@ -92,6 +105,18 @@ public final class AABB {
         return new AABB(min, max);
     }
 
+    /**
+     * Creates a new AABB that contains the vertices as represented by a {@link TFloatList}.
+     *
+     * @param vertices The vertices to encompass. It is assumed that the X, Y, Z components of each
+     *                 vertex are stored consecutively in the {@link TFloatList}.
+     *
+     *                 For the {@code i}th vertex in the list, the X, Y, and Z components
+     *                 are stored at indices {@code 3 * i}, {@code 3 * i + 1}, and
+     *                 {@code 3 * i + 2} respectively.
+     *
+     * @return The created AABB.
+     */
     public static AABB createEncompasing(TFloatList vertices) {
         int vertexCount = vertices.size() / 3;
         if (vertexCount == 0) {
@@ -111,17 +136,20 @@ public final class AABB {
         return AABB.createMinMax(min, max);
     }
 
+    /**
+     * @return The distance from the center to the max node
+     */
     public Vector3f getExtents() {
         Vector3f dimensions = new Vector3f(max);
         dimensions.sub(min);
-        dimensions.scale(0.5f);
+        dimensions.scale(HALVING_FACTOR);
         return dimensions;
     }
 
     public Vector3f getCenter() {
         Vector3f dimensions = new Vector3f(max);
         dimensions.add(min);
-        dimensions.scale(0.5f);
+        dimensions.scale(HALVING_FACTOR);
         return dimensions;
     }
 
@@ -133,6 +161,11 @@ public final class AABB {
         return new Vector3f(max);
     }
 
+    /**
+     * Get a new AABB which have a new location base on the offset
+     * @param offset The offset between the current AABB and the new AABB
+     * @return the new AABB
+     */
     public AABB move(Vector3f offset) {
         Vector3f newMin = new Vector3f(min);
         newMin.add(offset);
@@ -141,16 +174,71 @@ public final class AABB {
         return new AABB(newMin, newMax);
     }
 
+    /**
+     * Transform this AABB into a new AABB with the given rotation, offset and scale.
+     *
+     * @param rotation The rotation from the current AABB to the new AABB.
+     * @param offset The offset between the current AABB and the new AABB.
+     * @param scale The scale of the new AABB with respect to the old AABB.
+     * @return The new transformed AABB.
+     */
     public AABB transform(Quat4f rotation, Vector3f offset, float scale) {
-        Transform transform = new Transform(new Matrix4f(VecMath.to(rotation), VecMath.to(offset), scale));
+        Transform transform = new Transform(offset, rotation, scale);
         return transform(transform);
     }
 
+    /**
+     * Transform this AABB into a new AABB with the given rotation, offset and scale as represented by the {@link Transform}.
+     *
+     * @param transform The {@link Transform} representing the offset, rotation, and scale transformation from this AABB to the new AABB.
+     * @return the new transformed AABB.
+     */
     public AABB transform(Transform transform) {
-        javax.vecmath.Vector3f newMin = new javax.vecmath.Vector3f();
-        javax.vecmath.Vector3f newMax = new javax.vecmath.Vector3f();
-        AabbUtil2.transformAabb(VecMath.to(min), VecMath.to(max), 0.01f, transform, newMin, newMax);
-        return new AABB(VecMath.from(newMin), VecMath.from(newMax));
+        return transform(transform, DEFAULT_MARGIN);
+    }
+
+    public AABB transform(Transform transform, float margin) {
+        // Adaptation of method AabbUtil2.transformAabb from the TeraBullet library.
+        Vector3f localHalfExtents = new Vector3f();
+        localHalfExtents.sub(max, min);
+        localHalfExtents.mul(HALVING_FACTOR);
+
+        localHalfExtents.x += margin;
+        localHalfExtents.y += margin;
+        localHalfExtents.z += margin;
+
+        Vector3f localCenter = new Vector3f(max);
+        localCenter.add(min);
+        localCenter.mul(HALVING_FACTOR);
+
+        Matrix3f absBasis = transform.getBasis();
+
+        absBasis.m00 = Math.abs(absBasis.m00);
+        absBasis.m01 = Math.abs(absBasis.m01);
+        absBasis.m02 = Math.abs(absBasis.m02);
+        absBasis.m10 = Math.abs(absBasis.m10);
+        absBasis.m11 = Math.abs(absBasis.m11);
+        absBasis.m12 = Math.abs(absBasis.m12);
+        absBasis.m20 = Math.abs(absBasis.m20);
+        absBasis.m21 = Math.abs(absBasis.m21);
+        absBasis.m22 = Math.abs(absBasis.m22);
+
+        Vector3f center = new Vector3f(localCenter);
+        absBasis.transform(center);
+        center.add(transform.origin);
+
+        Vector3f extent = new Vector3f();
+
+        extent.x = absBasis.getRow(0).dot(localHalfExtents);
+        extent.y = absBasis.getRow(1).dot(localHalfExtents);
+        extent.z = absBasis.getRow(2).dot(localHalfExtents);
+
+        Vector3f worldMin = new Vector3f();
+        worldMin.sub(center, extent);
+
+        Vector3f worldMax = new Vector3f(center).add(extent);
+
+        return AABB.createMinMax(worldMin, worldMax);
     }
 
     /**
@@ -220,48 +308,6 @@ public final class AABB {
         return r;
     }
 
-    public Vector3f getFirstHitPlane(Vector3f direction, Vector3f pos, Vector3f dimensions, boolean testX, boolean testY, boolean testZ) {
-        Vector3f hitNormal = new Vector3f();
-
-        float dist = Float.POSITIVE_INFINITY;
-
-        if (testX) {
-            float distX;
-            if (direction.x > 0) {
-                distX = (min.x - pos.x - dimensions.x) / direction.x;
-            } else {
-                distX = (max.x - pos.x + dimensions.x) / direction.x;
-            }
-            if (distX >= 0 && distX < dist) {
-                hitNormal.set(Math.copySign(1, direction.x), 0, 0);
-            }
-        }
-        if (testY) {
-            float distY;
-            if (direction.y > 0) {
-                distY = (min.y - pos.y - dimensions.y) / direction.y;
-            } else {
-                distY = (max.y - pos.y + dimensions.y) / direction.y;
-            }
-            if (distY >= 0 && distY < dist) {
-                hitNormal.set(0, Math.copySign(1, direction.y), 0);
-            }
-        }
-        if (testZ) {
-            float distZ;
-            if (direction.z > 0) {
-                distZ = (min.z - pos.z - dimensions.z) / direction.z;
-            } else {
-                distZ = (max.z - pos.z + dimensions.z) / direction.z;
-            }
-            if (distZ >= 0 && distZ < dist) {
-                hitNormal.set(0, 0, Math.copySign(1, direction.z));
-            }
-        }
-        return hitNormal;
-
-    }
-
     /**
      * Returns the normal of the plane closest to the given origin.
      *
@@ -297,9 +343,7 @@ public final class AABB {
         float minDistance = Float.MAX_VALUE;
         Vector3f closestNormal = new Vector3f();
 
-        for (int i = 0; i < normals.size(); i++) {
-            Vector3f n = normals.get(i);
-
+        for (Vector3f n : normals) {
             Vector3f diff = new Vector3f(centerPointForNormal(n));
             diff.sub(origin);
 
@@ -403,23 +447,31 @@ public final class AABB {
         return false;
     }
 
+    @Override
     public int hashCode() {
         return Objects.hashCode(min, max);
     }
 
+    /**
+     * Checks whether a given ray intersects the AABB.
+     *
+     * @param from The origin of the ray.
+     * @param direction The direction of the ray.
+     * @return True if the ray intersects the AABB, else false.
+     */
     public boolean intersectRectangle(Vector3f from, Vector3f direction) {
-        Vector3f dirfrac = new Vector3f();
+        Vector3f dirFrac = new Vector3f(
+                1.0f / direction.x,
+                1.0f / direction.y,
+                1.0f / direction.z
+        );
 
-        dirfrac.x = 1.0f / direction.x;
-        dirfrac.y = 1.0f / direction.y;
-        dirfrac.z = 1.0f / direction.z;
-
-        float t1 = (min.x - from.x) * dirfrac.x;
-        float t2 = (max.x - from.x) * dirfrac.x;
-        float t3 = (min.y - from.y) * dirfrac.y;
-        float t4 = (max.y - from.y) * dirfrac.y;
-        float t5 = (min.z - from.z) * dirfrac.z;
-        float t6 = (max.z - from.z) * dirfrac.z;
+        float t1 = (min.x - from.x) * dirFrac.x;
+        float t2 = (max.x - from.x) * dirFrac.x;
+        float t3 = (min.y - from.y) * dirFrac.y;
+        float t4 = (max.y - from.y) * dirFrac.y;
+        float t5 = (min.z - from.z) * dirFrac.z;
+        float t6 = (max.z - from.z) * dirFrac.z;
 
         float tmin = Math.max(Math.max(Math.min(t1, t2), Math.min(t3, t4)), Math.min(t5, t6));
         float tmax = Math.min(Math.min(Math.max(t1, t2), Math.max(t3, t4)), Math.max(t5, t6));

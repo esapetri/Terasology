@@ -15,13 +15,16 @@
  */
 package org.terasology.rendering.nui.layouts;
 
+import org.terasology.rendering.nui.LayoutConfig;
 import org.terasology.rendering.nui.LayoutHint;
 
 /**
- * @author Immortius
  */
 public class RowLayoutHint implements LayoutHint {
+    @LayoutConfig
     private float relativeWidth;
+
+    @LayoutConfig
     private boolean useContentWidth;
 
     public RowLayoutHint() {

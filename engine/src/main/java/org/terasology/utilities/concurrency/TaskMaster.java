@@ -31,7 +31,31 @@ import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 /**
- * @author Immortius
+ * Manages execution of tasks on a queue.
+ *
+ * TaskMasters execute Tasks on separate threads, meaning that long running tasks can be performed without affecting
+ * rendering or other processing on the main thread. The usual caveats regarding threading and Events, Components,
+ * and Entities apply to the Tasks being processed.
+ * <p>
+ * Create TaskMaster instances using the static "create" helper methods, then use {@link #offer(Task)} to add tasks to
+ * the queue. In most cases the simple FIFO TaskMaster is good enough. However, you can create a prioritized queue by
+ * implementing {@link Comparable} in your {@link Task} implementations.
+ * <p>
+ * When you create a TaskMaster, it is important to shut it down after you're finished with it, generally in the
+ * shutdown method of a ComponentSystem. A basic usage example follows:
+ * <p>
+ * <pre>
+ * {@literal
+ * TaskMaster<MyBaseTask> taskMaster = TaskMaster.createFIFOTaskMaster("MyTaskMaster", 1);
+ * taskMaster.offer(new MyFooTask());
+ * taskMaster.offer(new MyBarTask());
+ * taskMaster.shutdown(new ShutdownTask());
+ * }
+ * </pre>
+ *
+ * @see Task
+ * @see #createFIFOTaskMaster(String, int)
+ * @see #createPriorityTaskMaster(String, int, int)
  */
 public final class TaskMaster<T extends Task> {
     private static final Logger logger = LoggerFactory.getLogger(TaskMaster.class);
@@ -52,20 +76,27 @@ public final class TaskMaster<T extends Task> {
         restart();
     }
 
+    /**
+     * Creates a FIFO taskmaster which simply reads from a task queue in order
+     */
     public static <T extends Task> TaskMaster<T> createFIFOTaskMaster(String name, int threads) {
-        return new TaskMaster<>(name, threads, new LinkedBlockingQueue<T>());
+        return new TaskMaster<>(name, threads, new LinkedBlockingQueue<>());
     }
 
+    /**
+     * Creates a prioritized taskmaster which uses {@link Comparable} Tasks to establish priority. The <em>least</em>
+     * task (according to the Comparable interface) is processed first.
+     */
     public static <T extends Task & Comparable<? super T>> TaskMaster<T> createPriorityTaskMaster(String name, int threads, int queueSize) {
-        return new TaskMaster<>(name, threads, new PriorityBlockingQueue<T>(queueSize));
+        return new TaskMaster<>(name, threads, new PriorityBlockingQueue<>(queueSize));
     }
 
     public static <T extends Task> TaskMaster<T> createPriorityTaskMaster(String name, int threads, int queueSize, Comparator<T> comparator) {
-        return new TaskMaster<>(name, threads, new PriorityBlockingQueue<T>(queueSize, comparator));
+        return new TaskMaster<>(name, threads, new PriorityBlockingQueue<>(queueSize, comparator));
     }
 
     public static <T extends Task> TaskMaster<T> createDynamicPriorityTaskMaster(String name, int threads, Comparator<T> comparator) {
-        return new TaskMaster<>(name, threads, new DynamicPriorityBlockingQueue<T>(comparator));
+        return new TaskMaster<>(name, threads, new DynamicPriorityBlockingQueue<>(comparator));
     }
 
     /**
@@ -101,21 +132,18 @@ public final class TaskMaster<T extends Task> {
                 logger.error("Failed to enqueue shutdown request", e);
             }
         }
-        AccessController.doPrivileged(new PrivilegedAction<Object>() {
-            @Override
-            public Object run() {
-                executorService.shutdown();
-                try {
-                    if (!executorService.awaitTermination(20, TimeUnit.SECONDS)) {
-                        logger.warn("Timed out awaiting thread termination");
-                        executorService.shutdownNow();
-                    }
-                } catch (InterruptedException e) {
-                    logger.warn("Interrupted awaiting chunk thread termination");
+        AccessController.doPrivileged((PrivilegedAction<Object>) () -> {
+            executorService.shutdown();
+            try {
+                if (!executorService.awaitTermination(20, TimeUnit.SECONDS)) {
+                    logger.warn("Timed out awaiting thread termination");
                     executorService.shutdownNow();
                 }
-                return null;
+            } catch (InterruptedException e) {
+                logger.warn("Interrupted awaiting chunk thread termination");
+                executorService.shutdownNow();
             }
+            return null;
         });
         running = false;
     }
@@ -124,10 +152,23 @@ public final class TaskMaster<T extends Task> {
         if (!running) {
             executorService = Executors.newFixedThreadPool(threads);
             for (int i = 0; i < threads; ++i) {
-                executorService.execute(new TaskProcessor(name + "-" + i, taskQueue));
+                executorService.execute(new TaskProcessor<>(name + "-" + i, taskQueue));
             }
             running = true;
         }
     }
 
+    /**
+     * Get the {@link ExecutorService} underlying this TaskMaster. Note that by default the service will have a
+     * {@link TaskProcessor} enqueued for each thread. In order to use the ExecutorService directly you will need to
+     * {@method offer} a {@link ShutdownTask} as shown:
+     * <p>
+     * {@code
+     * taskMaster.offer(new ShutdownTask());
+     * }
+     * @return the {@link ExecutorService} used by this instance
+     */
+    public ExecutorService getExecutorService() {
+        return executorService;
+    }
 }

@@ -16,14 +16,15 @@
 
 package org.terasology.core.world.generator.facetProviders;
 
-import java.util.List;
-import java.util.Map;
-
+import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
+import com.google.common.collect.HashBasedTable;
+import com.google.common.collect.Table;
 import org.terasology.math.Region3i;
 import org.terasology.math.TeraMath;
-import org.terasology.math.Vector3i;
-import org.terasology.utilities.procedural.FastNoise;
-import org.terasology.utilities.procedural.Noise2D;
+import org.terasology.math.geom.Vector3i;
+import org.terasology.utilities.procedural.Noise;
+import org.terasology.utilities.procedural.WhiteNoise;
 import org.terasology.world.generation.Facet;
 import org.terasology.world.generation.FacetProvider;
 import org.terasology.world.generation.Requires;
@@ -31,34 +32,33 @@ import org.terasology.world.generation.facets.SurfaceHeightFacet;
 import org.terasology.world.generation.facets.base.ObjectFacet2D;
 import org.terasology.world.generation.facets.base.ObjectFacet3D;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
-import com.google.common.collect.HashBasedTable;
-import com.google.common.collect.Table;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Places objects on the surface based on population densities
  * for a environmental variable (e.g. biome).
- * @author Martin Steiger
+ *
  */
 @Requires(@Facet(SurfaceHeightFacet.class))
 public abstract class SurfaceObjectProvider<B, T> implements FacetProvider {
 
-    private Noise2D typeNoiseGen;
+    private Noise typeNoiseGen;
 
     private final Table<B, T, Float> probsTable = HashBasedTable.create();
 
     @Override
     public void setSeed(long seed) {
-        typeNoiseGen = new FastNoise(seed + 1);
+        typeNoiseGen = new WhiteNoise(seed + 1);
     }
 
     /**
      * Populates a given facet based on filters and population densities
-     * @param facet the facet to populate
+     *
+     * @param facet        the facet to populate
      * @param surfaceFacet the surface height facet
-     * @param typeFacet the facet that provides the environment
-     * @param filters a set of filters
+     * @param typeFacet    the facet that provides the environment
+     * @param filters      a set of filters
      */
     protected void populateFacet(ObjectFacet3D<T> facet, SurfaceHeightFacet surfaceFacet, ObjectFacet2D<? extends B> typeFacet, List<Predicate<Vector3i>> filters) {
 
@@ -67,6 +67,8 @@ public abstract class SurfaceObjectProvider<B, T> implements FacetProvider {
         int minY = worldRegion.minY();
         int maxY = worldRegion.maxY();
 
+        Vector3i pos = new Vector3i();
+
         for (int z = worldRegion.minZ(); z <= worldRegion.maxZ(); z++) {
             for (int x = worldRegion.minX(); x <= worldRegion.maxX(); x++) {
                 int height = TeraMath.floorToInt(surfaceFacet.getWorld(x, z)) + 1;
@@ -74,7 +76,7 @@ public abstract class SurfaceObjectProvider<B, T> implements FacetProvider {
                 // if the surface is in range
                 if (height >= minY && height <= maxY) {
 
-                    Vector3i pos = new Vector3i(x, height, z);
+                    pos.set(x, height, z);
 
                     // if all predicates match
                     if (applyAll(filters, pos)) {
@@ -95,8 +97,8 @@ public abstract class SurfaceObjectProvider<B, T> implements FacetProvider {
         // Similar to guava's implementation of Predicates#all
         // According to google, using indices is superior to using an Iterator
         // This implementation also avoids duplicating the list
-        for (int i = 0; i < components.size(); i++) {
-            if (!components.get(i).apply(pos)) {
+        for (Predicate<Vector3i> component : components) {
+            if (!component.apply(pos)) {
                 return false;
             }
         }
@@ -105,8 +107,9 @@ public abstract class SurfaceObjectProvider<B, T> implements FacetProvider {
 
     /**
      * Registers an object type with a certain population density based on an environmental variable
-     * @param type the environment type (e.g. biome)
-     * @param tree the object type
+     *
+     * @param biome       the environment type (e.g. biome)
+     * @param tree        the object type
      * @param probability the population density in [0..1]
      * @throws IllegalArgumentException if probability is not in [0..1]
      */
@@ -114,25 +117,24 @@ public abstract class SurfaceObjectProvider<B, T> implements FacetProvider {
         Preconditions.checkArgument(probability >= 0, "probability must be >= 0");
         Preconditions.checkArgument(probability <= 1, "probability must be <= 1");
 
-        probsTable.put(biome, tree, Float.valueOf(probability));
+        probsTable.put(biome, tree, probability);
     }
 
     /**
      * Clears all registered population densities
-     * @see SurfaceObjectProvider#register(B, T, float)
      */
     protected void clearProbabilities() {
         probsTable.clear();
     }
 
     /**
-     * @param x the x coordinate
-     * @param z the z coordinate
-     * @param objs a map (objType -> probability)
+     * @param x    the x coordinate
+     * @param z    the z coordinate
+     * @param objs a map (objType to probability)
      * @return a random pick from the map or <code>null</code>
      */
     protected T getType(int x, int z, Map<T, Float> objs) {
-        float random = typeNoiseGen.noise(x, z);
+        float random = Math.abs(typeNoiseGen.noise(x, z));
 
         for (T generator : objs.keySet()) {
             Float threshold = objs.get(generator);

@@ -15,13 +15,12 @@
  */
 package org.terasology.persistence;
 
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.world.chunks.Chunk;
 
 /**
  * A chunk store is used to save a chunk and its entity contents.
  *
- * @author Immortius
  */
 public interface ChunkStore {
 

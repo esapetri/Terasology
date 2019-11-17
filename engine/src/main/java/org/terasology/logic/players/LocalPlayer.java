@@ -15,38 +15,36 @@
  */
 package org.terasology.logic.players;
 
-import org.terasology.math.QuaternionUtil;
-
+import com.google.common.collect.Sets;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.logic.characters.CharacterComponent;
 import org.terasology.logic.characters.CharacterMovementComponent;
+import org.terasology.logic.characters.CharacterSystem;
 import org.terasology.logic.characters.events.ActivationPredicted;
 import org.terasology.logic.characters.events.ActivationRequest;
 import org.terasology.logic.location.LocationComponent;
 import org.terasology.math.Direction;
-import org.terasology.math.TeraMath;
 import org.terasology.math.geom.Quat4f;
 import org.terasology.math.geom.Vector3f;
 import org.terasology.network.ClientComponent;
-import org.terasology.physics.CollisionGroup;
 import org.terasology.physics.HitResult;
 import org.terasology.physics.Physics;
-import org.terasology.physics.StandardCollisionGroup;
+import org.terasology.recording.DirectionAndOriginPosRecorderList;
+import org.terasology.recording.RecordAndReplayCurrentStatus;
+import org.terasology.recording.RecordAndReplayStatus;
 import org.terasology.registry.CoreRegistry;
 
-/**
- * @author Immortius <immortius@gmail.com>
- */
 public class LocalPlayer {
 
     private EntityRef clientEntity = EntityRef.NULL;
     private int nextActivationId;
 
-    // TODO use same as CharacterSystem?
-    private CollisionGroup[] filter = {StandardCollisionGroup.DEFAULT, StandardCollisionGroup.WORLD,
-            StandardCollisionGroup.CHARACTER};
+    //Record and Replay classes
+    private DirectionAndOriginPosRecorderList directionAndOriginPosRecorderList;
+    private RecordAndReplayCurrentStatus recordAndReplayCurrentStatus;
 
     public LocalPlayer() {
+
     }
 
     // TODO: As per Immortius answer in Pull Request #1088,
@@ -64,6 +62,11 @@ public class LocalPlayer {
         }
     }
 
+    public void setRecordAndReplayClasses(DirectionAndOriginPosRecorderList list, RecordAndReplayCurrentStatus status) {
+        this.directionAndOriginPosRecorderList = list;
+        this.recordAndReplayCurrentStatus = status;
+    }
+
     public EntityRef getClientEntity() {
         return clientEntity;
     }
@@ -72,6 +75,22 @@ public class LocalPlayer {
         ClientComponent client = clientEntity.getComponent(ClientComponent.class);
         if (client != null) {
             return client.character;
+        }
+        return EntityRef.NULL;
+    }
+
+    public EntityRef getCameraEntity() {
+        ClientComponent client = clientEntity.getComponent(ClientComponent.class);
+        if (client != null) {
+            return client.camera;
+        }
+        return EntityRef.NULL;
+    }
+
+    public EntityRef getClientInfoEntity() {
+        ClientComponent client = clientEntity.getComponent(ClientComponent.class);
+        if (client != null) {
+            return client.clientInfo;
         }
         return EntityRef.NULL;
     }
@@ -97,30 +116,47 @@ public class LocalPlayer {
     public Quat4f getRotation() {
         LocationComponent location = getCharacterEntity().getComponent(LocationComponent.class);
         if (location == null) {
-            return new Quat4f(0, 0, 0, 1);
+            return new Quat4f(Quat4f.IDENTITY);
         }
         return location.getWorldRotation();
     }
 
-    public Quat4f getViewRotation() {
-        CharacterComponent character = getCharacterEntity().getComponent(CharacterComponent.class);
-        if (character == null) {
-            return new Quat4f(0, 0, 0, 1);
+    public Vector3f getViewPosition() {
+        return getViewPosition(new Vector3f());
+    }
+
+    public Vector3f getViewPosition(Vector3f out) {
+        ClientComponent clientComponent = getClientEntity().getComponent(ClientComponent.class);
+        if (clientComponent == null) {
+            return out;
         }
-        Quat4f rot = new Quat4f(TeraMath.DEG_TO_RAD * character.yaw, TeraMath.DEG_TO_RAD * character.pitch, 0);
-        return rot;
+        LocationComponent location = clientComponent.camera.getComponent(LocationComponent.class);
+        if (location == null) {
+            return getPosition();
+        }
+
+        return location.getWorldPosition(out);
+    }
+
+    public Quat4f getViewRotation() {
+        ClientComponent clientComponent = getClientEntity().getComponent(ClientComponent.class);
+        if (clientComponent == null) {
+            return new Quat4f(Quat4f.IDENTITY);
+        }
+        LocationComponent location = clientComponent.camera.getComponent(LocationComponent.class);
+        if (location == null) {
+            return getRotation();
+        }
+
+        return location.getWorldRotation();
     }
 
     public Vector3f getViewDirection() {
-        CharacterComponent character = getCharacterEntity().getComponent(CharacterComponent.class);
-        if (character == null) {
-            return Direction.FORWARD.getVector3f();
-        }
-        Quat4f rot = new Quat4f(TeraMath.DEG_TO_RAD * character.yaw, TeraMath.DEG_TO_RAD * character.pitch, 0);
+        Quat4f rot = getViewRotation();
         // TODO: Put a generator for direction vectors in a util class somewhere
         // And just put quaternion -> vector somewhere too
         Vector3f dir = Direction.FORWARD.getVector3f();
-        return QuaternionUtil.quatRotate(rot, dir, dir);
+        return rot.rotate(dir, dir);
     }
 
     public Vector3f getVelocity() {
@@ -136,8 +172,8 @@ public class LocalPlayer {
      * Can be used by modules to trigger the activation of a player owned entity like an item.
      *
      * The method has been made for the usage on the client. It triggers a {@link ActivationPredicted} event
-     * on the client and a {@link ActivationRequest} event on the server which will lead to a {@link ActivateEvent}
-     * on the server.
+     * on the client and a {@link ActivationRequest} event on the server which will lead
+     * to a {@link org.terasology.logic.common.ActivateEvent} on the server.
      *
      * @param usedOwnedEntity an entity owned by the player like an item.
      *
@@ -156,7 +192,7 @@ public class LocalPlayer {
      *
      * @return true if a target got activated.
      */
-    public boolean activateTargetAsClient() {
+    boolean activateTargetAsClient() {
         return activateTargetOrOwnedEntity(EntityRef.NULL);
     }
 
@@ -167,15 +203,20 @@ public class LocalPlayer {
      */
     private boolean activateTargetOrOwnedEntity(EntityRef usedOwnedEntity) {
         EntityRef character = getCharacterEntity();
-        LocationComponent location = character.getComponent(LocationComponent.class);
         CharacterComponent characterComponent = character.getComponent(CharacterComponent.class);
-        Vector3f direction = characterComponent.getLookDirection();
-        Vector3f originPos = location.getWorldPosition();
-        originPos.y += characterComponent.eyeOffset;
+        Vector3f direction = getViewDirection();
+        Vector3f originPos = getViewPosition();
+        if (recordAndReplayCurrentStatus.getStatus() == RecordAndReplayStatus.RECORDING) {
+            this.directionAndOriginPosRecorderList.getTargetOrOwnedEntityDirectionAndOriginPosRecorder().add(direction, originPos);
+        } else if (recordAndReplayCurrentStatus.getStatus() == RecordAndReplayStatus.REPLAYING) {
+            Vector3f[] data = this.directionAndOriginPosRecorderList.getTargetOrOwnedEntityDirectionAndOriginPosRecorder().poll();
+            direction = data[0];
+            originPos = data[1];
+        }
         boolean ownedEntityUsage = usedOwnedEntity.exists();
         int activationId = nextActivationId++;
         Physics physics = CoreRegistry.get(Physics.class);
-        HitResult result = physics.rayTrace(originPos, direction, characterComponent.interactionRange, filter);
+        HitResult result = physics.rayTrace(originPos, direction, characterComponent.interactionRange, Sets.newHashSet(character), CharacterSystem.DEFAULTPHYSICSFILTER);
         boolean eventWithTarget = result.isHit();
         if (eventWithTarget) {
             EntityRef activatedObject = usedOwnedEntity.exists() ? usedOwnedEntity : result.getEntity();
@@ -195,6 +236,7 @@ public class LocalPlayer {
     }
 
 
+    @Override
     public String toString() {
         return String.format("player (x: %.2f, y: %.2f, z: %.2f | x: %.2f, y: %.2f, z: %.2f)",
                 getPosition().x, getPosition().y, getPosition().z, getViewDirection().x, getViewDirection().y, getViewDirection().z);

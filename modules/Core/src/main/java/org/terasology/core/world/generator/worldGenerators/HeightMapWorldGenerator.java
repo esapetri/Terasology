@@ -17,33 +17,39 @@ package org.terasology.core.world.generator.worldGenerators;
 
 import org.terasology.core.world.generator.facetProviders.BiomeProvider;
 import org.terasology.core.world.generator.facetProviders.DefaultFloraProvider;
+import org.terasology.core.world.generator.facetProviders.DefaultTreeProvider;
 import org.terasology.core.world.generator.facetProviders.HeightMapSurfaceHeightProvider;
 import org.terasology.core.world.generator.facetProviders.PerlinHumidityProvider;
 import org.terasology.core.world.generator.facetProviders.PerlinSurfaceTemperatureProvider;
 import org.terasology.core.world.generator.facetProviders.SeaLevelProvider;
 import org.terasology.core.world.generator.facetProviders.SurfaceToDensityProvider;
-import org.terasology.core.world.generator.facetProviders.DefaultTreeProvider;
 import org.terasology.core.world.generator.rasterizers.FloraRasterizer;
 import org.terasology.core.world.generator.rasterizers.SolidRasterizer;
 import org.terasology.core.world.generator.rasterizers.TreeRasterizer;
 import org.terasology.engine.SimpleUri;
+import org.terasology.registry.In;
 import org.terasology.world.generation.BaseFacetedWorldGenerator;
 import org.terasology.world.generation.WorldBuilder;
 import org.terasology.world.generator.RegisterWorldGenerator;
+import org.terasology.world.generator.plugin.WorldGeneratorPluginLibrary;
 
 /**
- * @author Immortius
  */
 @RegisterWorldGenerator(id = "heightMap", displayName = "Height Map", description = "Generates the world using a height map")
 public class HeightMapWorldGenerator extends BaseFacetedWorldGenerator {
+
+    @In
+    private WorldGeneratorPluginLibrary worldGeneratorPluginLibrary;
+
     public HeightMapWorldGenerator(SimpleUri uri) {
         super(uri);
     }
 
     @Override
-    protected WorldBuilder createWorld(long seed) {
-        return new WorldBuilder(seed)
-                .addProvider(new SeaLevelProvider())
+    protected WorldBuilder createWorld() {
+        return new WorldBuilder(worldGeneratorPluginLibrary)
+                .setSeaLevel(16)
+                .addProvider(new SeaLevelProvider(16))
                 .addProvider(new HeightMapSurfaceHeightProvider())
                 .addProvider(new PerlinHumidityProvider())
                 .addProvider(new PerlinSurfaceTemperatureProvider())

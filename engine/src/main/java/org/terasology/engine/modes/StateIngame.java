@@ -15,21 +15,20 @@
  */
 package org.terasology.engine.modes;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.terasology.TeraOVR;
-import org.terasology.asset.AssetManager;
+import org.terasology.audio.AudioManager;
 import org.terasology.config.Config;
+import org.terasology.context.Context;
 import org.terasology.engine.ComponentSystemManager;
 import org.terasology.engine.GameEngine;
 import org.terasology.engine.GameThread;
+import org.terasology.engine.bootstrap.EnvironmentSwitchHandler;
 import org.terasology.engine.module.ModuleManager;
 import org.terasology.engine.subsystem.DisplayDevice;
-import org.terasology.entitySystem.entity.EntityManager;
-import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.entity.internal.EngineEntityManager;
 import org.terasology.entitySystem.event.internal.EventSystem;
 import org.terasology.entitySystem.systems.UpdateSubscriberSystem;
+import org.terasology.game.GameManifest;
+import org.terasology.identity.storageServiceClient.StorageServiceWorker;
 import org.terasology.input.InputSystem;
 import org.terasology.input.cameraTarget.CameraTargetSystem;
 import org.terasology.logic.console.Console;
@@ -40,26 +39,21 @@ import org.terasology.network.NetworkMode;
 import org.terasology.network.NetworkSystem;
 import org.terasology.persistence.StorageManager;
 import org.terasology.physics.engine.PhysicsEngine;
-import org.terasology.registry.CoreRegistry;
 import org.terasology.rendering.nui.NUIManager;
 import org.terasology.rendering.nui.databinding.ReadOnlyBinding;
-import org.terasology.rendering.oculusVr.OculusVrHelper;
+import org.terasology.rendering.nui.layers.mainMenu.MessagePopup;
 import org.terasology.rendering.world.WorldRenderer;
-import org.terasology.rendering.world.WorldRenderer.WorldRenderingStage;
-import org.terasology.world.block.BlockManager;
+import org.terasology.rendering.world.WorldRenderer.RenderingStage;
+import org.terasology.world.chunks.ChunkProvider;
 
 import java.util.Collections;
 
 /**
  * Play mode.
  *
- * @author Benjamin Glatzel <benjamin.glatzel@me.com>
- * @author Anton Kireev <adeon.k87@gmail.com>
  * @version 0.1
  */
 public class StateIngame implements GameState {
-
-    private static final Logger logger = LoggerFactory.getLogger(StateIngame.class);
 
     private ComponentSystemManager componentSystemManager;
     private EventSystem eventSystem;
@@ -69,51 +63,58 @@ public class StateIngame implements GameState {
     private CameraTargetSystem cameraTargetSystem;
     private InputSystem inputSystem;
     private NetworkSystem networkSystem;
+    private StorageServiceWorker storageServiceWorker;
+    private Console console;
+    private Context context;
 
     /* GAME LOOP */
     private boolean pauseGame;
 
     private StorageManager storageManager;
 
-    public StateIngame() {
+    private GameManifest gameManifest;
+
+    public StateIngame(GameManifest gameManifest, Context context) {
+        this.gameManifest = gameManifest;
+        this.context = context;
     }
 
+    @Override
     public void init(GameEngine engine) {
-        nuiManager = CoreRegistry.get(NUIManager.class);
-        worldRenderer = CoreRegistry.get(WorldRenderer.class);
-        eventSystem = CoreRegistry.get(EventSystem.class);
-        componentSystemManager = CoreRegistry.get(ComponentSystemManager.class);
-        entityManager = (EngineEntityManager) CoreRegistry.get(EntityManager.class);
-        cameraTargetSystem = CoreRegistry.get(CameraTargetSystem.class);
-        inputSystem = CoreRegistry.get(InputSystem.class);
+        // context from loading state gets used.
+        nuiManager = context.get(NUIManager.class);
+        worldRenderer = context.get(WorldRenderer.class);
+        eventSystem = context.get(EventSystem.class);
+        componentSystemManager = context.get(ComponentSystemManager.class);
+        entityManager = context.get(EngineEntityManager.class);
+        cameraTargetSystem = context.get(CameraTargetSystem.class);
+        inputSystem = context.get(InputSystem.class);
         eventSystem.registerEventHandler(nuiManager);
-        networkSystem = CoreRegistry.get(NetworkSystem.class);
-        storageManager = CoreRegistry.get(StorageManager.class);
+        networkSystem = context.get(NetworkSystem.class);
+        storageManager = context.get(StorageManager.class);
+        storageServiceWorker = context.get(StorageServiceWorker.class);
+        console = context.get(Console.class);
 
-        if (CoreRegistry.get(Config.class).getRendering().isOculusVrSupport()
-                && OculusVrHelper.isNativeLibraryLoaded()) {
-
-            logger.info("Trying to initialize Oculus SDK...");
-            TeraOVR.initSDK();
-
-            logger.info("Updating Oculus projection parameters from device...");
-            OculusVrHelper.updateFromDevice();
-        }
         // Show or hide the HUD according to the settings
         nuiManager.getHUD().bindVisible(new ReadOnlyBinding<Boolean>() {
             @Override
             public Boolean get() {
-                return !CoreRegistry.get(Config.class).getRendering().getDebug().isHudHidden();
+                return !context.get(Config.class).getRendering().getDebug().isHudHidden();
             }
         });
+
+        if (networkSystem.getMode() == NetworkMode.CLIENT) {
+            String motd = networkSystem.getServer().getInfo().getMOTD();
+            if (motd != null && motd.length() != 0) {
+                nuiManager.pushScreen(MessagePopup.ASSET_URI, MessagePopup.class).setMessage("Server MOTD", motd);
+            }
+        }
     }
 
     @Override
-    public void dispose() {
-        if (CoreRegistry.get(Config.class).getRendering().isOculusVrSupport() && OculusVrHelper.isNativeLibraryLoaded()) {
-            logger.info("Shutting down Oculus SDK...");
-            TeraOVR.clear();
-        }
+    public void dispose(boolean shuttingDown) {
+        ChunkProvider chunkProvider = context.get(ChunkProvider.class);
+        chunkProvider.dispose();
 
         boolean save = networkSystem.getMode().isAuthority();
         if (save) {
@@ -126,25 +127,33 @@ public class StateIngame implements GameState {
         GameThread.processWaitingProcesses();
         nuiManager.clear();
 
+        context.get(AudioManager.class).stopAllSounds();
+
         if (worldRenderer != null) {
             worldRenderer.dispose();
             worldRenderer = null;
         }
         componentSystemManager.shutdown();
 
-        CoreRegistry.get(PhysicsEngine.class).dispose();
+        context.get(PhysicsEngine.class).dispose();
 
         entityManager.clear();
 
         if (storageManager != null) {
             storageManager.finishSavingAndShutdown();
         }
-        ModuleEnvironment environment = CoreRegistry.get(ModuleManager.class).loadEnvironment(Collections.<Module>emptySet(), true);
-        CoreRegistry.get(AssetManager.class).setEnvironment(environment);
-        CoreRegistry.get(Console.class).dispose();
-        CoreRegistry.clear();
-        BlockManager.getAir().setEntity(EntityRef.NULL);
+
+        ModuleEnvironment oldEnvironment = context.get(ModuleManager.class).getEnvironment();
+        context.get(ModuleManager.class).loadEnvironment(Collections.<Module>emptySet(), true);
+        if (!shuttingDown) {
+            context.get(EnvironmentSwitchHandler.class).handleSwitchToEmptyEnvironment(context);
+        }
+        if (oldEnvironment != null) {
+            oldEnvironment.close();
+        }
+        console.dispose();
         GameThread.clearWaitingProcesses();
+
         /*
          * Clear the binding as otherwise the complete ingame state would be
          * referenced.
@@ -172,8 +181,9 @@ public class StateIngame implements GameState {
 
 
         updateUserInterface(delta);
-    }
 
+        storageServiceWorker.flushNotificationsToConsole(console);
+    }
 
 
     @Override
@@ -186,16 +196,17 @@ public class StateIngame implements GameState {
         return !pauseGame;
     }
 
+    @Override
     public void render() {
-        DisplayDevice displayDevice = CoreRegistry.get(DisplayDevice.class);
-        displayDevice.prepareToRender();
+        DisplayDevice display = context.get(DisplayDevice.class);
+        display.prepareToRender();
 
         if (worldRenderer != null) {
-            if (!CoreRegistry.get(Config.class).getRendering().isOculusVrSupport()) {
-                worldRenderer.render(WorldRenderingStage.MONO);
+            if (!context.get(Config.class).getRendering().isVrSupport()) {
+                worldRenderer.render(RenderingStage.MONO);
             } else {
-                worldRenderer.render(WorldRenderingStage.LEFT_EYE);
-                worldRenderer.render(WorldRenderingStage.RIGHT_EYE);
+                worldRenderer.render(RenderingStage.LEFT_EYE);
+                worldRenderer.render(RenderingStage.RIGHT_EYE);
             }
         }
 
@@ -210,7 +221,12 @@ public class StateIngame implements GameState {
         return networkSystem.getMode() == NetworkMode.NONE;
     }
 
-    public void renderUserInterface() {
+    @Override
+    public String getLoggingPhase() {
+        return gameManifest.getTitle();
+    }
+
+    private void renderUserInterface() {
         PerformanceMonitor.startActivity("Rendering NUI");
         nuiManager.render();
         PerformanceMonitor.endActivity();
@@ -224,7 +240,7 @@ public class StateIngame implements GameState {
         pauseGame = true;
     }
 
-    public void unpause() {
+    private void unpause() {
         pauseGame = false;
     }
 
@@ -240,4 +256,7 @@ public class StateIngame implements GameState {
         return pauseGame;
     }
 
+    public Context getContext() {
+        return context;
+    }
 }

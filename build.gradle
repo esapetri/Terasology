@@ -1,10 +1,3 @@
-/*
- * This is a Gradle build file:
- * - Gradle Homepage: http://gradle.org/
- * - Gradle Documentation: http://gradle.org/documentation
- * - View tasks for this project: $ gradlew tasks
- */
-
 // Separate build file for structure heavy stuff like using Git to fetch other repos to embed within the project
 apply from: 'config/gradle/utility.gradle'
 apply from: 'config/gradle/ide.gradle'
@@ -24,58 +17,48 @@ import org.ajoberstar.gradle.git.tasks.*
 // Dependencies needed for what our Gradle scripts themselves use. It cannot be included via an external Gradle file :-(
 buildscript {
     repositories {
+        // External libs - jcenter is Bintray and is supposed to be a superset of Maven Central, but do both just in case
+        jcenter()
         mavenCentral()
-        maven {
-            url 'http://dl.bintray.com/jfrog/jfrog-jars'
-        }
     }
 
     dependencies {
         // Artifactory plugin
-        classpath(group: 'org.jfrog.buildinfo', name: 'build-info-extractor-gradle', version: '2.2.3')
+        classpath(group: 'org.jfrog.buildinfo', name: 'build-info-extractor-gradle', version: '4.10.0')
 
         // Git plugin for Gradle
         classpath 'org.ajoberstar:gradle-git:0.6.3'
 
         // Needed for caching reflected data during builds
-        classpath 'org.reflections:reflections:0.9.9-RC1'
+        classpath 'org.reflections:reflections:0.9.10'
+        classpath 'dom4j:dom4j:1.6.1'
     }
 }
 
-/*
- * To Update Gradle Wrapper:
- * 1. Uncomment 'wrapper' task
- * 2. Change 'gradleVersion'
- * 3. Run "gradlew wrapper" TWICE (first upgrades the prop file, second the jar if needed)
- * 4. Comment 'wrapper' task
- */
-//task wrapper(type: Wrapper) {
-//    gradleVersion = '2.1'
-//}
-
-import org.apache.tools.ant.filters.FixCrLfFilter;
-
 // Test for right version of Java in use for running this script
-assert org.gradle.api.JavaVersion.current().isJava7Compatible()
+assert org.gradle.api.JavaVersion.current().isJava8Compatible()
 
 // Declare "extra properties" (variables) for the project (and subs) - a Gradle thing that makes them special.
 ext {
     dirNatives = 'natives'
+    dirConfigMetrics = 'config/metrics'
     templatesDir = 'templates'
 
     // Lib dir for use in manifest entries etc (like in :engine). A separate "libsDir" exists, auto-created by Gradle
     subDirLibs = 'libs'
 
-    LwjglVersion = '2.9.2'
+    LwjglVersion = '2.9.3'
 }
 
 // Declare remote repositories we're interested in - library files will be fetched from here
 repositories {
-    // Main Maven repo
+    // External libs - jcenter is Bintray and is supposed to be a superset of Maven Central, but do both just in case
+    jcenter()
     mavenCentral()
+
     // MovingBlocks Artifactory instance for libs not readily available elsewhere plus our own libs
     maven {
-        url "http://artifactory.terasology.org:8081/artifactory/repo"
+        url "http://artifactory.terasology.org/artifactory/virtual-repo-live"
     }
 }
 
@@ -83,17 +66,24 @@ repositories {
 // Natives - Handles pulling in and extracting native libraries for LWJGL                                            //
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Define a custom configuration named "natives"
+// Define configurations for natives and config
 configurations {
     natives
+    codeMetrics
 }
 
-// For the "natives" configuration make it depend on the native files from LWJGL
 dependencies {
+    // For the "natives" configuration make it depend on the native files from LWJGL
     natives group: 'org.lwjgl.lwjgl', name: 'lwjgl', version: LwjglVersion
+
+    // Config for our code analytics lives in a centralized repo: https://github.com/MovingBlocks/TeraConfig
+    codeMetrics group: 'org.terasology.config', name: 'codemetrics', version: '1.2.0', ext: 'zip'
+
+    // Natives for JNLua (Kallisti, KComputers)
+    natives group: 'org.terasology.jnlua', name: 'jnlua_natives', version: '0.1.0-SNAPSHOT', ext: 'zip'
 }
 
-task extractWindowsNatives(type:Sync) {
+task extractWindowsNatives(type:Copy) {
     description = "Extracts the Windows natives from the downloaded zip"
     from {
         configurations.natives.collect { it.getName().contains('-natives-window') ? zipTree(it) : [] }
@@ -102,7 +92,7 @@ task extractWindowsNatives(type:Sync) {
     exclude ('META-INF/**')
 }
 
-task extractMacOSXNatives(type:Sync) {
+task extractMacOSXNatives(type:Copy) {
     description = "Extracts the OSX natives from the downloaded zip"
     from {
         configurations.natives.collect { it.getName().contains('-natives-osx') ? zipTree(it) : [] }
@@ -111,7 +101,7 @@ task extractMacOSXNatives(type:Sync) {
     exclude ('META-INF/**')
 }
 
-task extractLinuxNatives(type:Sync) {
+task extractLinuxNatives(type:Copy) {
     description = "Extracts the Linux natives from the downloaded zip"
     from {
         configurations.natives.collect { it.getName().contains('-natives-linux') ? zipTree(it) : [] }
@@ -120,11 +110,20 @@ task extractLinuxNatives(type:Sync) {
     exclude ('META-INF/**')
 }
 
+task extractJNLuaNatives(type:Copy) {
+    description = "Extracts the JNLua natives from the downloaded zip"
+    from {
+        configurations.natives.collect { it.getName().contains('jnlua') ? zipTree(it) : [] }
+    }
+    into ("$dirNatives")
+}
+
 task extractNatives {
     description = "Extracts all the native lwjgl libraries from the downloaded zip"
     dependsOn extractWindowsNatives
     dependsOn extractLinuxNatives
     dependsOn extractMacOSXNatives
+    dependsOn extractJNLuaNatives
 }
 
 // TODO: Test meta modules and other libs - not that there's really much to test other than being able to Git via Gradle
@@ -132,6 +131,16 @@ task extractNatives {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helper tasks                                                                                                      //
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+task extractConfig (type: Copy) {
+    description = "Extracts our configuration files from the zip we fetched as a dependency"
+    from {
+        configurations.codeMetrics.collect {
+            zipTree(it)
+        }
+    }
+    into "$rootDir/$dirConfigMetrics"
+}
 
 // Helper that returns a list of all local Terasology module projects
 def terasologyModules() {
@@ -172,7 +181,8 @@ configurations.all {
 // Include deletion of extracted natives in the global clean task. Without the doLast it runs on *every* execution ...
 clean.doLast {
     new File(dirNatives).deleteDir()
-    println "Cleaned root - don't forget to re-extract the natives! 'gradlew extractNatives' or a dependent task"
+    new File(dirConfigMetrics).deleteDir()
+    println "Cleaned root - don't forget to re-extract stuff! 'gradlew extractNatives extractConfig' will do so, or 'gradlew idea' (or eclipse)"
 }
 
 task protobufCompileWindows(type:Exec) {
@@ -189,8 +199,21 @@ task protobufCompileLinux(type:Exec) {
 // General IDE customization                                                                                         //
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+task copyInMissingTemplates {
+    description = "Copies in placeholders from the /templates dir to project root if not present yet"
+    File gradlePropsFile = new File(rootDir, 'gradle.properties')
+    File OverrideCfgFile = new File(rootDir, 'override.cfg')
+    if (!gradlePropsFile.exists()) {
+        new File(rootDir, 'gradle.properties') << new File(templatesDir, 'gradle.properties').text
+    }
+    if (!OverrideCfgFile.exists()) {
+        new File(rootDir, 'override.cfg') << new File(templatesDir, 'override.cfg').text
+    }
+}
+
 // Make sure the IDE prep includes extraction of natives
 ideaModule.dependsOn extractNatives
+ideaModule.dependsOn copyInMissingTemplates
 
 // For IntelliJ add a bunch of excluded directories
 idea {
@@ -206,15 +229,18 @@ idea {
     module.excludeDirs += file('protobuf')
 
     // Exclude output dirs
+    module.excludeDirs += file('configs')
     module.excludeDirs += file('logs')
     module.excludeDirs += file('saves')
     module.excludeDirs += file('screenshots')
     module.excludeDirs += file('terasology-server')
     module.excludeDirs += file('terasology-2ndclient')
 
+    module.downloadSources = true
+
     project {
         // Set JDK
-        jdkName = '1.7'
+        jdkName = '1.8'
         wildcards -= '!?*.groovy'
 
         ipr {
@@ -231,7 +257,7 @@ idea {
 
             // Sets sourceCompatibility within IntelliJ (without this root build having the Java plugin applied)
             whenMerged {project ->
-                project.jdk.languageLevel = 'JDK_1_7'
+                project.jdk.languageLevel = 'JDK_1_8'
             }
         }
     }

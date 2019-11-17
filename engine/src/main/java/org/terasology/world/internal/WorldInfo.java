@@ -21,11 +21,11 @@ import org.terasology.engine.SimpleUri;
 /**
  * Summary information on a world.
  *
- * @author Immortius
  */
 public class WorldInfo {
 
     private String title = "";
+    private String customTitle = "";
     private String seed = "";
     private long time;
     private SimpleUri worldGenerator = new SimpleUri();
@@ -34,9 +34,14 @@ public class WorldInfo {
     }
 
     public WorldInfo(String title, String seed, long time, SimpleUri worldGenerator) {
+        this(title, "", seed, time, worldGenerator);
+    }
+
+    public WorldInfo(String title, String customTitle, String seed, long time, SimpleUri worldGenerator) {
         if (title != null) {
             this.title = title;
         }
+        this.customTitle = customTitle;
         if (seed != null) {
             this.seed = seed;
         }
@@ -54,6 +59,10 @@ public class WorldInfo {
         if (title != null) {
             this.title = title;
         }
+    }
+
+    public String getCustomTitle() {
+        return customTitle;
     }
 
     public String getSeed() {
@@ -80,5 +89,10 @@ public class WorldInfo {
 
     public void setWorldGenerator(SimpleUri worldGenerator) {
         this.worldGenerator = worldGenerator;
+    }
+
+    @Override
+    public String toString() {
+        return title;
     }
 }

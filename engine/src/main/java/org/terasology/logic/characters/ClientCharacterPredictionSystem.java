@@ -44,7 +44,6 @@ import java.util.Iterator;
 import java.util.Map;
 
 /**
- * @author Immortius
  */
 @RegisterSystem(RegisterMode.REMOTE_CLIENT)
 public class ClientCharacterPredictionSystem extends BaseComponentSystem implements UpdateSubscriberSystem {
@@ -68,13 +67,15 @@ public class ClientCharacterPredictionSystem extends BaseComponentSystem impleme
     private Deque<CharacterMoveInputEvent> inputs = Queues.newArrayDeque();
     private CharacterStateEvent predictedState;
     private CharacterStateEvent authoritiveState;
+    private CharacterMovementSystemUtility characterMovementSystemUtility;
 
     @Override
     public void initialise() {
         characterMover = new KinematicCharacterMover(worldProvider, physics);
+        characterMovementSystemUtility = new CharacterMovementSystemUtility(physics);
     }
 
-    @ReceiveEvent(components = {CharacterMovementComponent.class, LocationComponent.class})
+    @ReceiveEvent(components = {CharacterMovementComponent.class, LocationComponent.class, AliveCharacterComponent.class})
     public void onCreate(final OnActivatedComponent event, final EntityRef entity) {
         physics.getCharacterCollider(entity);
         CircularBuffer<CharacterStateEvent> stateBuffer = CircularBuffer.create(BUFFER_SIZE);
@@ -82,7 +83,7 @@ public class ClientCharacterPredictionSystem extends BaseComponentSystem impleme
         playerStates.put(entity, stateBuffer);
     }
 
-    @ReceiveEvent(components = {CharacterComponent.class, CharacterMovementComponent.class, LocationComponent.class})
+    @ReceiveEvent(components = {CharacterComponent.class, CharacterMovementComponent.class, LocationComponent.class, AliveCharacterComponent.class})
     public void onDestroy(final BeforeDeactivateComponent event, final EntityRef entity) {
         CharacterComponent character = entity.getComponent(CharacterComponent.class);
         ClientComponent controller = character.controller.getComponent(ClientComponent.class);
@@ -95,7 +96,7 @@ public class ClientCharacterPredictionSystem extends BaseComponentSystem impleme
         playerStates.remove(entity);
     }
 
-    @ReceiveEvent(components = {CharacterMovementComponent.class, LocationComponent.class})
+    @ReceiveEvent(components = {CharacterMovementComponent.class, LocationComponent.class, AliveCharacterComponent.class})
     public void onCharacterStateReceived(CharacterStateEvent state, EntityRef entity) {
         if (entity.equals(localPlayer.getCharacterEntity())) {
             logger.trace("Received new state, sequence number: {}, buffered input size {}", state.getSequenceNumber(), inputs.size());
@@ -113,7 +114,7 @@ public class ClientCharacterPredictionSystem extends BaseComponentSystem impleme
                 }
             }
             logger.trace("Resultant input size {}", inputs.size());
-            CharacterStateEvent.setToState(entity, newState);
+            characterMovementSystemUtility.setToState(entity, newState);
             // TODO: soft correct predicted state
             predictedState = newState;
         } else {
@@ -122,7 +123,7 @@ public class ClientCharacterPredictionSystem extends BaseComponentSystem impleme
     }
 
 
-    @ReceiveEvent(components = {CharacterMovementComponent.class, LocationComponent.class})
+    @ReceiveEvent(components = {CharacterMovementComponent.class, LocationComponent.class, AliveCharacterComponent.class})
     public void onPlayerInput(CharacterMoveInputEvent input, EntityRef entity) {
         if (predictedState == null) {
             predictedState = createInitialState(entity);
@@ -134,7 +135,7 @@ public class ClientCharacterPredictionSystem extends BaseComponentSystem impleme
         CharacterStateEvent newState = stepState(input, predictedState, entity);
         predictedState = newState;
 
-        CharacterStateEvent.setToState(entity, newState);
+        characterMovementSystemUtility.setToState(entity, newState);
     }
 
     private CharacterStateEvent createInitialState(EntityRef entity) {
@@ -162,9 +163,9 @@ public class ClientCharacterPredictionSystem extends BaseComponentSystem impleme
             }
             if (previous != null) {
                 if (next != null) {
-                    CharacterStateEvent.setToInterpolateState(entry.getKey(), previous, next, renderTime);
+                    characterMovementSystemUtility.setToInterpolateState(entry.getKey(), previous, next, renderTime);
                 } else {
-                    CharacterStateEvent.setToExtrapolateState(entry.getKey(), previous, renderTime);
+                    characterMovementSystemUtility.setToExtrapolateState(entry.getKey(), previous, renderTime);
                 }
             }
         }

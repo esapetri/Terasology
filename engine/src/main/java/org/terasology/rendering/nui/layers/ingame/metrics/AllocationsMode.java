@@ -20,12 +20,11 @@ import gnu.trove.map.TObjectDoubleMap;
 import org.terasology.monitoring.PerformanceMonitor;
 
 /**
- * @author Immortius
  */
 final class AllocationsMode extends TimeMetricsMode {
 
-    public AllocationsMode() {
-        super("Memory Allocations", 10, "bytes");
+    AllocationsMode() {
+        super("\n- Memory Allocations -", 10, "bytes");
     }
 
     @Override

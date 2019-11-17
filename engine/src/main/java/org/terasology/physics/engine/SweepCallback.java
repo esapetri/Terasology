@@ -20,7 +20,6 @@ import org.terasology.math.geom.Vector3f;
 /**
  * Provides the results from a CharacterCollider sweep()
  *
- * @author Xanhou
  */
 public interface SweepCallback {
 
@@ -35,14 +34,14 @@ public interface SweepCallback {
     float calculateAverageSlope(float originalSlope, float checkingOffset);
 
     /**
-     * Returns where the closest hit took place.
+     * Returns the normal of the surface that has been hit in the closest hit.
      *
      * @return
      */
     Vector3f getHitNormalWorld();
 
     /**
-     * Returns the normal of the surface that has been hit in the closest hit.
+     * Returns where the closest hit took place.
      *
      * @return
      */

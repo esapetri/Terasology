@@ -21,25 +21,30 @@ import org.terasology.entitySystem.entity.EntityManager;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.event.Event;
 import org.terasology.logic.common.DisplayNameComponent;
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.network.ClientComponent;
 import org.terasology.network.ColorComponent;
 import org.terasology.registry.CoreRegistry;
 import org.terasology.rendering.nui.Color;
-import org.terasology.rendering.world.ViewDistance;
+import org.terasology.rendering.world.viewDistance.ViewDistance;
 import org.terasology.world.chunks.Chunk;
 
 /**
  * A local client.
  *
- * @author Immortius
  */
 public class LocalClient extends AbstractClient {
 
     private Config config = CoreRegistry.get(Config.class);
 
-    public LocalClient(String name, Color color, EntityManager entityManager) {
-        createEntity(name, color, entityManager);
+    /**
+     * Creates an entity for the new local client.
+     * @param preferredName Clients preferred name.
+     * @param color Clients preferred color.
+     * @param entityManager Entity manager for the clients entity creation.
+     */
+    public LocalClient(String preferredName, Color color, EntityManager entityManager) {
+        createEntity(preferredName, color, entityManager);
     }
 
     @Override

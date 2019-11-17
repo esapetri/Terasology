@@ -16,16 +16,22 @@
 
 package org.terasology.config;
 
-/**
- * @author Immortius
- */
+import java.util.Locale;
+import java.util.Locale.Category;
+
 public class SystemConfig {
-    private long dayNightLengthInMs = 1800000;
-    private int maxThreads = 2;
-    private int maxSecondsBetweenSaves = 60;
-    private int maxUnloadedChunksPercentageTillSave = 40;
+    public static final String SAVED_GAMES_ENABLED_PROPERTY = "org.terasology.savedGamesEnabled";
+    public static final String PERMISSIVE_SECURITY_ENABLED_PROPERTY = "org.terasology.permissiveSecurityEnabled";
+
+    private long dayNightLengthInMs;
+    private int maxThreads;
+    private int maxSecondsBetweenSaves;
+    private int maxUnloadedChunksPercentageTillSave;
     private boolean debugEnabled;
     private boolean monitoringEnabled;
+    private boolean writeSaveGamesEnabled;
+    private long chunkGenerationFailTimeoutInMs;
+    private String locale;
 
     public long getDayNightLengthInMs() {
         return dayNightLengthInMs;
@@ -73,5 +79,36 @@ public class SystemConfig {
 
     public void setMonitoringEnabled(boolean monitoringEnabled) {
         this.monitoringEnabled = monitoringEnabled;
+    }
+
+    public boolean isWriteSaveGamesEnabled() {
+        String property = System.getProperty(SAVED_GAMES_ENABLED_PROPERTY);
+        if (property != null) {
+            return Boolean.parseBoolean(property);
+        }
+        return writeSaveGamesEnabled;
+    }
+
+    public void setWriteSaveGamesEnabled(boolean writeSaveGamesEnabled) {
+        this.writeSaveGamesEnabled = writeSaveGamesEnabled;
+    }
+
+    public long getChunkGenerationFailTimeoutInMs() {
+        return chunkGenerationFailTimeoutInMs;
+    }
+
+    public void setChunkGenerationFailTimeoutInMs(long chunkGenerationFailTimeoutInMs) {
+        this.chunkGenerationFailTimeoutInMs = chunkGenerationFailTimeoutInMs;
+    }
+
+    public Locale getLocale() {
+        if (locale == null) {
+            setLocale(Locale.getDefault(Category.DISPLAY));
+        }
+        return Locale.forLanguageTag(locale);
+    }
+
+    public void setLocale(Locale locale) {
+        this.locale = locale.toLanguageTag();
     }
 }

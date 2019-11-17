@@ -16,11 +16,10 @@
 package org.terasology.network;
 
 /**
- * @author Immortius
  */
 public interface JoinStatus {
 
-    public enum Status {
+    enum Status {
         IN_PROGRESS,
         COMPLETE,
         FAILED

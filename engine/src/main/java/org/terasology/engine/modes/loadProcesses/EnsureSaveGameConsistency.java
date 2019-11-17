@@ -15,29 +15,32 @@
  */
 package org.terasology.engine.modes.loadProcesses;
 
+import org.terasology.context.Context;
 import org.terasology.engine.modes.LoadProcess;
 import org.terasology.persistence.StorageManager;
-import org.terasology.registry.CoreRegistry;
 
 import java.io.IOException;
 
 /**
  * Repairs the save game when it is in an inconsistent state after a crash.
  *
- * @author Florian <florian@fkoeberle.de>
  */
 public class EnsureSaveGameConsistency implements LoadProcess {
+    private final Context context;
 
+    public EnsureSaveGameConsistency(Context context) {
+        this.context = context;
+    }
 
     @Override
     public String getMessage() {
-        return "Ensuring save game consistency";
+        return "${engine:menu#ensuring-save-game-consistency}";
     }
 
     @Override
     public boolean step() {
         try {
-            CoreRegistry.get(StorageManager.class).checkAndRepairSaveIfNecessary();
+            context.get(StorageManager.class).checkAndRepairSaveIfNecessary();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

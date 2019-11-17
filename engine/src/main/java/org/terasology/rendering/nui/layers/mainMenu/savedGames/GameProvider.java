@@ -32,22 +32,49 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-/**
- * @author Immortius
- */
 public final class GameProvider {
 
     private static final Logger logger = LoggerFactory.getLogger(GameProvider.class);
+    private static final String DEFAULT_GAME_NAME_PREFIX = "Game ";
 
     private GameProvider() {
     }
 
+    public static List<GameInfo> getSavedRecordings() {
+        Path recordingPath = PathManager.getInstance().getRecordingsPath();
+        return getSavedGameOrRecording(recordingPath);
+    }
+
     public static List<GameInfo> getSavedGames() {
-        Path savedGames = PathManager.getInstance().getSavesPath();
+        Path savePath = PathManager.getInstance().getSavesPath();
+        return getSavedGameOrRecording(savePath);
+    }
+
+    /**
+     * Checks if saved games are present.
+     */
+    public static boolean isSavesFolderEmpty() {
+        Path savePath = PathManager.getInstance().getSavesPath();
+        if (savePath != null) {
+
+            // Set the stream path in a try with resources construct first in order to close the stream.
+            try (Stream<Path> stream = Files.list(savePath)
+                    .filter(savedGameFolderPath -> Files.isDirectory(savedGameFolderPath)
+                                                   && Files.isRegularFile(savedGameFolderPath.resolve(GameManifest.DEFAULT_FILE_NAME)))) {
+                return stream.collect(Collectors.toList()).isEmpty();
+            } catch (IOException e) {
+                logger.warn("Can't read saves path {}", savePath, e);
+            }
+        }
+        return true;
+    }
+
+    private static List<GameInfo> getSavedGameOrRecording(Path saveOrRecordingPath) {
         SortedMap<FileTime, Path> savedGamePaths = Maps.newTreeMap(Collections.reverseOrder());
-        try (DirectoryStream<Path> stream =
-                     Files.newDirectoryStream(savedGames)) {
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(saveOrRecordingPath)) {
             for (Path entry : stream) {
                 if (Files.isRegularFile(entry.resolve(GameManifest.DEFAULT_FILE_NAME))) {
                     savedGamePaths.put(Files.getLastModifiedTime(entry.resolve(GameManifest.DEFAULT_FILE_NAME)), entry);
@@ -67,15 +94,37 @@ public final class GameProvider {
             }
             try {
                 GameManifest info = GameManifest.load(gameManifest);
-                if (!info.getTitle().isEmpty()) {
-                    Date date = new Date(world.getKey().toMillis());
-                    result.add(new GameInfo(info, date));
+                try {
+                    if (!info.getTitle().isEmpty()) {
+                        Date date = new Date(world.getKey().toMillis());
+                        result.add(new GameInfo(info, date, world.getValue()));
+                    }
+                } catch (NullPointerException npe) {
+                    logger.error("The save file was corrupted for: " + world.toString() + ". The manifest can be found and restored at: " + gameManifest.toString(), npe);
                 }
             } catch (IOException e) {
                 logger.error("Failed reading world data object.", e);
             }
         }
         return result;
+    }
+
+    /**
+     * Generates the game name based on the game number of the last saved game
+     */
+    public static String getNextGameName() {
+        int gameNumber = 1;
+        for (GameInfo info : GameProvider.getSavedGames()) {
+            if (info.getManifest().getTitle().startsWith(DEFAULT_GAME_NAME_PREFIX)) {
+                String remainder = info.getManifest().getTitle().substring(DEFAULT_GAME_NAME_PREFIX.length());
+                try {
+                    gameNumber = Math.max(gameNumber, Integer.parseInt(remainder) + 1);
+                } catch (NumberFormatException e) {
+                    logger.trace("Could not parse {} as integer (not an error)", remainder, e);
+                }
+            }
+        }
+        return DEFAULT_GAME_NAME_PREFIX + gameNumber;
     }
 
 }

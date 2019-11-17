@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MovingBlocks
+ * Copyright 2016 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 package org.terasology.rendering.assets.shader;
 
 /**
- * @author Immortius
+ * TODO: write javadoc
  */
 public enum ParamType {
     sampler2D(true),
@@ -25,7 +25,7 @@ public enum ParamType {
 
     private boolean texture;
 
-    private ParamType(boolean texture) {
+    ParamType(boolean texture) {
         this.texture = texture;
     }
 

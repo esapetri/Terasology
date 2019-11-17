@@ -24,8 +24,10 @@ import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.terasology.config.ClientIdentity;
+import org.terasology.identity.ClientIdentity;
 import org.terasology.config.Config;
+import org.terasology.identity.storageServiceClient.StorageServiceWorker;
+import org.terasology.identity.storageServiceClient.StorageServiceWorkerStatus;
 import org.terasology.registry.CoreRegistry;
 import org.terasology.identity.IdentityConstants;
 import org.terasology.identity.PrivateIdentityCertificate;
@@ -51,7 +53,6 @@ public class ClientHandshakeHandler extends SimpleChannelUpstreamHandler {
     private static final String AUTHENTICATION_FAILURE = "Authentication failure";
 
     private Config config = CoreRegistry.get(Config.class);
-    private ClientConnectionHandler clientConnectionHandler;
     private JoinStatusImpl joinStatus;
 
     private byte[] serverRandom;
@@ -71,7 +72,6 @@ public class ClientHandshakeHandler extends SimpleChannelUpstreamHandler {
     @Override
     public void channelOpen(ChannelHandlerContext ctx, ChannelStateEvent e) throws Exception {
         super.channelOpen(ctx, e);
-        clientConnectionHandler = ctx.getPipeline().get(ClientConnectionHandler.class);
         joinStatus.setCurrentActivity("Authenticating with server");
     }
 
@@ -87,6 +87,11 @@ public class ClientHandshakeHandler extends SimpleChannelUpstreamHandler {
         }
     }
 
+    /**
+     * Process the handshake verification, checking that both the server and client have attempted it. If successful marks the channel as Authenticated.
+     * @param handshakeVerification
+     * @param ctx Channel Handler Context.
+     */
     private void processHandshakeVerification(NetData.HandshakeVerification handshakeVerification, ChannelHandlerContext ctx) {
         logger.info("Received server verification");
         if (serverHello == null || clientHello == null) {
@@ -105,9 +110,14 @@ public class ClientHandshakeHandler extends SimpleChannelUpstreamHandler {
 
         // And we're authenticated.
         ctx.getPipeline().remove(this);
-        clientConnectionHandler.channelAuthenticated(ctx);
+        channelAuthenticated(ctx);
     }
 
+    /**
+     * Generates a new secret key for a user and then decrypts the certificate into a byte array. Storing the certificate to the user ID.
+     * @param provisionIdentity
+     * @param ctx Channel Handler Context.
+     */
     private void processNewIdentity(NetData.ProvisionIdentity provisionIdentity, ChannelHandlerContext ctx) {
         logger.info("Received identity from server");
         if (!requestedCertificate) {
@@ -151,9 +161,15 @@ public class ClientHandshakeHandler extends SimpleChannelUpstreamHandler {
             config.getSecurity().addIdentity(serverCertificate, identity);
             config.save();
 
+            //Try to upload the new identity to the identity storage service (if user is logged in)
+            StorageServiceWorker storageServiceWorker = CoreRegistry.get(StorageServiceWorker.class);
+            if (storageServiceWorker != null && storageServiceWorker.getStatus() == StorageServiceWorkerStatus.LOGGED_IN) {
+                storageServiceWorker.putIdentity(serverCertificate, identity);
+            }
+
             // And we're authenticated.
             ctx.getPipeline().remove(this);
-            clientConnectionHandler.channelAuthenticated(ctx);
+            channelAuthenticated(ctx);
         } catch (InvalidProtocolBufferException e) {
             logger.error("Received invalid certificate data: cancelling authentication", e);
             joinStatus.setErrorMessage(AUTHENTICATION_FAILURE);
@@ -161,6 +177,21 @@ public class ClientHandshakeHandler extends SimpleChannelUpstreamHandler {
         }
     }
 
+    /**
+     * Creates a new builder on the channel and sets join status.
+     * @param ctx Channel Handler Context.
+     */
+    private void channelAuthenticated(ChannelHandlerContext ctx) {
+        ctx.getChannel().write(NetData.NetMessage.newBuilder()
+                .setServerInfoRequest(NetData.ServerInfoRequest.newBuilder()).build());
+        joinStatus.setCurrentActivity("Requesting server info");
+    }
+
+    /**
+     * Client checks to see if it received the server hello message, if so it processes it into a random key and the certificate.
+     * @param helloMessage Message from server to client.
+     * @param ctx Channel Handler Context.
+     */
     private void processServerHello(NetData.HandshakeHello helloMessage, ChannelHandlerContext ctx) {
         if (serverHello == null) {
             logger.info("Received Server Hello");
@@ -193,6 +224,11 @@ public class ClientHandshakeHandler extends SimpleChannelUpstreamHandler {
 
     }
 
+    /**
+     * Generates a client hello from clientRandom file, time, and the public client certificate. Sends the clients hello and certificate back to the server via network channel.
+     * @param helloMessage Message from server to client.
+     * @param ctx Channel Handler Context.
+     */
     private void sendCertificate(NetData.HandshakeHello helloMessage, ChannelHandlerContext ctx) {
         logger.info("Sending client certificate");
         PublicIdentityCertificate pubClientCert = identity.getPlayerPublicCertificate();
@@ -213,6 +249,10 @@ public class ClientHandshakeHandler extends SimpleChannelUpstreamHandler {
                 .build());
     }
 
+    /**
+     * Requests a new identity for a client if one doesn't already exist. Generated from the master secret key and server certificate.
+     * @param ctx Channel Handler Context.
+     */
     private void requestIdentity(ChannelHandlerContext ctx) {
         logger.info("No existing identity, requesting one");
 

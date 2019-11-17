@@ -16,7 +16,7 @@
 
 package org.terasology.audio;
 
-import org.terasology.asset.AssetData;
+import org.terasology.assets.AssetData;
 
 import java.nio.ByteBuffer;
 
@@ -35,6 +35,7 @@ public class StaticSoundData implements AssetData {
         this.sampleRate = sampleRate;
         this.bufferBits = bufferBits;
     }
+
 
     public ByteBuffer getData() {
         return data;

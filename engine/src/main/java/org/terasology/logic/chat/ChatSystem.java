@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MovingBlocks
+ * Copyright 2017 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,8 +18,7 @@ package org.terasology.logic.chat;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.terasology.asset.AssetType;
-import org.terasology.asset.AssetUri;
+import org.terasology.assets.ResourceUrn;
 import org.terasology.entitySystem.entity.EntityManager;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.event.ReceiveEvent;
@@ -28,7 +27,6 @@ import org.terasology.entitySystem.systems.RegisterSystem;
 import org.terasology.input.ButtonState;
 import org.terasology.input.binds.general.ChatButton;
 import org.terasology.logic.common.DisplayNameComponent;
-import org.terasology.logic.console.Console;
 import org.terasology.logic.console.ConsoleColors;
 import org.terasology.logic.console.CoreMessageType;
 import org.terasology.logic.console.Message;
@@ -36,38 +34,38 @@ import org.terasology.logic.console.MessageEvent;
 import org.terasology.logic.console.commandSystem.annotations.Command;
 import org.terasology.logic.console.commandSystem.annotations.CommandParam;
 import org.terasology.logic.console.commandSystem.annotations.Sender;
-import org.terasology.logic.console.suggesters.UsernameSuggester;
-import org.terasology.logic.console.ui.MiniChatOverlay;
+import org.terasology.logic.console.suggesters.OnlineUsernameSuggester;
+import org.terasology.logic.console.ui.NotificationOverlay;
+import org.terasology.logic.permission.PermissionManager;
 import org.terasology.network.ClientComponent;
 import org.terasology.registry.In;
 import org.terasology.rendering.FontColor;
 import org.terasology.rendering.nui.NUIManager;
 
+import java.util.Arrays;
+
+import static java.util.stream.Collectors.joining;
+
 /**
- * @author Immortius
  */
 @RegisterSystem
 public class ChatSystem extends BaseComponentSystem {
     private static final Logger logger = LoggerFactory.getLogger(ChatSystem.class);
 
-    private static final AssetUri CHAT_UI = new AssetUri(AssetType.UI_ELEMENT, "engine:chat");
-    private static final AssetUri CONSOLE_UI = new AssetUri(AssetType.UI_ELEMENT, "engine:console");
-    private static final AssetUri MINICHAT_UI = new AssetUri(AssetType.UI_ELEMENT, "engine:minichatOverlay");
-    
-    @In
-    private Console console;
-    
+    private static final ResourceUrn CHAT_UI = new ResourceUrn("engine:chat");
+    private static final ResourceUrn CONSOLE_UI = new ResourceUrn("engine:console");
+
     @In
     private EntityManager entityManager;
 
     @In
     private NUIManager nuiManager;
 
-    private MiniChatOverlay overlay;
+    private NotificationOverlay overlay;
 
     @Override
     public void initialise() {
-        overlay = nuiManager.addOverlay(MINICHAT_UI, MiniChatOverlay.class);
+        overlay = nuiManager.addOverlay(NotificationOverlay.ASSET_URI, NotificationOverlay.class);
     }
 
     @ReceiveEvent(components = ClientComponent.class)
@@ -94,26 +92,38 @@ public class ChatSystem extends BaseComponentSystem {
         }
     }
 
-    @Command(runOnServer = true, shortDescription = "Sends a message to all other players")
+    @Command(runOnServer = true,
+            requiredPermission = PermissionManager.CHAT_PERMISSION,
+            shortDescription = "Sends a message to all other players")
     public String say(
             @Sender EntityRef sender,
-            @CommandParam(value = "message") String message
+            @CommandParam(value = "message") String[] message
     ) {
-        logger.debug("Received chat message from {} : '{}'", sender, message);
+        String messageToString = join(message, " ");
+
+        logger.debug("Received chat message from {} : '{}'", sender, messageToString);
 
         for (EntityRef client : entityManager.getEntitiesWith(ClientComponent.class)) {
-            client.send(new ChatMessageEvent(message, sender.getComponent(ClientComponent.class).clientInfo));
+            client.send(new ChatMessageEvent(messageToString, sender.getComponent(ClientComponent.class).clientInfo));
         }
 
-        return "Message sent.";
+        return "Message sent";
     }
 
-    @Command(runOnServer = true, shortDescription = "Sends a private message to a specified user")
+    private String join(String[] words, String sep) {
+        return Arrays.stream(words).collect(joining(sep));
+    }
+
+    @Command(runOnServer = true,
+            requiredPermission = PermissionManager.CHAT_PERMISSION,
+            shortDescription = "Sends a private message to a specified user")
     public String whisper(
             @Sender EntityRef sender,
-            @CommandParam(value = "user", suggester = UsernameSuggester.class) String username,
-            @CommandParam("message") String message
+            @CommandParam(value = "user", suggester = OnlineUsernameSuggester.class) String username,
+            @CommandParam("message") String[] message
     ) {
+        String messageToString = join(message, " ");
+
         Iterable<EntityRef> clients = entityManager.getEntitiesWith(ClientComponent.class);
         EntityRef targetClient = null;
         boolean unique = true;
@@ -162,13 +172,12 @@ public class ChatSystem extends BaseComponentSystem {
         }
 
         ClientComponent senderClientComponent = sender.getComponent(ClientComponent.class);
-        DisplayNameComponent senderDisplayNameComponent = senderClientComponent.clientInfo.getComponent(DisplayNameComponent.class);
         ClientComponent targetClientComponent = targetClient.getComponent(ClientComponent.class);
         DisplayNameComponent targetDisplayNameComponent = targetClientComponent.clientInfo.getComponent(DisplayNameComponent.class);
         String targetMessage = FontColor.getColored("*whispering* ", ConsoleColors.ERROR)
-                + FontColor.getColored(message, ConsoleColors.CHAT);
+                + FontColor.getColored(messageToString, ConsoleColors.CHAT);
         String senderMessage = "You -> " + targetDisplayNameComponent.name
-                + ": " + FontColor.getColored(message, ConsoleColors.CHAT);
+                + ": " + FontColor.getColored(messageToString, ConsoleColors.CHAT);
 
         targetClient.send(new ChatMessageEvent(targetMessage, senderClientComponent.clientInfo));
 

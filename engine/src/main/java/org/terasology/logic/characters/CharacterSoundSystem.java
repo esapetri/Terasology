@@ -15,7 +15,8 @@
  */
 package org.terasology.logic.characters;
 
-import org.terasology.audio.AudioManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.terasology.audio.StaticSound;
 import org.terasology.audio.events.PlaySoundEvent;
 import org.terasology.engine.Time;
@@ -25,19 +26,16 @@ import org.terasology.entitySystem.systems.BaseComponentSystem;
 import org.terasology.entitySystem.systems.RegisterMode;
 import org.terasology.entitySystem.systems.RegisterSystem;
 import org.terasology.logic.characters.events.FootstepEvent;
-import org.terasology.logic.characters.events.HorizontalCollisionEvent;
 import org.terasology.logic.characters.events.JumpEvent;
 import org.terasology.logic.characters.events.OnEnterBlockEvent;
+import org.terasology.logic.characters.events.PlayerDeathEvent;
 import org.terasology.logic.characters.events.SwimStrokeEvent;
 import org.terasology.logic.characters.events.VerticalCollisionEvent;
-import org.terasology.logic.health.DamageSoundComponent;
-import org.terasology.logic.health.DestroyEvent;
-import org.terasology.logic.health.HealthComponent;
-import org.terasology.logic.health.OnDamagedEvent;
+import org.terasology.logic.health.DoDestroyEvent;
 import org.terasology.logic.location.LocationComponent;
-import org.terasology.logic.players.event.OnPlayerSpawnedEvent;
-import org.terasology.math.Vector3i;
+import org.terasology.logic.players.event.OnPlayerRespawnedEvent;
 import org.terasology.math.geom.Vector3f;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.registry.In;
 import org.terasology.utilities.random.FastRandom;
 import org.terasology.utilities.random.Random;
@@ -47,12 +45,13 @@ import org.terasology.world.block.Block;
 import java.util.List;
 
 /**
- * @author Immortius <immortius@gmail.com>, Limeth
  */
 @RegisterSystem(RegisterMode.ALWAYS)
 public class CharacterSoundSystem extends BaseComponentSystem {
 
-    private static final long MIN_TIME = 10;
+    public static final long MIN_TIME = 10;
+
+    private static final Logger logger = LoggerFactory.getLogger(CharacterSoundSystem.class);
     private static final float LANDING_VOLUME_MODIFIER = 0.2f; //The sound volume is multiplied by this number
     private static final float LANDING_VELOCITY_THRESHOLD = 7; //How fast do you have to be falling for the sound to play
     private static final float LANDING_VOLUME_MAX = 2; //The maximum modifier value
@@ -60,9 +59,6 @@ public class CharacterSoundSystem extends BaseComponentSystem {
 
     @In
     private Time time;
-
-    @In
-    private AudioManager audioManager;
 
     @In
     private WorldProvider worldProvider;
@@ -76,8 +72,12 @@ public class CharacterSoundSystem extends BaseComponentSystem {
         Vector3i blockPos = new Vector3i(locationComponent.getLocalPosition());
         blockPos.y--; // The block *below* the character's feet is interesting to us
         Block block = worldProvider.getBlock(blockPos);
-        if (block != null && !block.getSounds().getStepSounds().isEmpty()) {
-            footstepSounds = block.getSounds().getStepSounds();
+        if (block != null) {
+            if (block.getSounds() == null) {
+                logger.error("Block '{}' has no sounds", block.getURI());
+            } else if (!block.getSounds().getStepSounds().isEmpty()) {
+                footstepSounds = block.getSounds().getStepSounds();
+            }
         }
 
         if (footstepSounds.size() > 0 && characterSounds.lastSoundTime + MIN_TIME < time.getGameTimeInMs()) {
@@ -134,44 +134,7 @@ public class CharacterSoundSystem extends BaseComponentSystem {
     }
 
     @ReceiveEvent
-    public void onCrash(HorizontalCollisionEvent event, EntityRef entity, CharacterSoundComponent characterSounds, HealthComponent healthComponent) {
-        Vector3f horizVelocity = new Vector3f(event.getVelocity());
-        horizVelocity.y = 0;
-        float velocity = horizVelocity.length();
-
-        if (velocity > healthComponent.horizontalDamageSpeedThreshold) {
-            if (characterSounds.lastSoundTime + MIN_TIME < time.getGameTimeInMs()) {
-                StaticSound sound = random.nextItem(characterSounds.landingSounds);
-                if (sound != null) {
-                    entity.send(new PlaySoundEvent(entity, sound, characterSounds.landingVolume));
-                    characterSounds.lastSoundTime = time.getGameTimeInMs();
-                    entity.saveComponent(characterSounds);
-                }
-            }
-        }
-    }
-
-    @ReceiveEvent
-    public void onDamaged(OnDamagedEvent event, EntityRef entity, CharacterSoundComponent characterSounds) {
-        if (characterSounds.lastSoundTime + MIN_TIME < time.getGameTimeInMs()) {
-            DamageSoundComponent damageSounds = event.getType().getComponent(DamageSoundComponent.class);
-            StaticSound sound = null;
-            if (damageSounds != null && !damageSounds.sounds.isEmpty()) {
-                sound = random.nextItem(damageSounds.sounds);
-            } else if (!characterSounds.damageSounds.isEmpty()) {
-                sound = random.nextItem(characterSounds.damageSounds);
-            }
-
-            if (sound != null) {
-                entity.send(new PlaySoundEvent(entity, sound, characterSounds.damageVolume));
-                characterSounds.lastSoundTime = time.getGameTimeInMs();
-                entity.saveComponent(characterSounds);
-            }
-        }
-    }
-
-    @ReceiveEvent
-    public void onDeath(DestroyEvent event, EntityRef entity, CharacterSoundComponent characterSounds) {
+    public void onDeath(DoDestroyEvent event, EntityRef entity, CharacterSoundComponent characterSounds) {
         if (characterSounds.deathSounds.size() > 0) {
             StaticSound sound = random.nextItem(characterSounds.deathSounds);
             entity.send(new PlaySoundEvent(entity, sound, characterSounds.deathVolume));
@@ -179,7 +142,16 @@ public class CharacterSoundSystem extends BaseComponentSystem {
     }
 
     @ReceiveEvent
-    public void onRespawn(OnPlayerSpawnedEvent event, EntityRef character, CharacterSoundComponent characterSounds) {
+    public void onPlayerDeath(PlayerDeathEvent event, EntityRef character) {
+        CharacterSoundComponent characterSounds = character.getComponent(CharacterSoundComponent.class);
+        if (characterSounds.deathSounds.size() > 0) {
+            StaticSound sound = random.nextItem(characterSounds.deathSounds);
+            character.send(new PlaySoundEvent(character, sound, characterSounds.deathVolume));
+        }
+    }
+
+    @ReceiveEvent
+    public void onRespawn(OnPlayerRespawnedEvent event, EntityRef character, CharacterSoundComponent characterSounds) {
         if (characterSounds.respawnSounds.size() > 0) {
             StaticSound sound = random.nextItem(characterSounds.respawnSounds);
             character.send(new PlaySoundEvent(character, sound, characterSounds.respawnVolume));

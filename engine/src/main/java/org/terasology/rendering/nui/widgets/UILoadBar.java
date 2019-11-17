@@ -15,11 +15,10 @@
  */
 package org.terasology.rendering.nui.widgets;
 
-import org.terasology.asset.Assets;
 import org.terasology.engine.Time;
-import org.terasology.math.Rect2i;
 import org.terasology.math.TeraMath;
-import org.terasology.math.Vector2i;
+import org.terasology.math.geom.Rect2i;
+import org.terasology.math.geom.Vector2i;
 import org.terasology.registry.CoreRegistry;
 import org.terasology.rendering.assets.texture.TextureRegion;
 import org.terasology.rendering.nui.Canvas;
@@ -30,16 +29,17 @@ import org.terasology.rendering.nui.databinding.Binding;
 import org.terasology.rendering.nui.databinding.DefaultBinding;
 
 /**
- * @author Immortius
+ * An animated loading bar
  */
 public class UILoadBar extends CoreWidget {
 
     @LayoutConfig
-    private TextureRegion fillTexture = Assets.getTexture("engine:loadBar");
+    private TextureRegion fillTexture;
 
     @LayoutConfig
     private boolean animate = true;
 
+    @LayoutConfig
     private Binding<Float> value = new DefaultBinding<>(0f);
     private Time time = CoreRegistry.get(Time.class);
 
@@ -56,15 +56,15 @@ public class UILoadBar extends CoreWidget {
             // Draw Offset
             if (offset != 0) {
                 int drawWidth = Math.min(size, offset);
-                canvas.drawTextureRaw(fillTexture, Rect2i.createFromMinAndSize(0, 0, drawWidth, canvas.size().y)
-                        , ScaleMode.STRETCH, barWidth - offset, 0, drawWidth, canvas.size().y);
+                canvas.drawTextureRaw(fillTexture, Rect2i.createFromMinAndSize(0, 0, drawWidth, canvas.size().y),
+                        ScaleMode.STRETCH, barWidth - offset, 0, drawWidth, canvas.size().y);
                 drawnWidth += drawWidth;
             }
             // Draw Remainder
             while (drawnWidth < size) {
                 int drawWidth = Math.min(size - drawnWidth, barWidth);
-                canvas.drawTextureRaw(fillTexture, Rect2i.createFromMinAndSize(drawnWidth, 0, drawWidth, canvas.size().y)
-                        , ScaleMode.STRETCH, 0, 0, drawWidth, canvas.size().y);
+                canvas.drawTextureRaw(fillTexture, Rect2i.createFromMinAndSize(drawnWidth, 0, drawWidth, canvas.size().y),
+                        ScaleMode.STRETCH, 0, 0, drawWidth, canvas.size().y);
                 drawnWidth += drawWidth;
             }
         }
@@ -80,18 +80,30 @@ public class UILoadBar extends CoreWidget {
         super.update(delta);
     }
 
+    /**
+     * @return The texture used in the bar.
+     */
     public TextureRegion getFillTexture() {
         return fillTexture;
     }
 
+    /**
+     * @param fillTexture The new texture to use.
+     */
     public void setFillTexture(TextureRegion fillTexture) {
         this.fillTexture = fillTexture;
     }
 
+    /**
+     * @return A Boolean indicating whether. the bar is animated.
+     */
     public boolean isAnimate() {
         return animate;
     }
 
+    /**
+     * @param animate A Boolean indicating if the bar should be animated.
+     */
     public void setAnimate(boolean animate) {
         this.animate = animate;
     }
@@ -100,10 +112,16 @@ public class UILoadBar extends CoreWidget {
         value = binding;
     }
 
+    /**
+     * @return A Float between 0 and 1 indicating the percentage of the bar.
+     */
     public float getValue() {
         return value.get();
     }
 
+    /**
+     * @param val A float from 0 to 1 indicating the percentage loaded.
+     */
     public void setValue(float val) {
         value.set(val);
     }

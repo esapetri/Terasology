@@ -19,20 +19,18 @@ package org.terasology.world.chunks.remoteChunkProvider;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Queues;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.logic.players.LocalPlayer;
 import org.terasology.math.ChunkMath;
 import org.terasology.math.Region3i;
-import org.terasology.math.Side;
 import org.terasology.math.TeraMath;
-import org.terasology.math.Vector3i;
 import org.terasology.math.geom.Vector3f;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.monitoring.PerformanceMonitor;
 import org.terasology.monitoring.chunk.ChunkMonitor;
-import org.terasology.registry.CoreRegistry;
+import org.terasology.world.block.BlockManager;
 import org.terasology.world.chunks.Chunk;
 import org.terasology.world.chunks.ChunkConstants;
 import org.terasology.world.chunks.ChunkProvider;
@@ -47,6 +45,7 @@ import org.terasology.world.internal.ChunkViewCoreImpl;
 import org.terasology.world.propagation.light.InternalLightProcessor;
 import org.terasology.world.propagation.light.LightMerger;
 
+import java.math.RoundingMode;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -55,8 +54,6 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 
 /**
- * @author Immortius
- * @author Florian <florian@fkoeberle.de>
  */
 public class RemoteChunkProvider implements ChunkProvider, GeneratingChunkProvider {
 
@@ -68,11 +65,17 @@ public class RemoteChunkProvider implements ChunkProvider, GeneratingChunkProvid
     private ChunkReadyListener listener;
     private EntityRef worldEntity = EntityRef.NULL;
 
+    private BlockManager blockManager;
+
     private ChunkGenerationPipeline pipeline;
 
     private LightMerger<Chunk> lightMerger = new LightMerger<>(this);
 
-    public RemoteChunkProvider() {
+    private LocalPlayer localPlayer;
+
+    public RemoteChunkProvider(BlockManager blockManager, LocalPlayer localPlayer) {
+        this.blockManager = blockManager;
+        this.localPlayer = localPlayer;
         pipeline = new ChunkGenerationPipeline(new ChunkTaskRelevanceComparator());
         ChunkMonitor.fireChunkProviderInitialized(this);
     }
@@ -117,7 +120,6 @@ public class RemoteChunkProvider implements ChunkProvider, GeneratingChunkProvid
                     Chunk oldChunk = chunkCache.put(chunk.getPosition(), chunk);
                     if (oldChunk != null) {
                         oldChunk.dispose();
-                        updateAdjacentChunksReadyFieldOfAdjChunks(chunk);
                     }
                 }
             }
@@ -234,7 +236,7 @@ public class RemoteChunkProvider implements ChunkProvider, GeneratingChunkProvid
             int index = TeraMath.calculate3DArrayIndex(chunkPos, region.size());
             chunks[index] = chunk;
         }
-        return new ChunkViewCoreImpl(chunks, region, offset);
+        return new ChunkViewCoreImpl(chunks, region, offset, blockManager.getBlock(BlockManager.AIR_ID));
     }
 
     @Override
@@ -263,8 +265,6 @@ public class RemoteChunkProvider implements ChunkProvider, GeneratingChunkProvid
         Chunk chunk = lightMerger.completeMerge();
         if (chunk != null) {
             chunk.markReady();
-            updateAdjacentChunksReadyFieldOf(chunk);
-            updateAdjacentChunksReadyFieldOfAdjChunks(chunk);
             listener.onChunkReady(chunk.getPosition());
             worldEntity.send(new OnChunkLoaded(chunk.getPosition()));
         }
@@ -284,37 +284,8 @@ public class RemoteChunkProvider implements ChunkProvider, GeneratingChunkProvid
         return chunkCache.get(pos);
     }
 
-    private boolean areAdjacentChunksReady(Chunk chunk) {
-        Vector3i centerChunkPos = chunk.getPosition();
-        for (Side side : Side.values()) {
-            Vector3i adjChunkPos = side.getAdjacentPos(centerChunkPos);
-            Chunk adjChunk = chunkCache.get(adjChunkPos);
-            boolean adjChunkReady = (adjChunk != null && adjChunk.isReady());
-            if (!adjChunkReady) {
-                return false;
-            }
-        }
-        return true;
-    }
 
-    private void updateAdjacentChunksReadyFieldOf(Chunk chunk) {
-        chunk.setAdjacentChunksReady(areAdjacentChunksReady(chunk));
-    }
-
-    private void updateAdjacentChunksReadyFieldOfAdjChunks(Chunk chunkInCenter) {
-        Vector3i centerChunkPos = chunkInCenter.getPosition();
-        for (Side side : Side.values()) {
-            Vector3i adjChunkPos = side.getAdjacentPos(centerChunkPos);
-            Chunk adjChunk = chunkCache.get(adjChunkPos);
-            if (adjChunk != null) {
-                updateAdjacentChunksReadyFieldOf(adjChunk);
-            }
-        }
-    }
-
-    private static class ChunkTaskRelevanceComparator implements Comparator<ChunkTask> {
-
-        private LocalPlayer localPlayer = CoreRegistry.get(LocalPlayer.class);
+    private class ChunkTaskRelevanceComparator implements Comparator<ChunkTask> {
 
         @Override
         public int compare(ChunkTask o1, ChunkTask o2) {
@@ -322,14 +293,12 @@ public class RemoteChunkProvider implements ChunkProvider, GeneratingChunkProvid
         }
 
         private int score(Vector3i chunk) {
-            Vector3i playerChunk = ChunkMath.calcChunkPos(new Vector3i(localPlayer.getPosition(), 0.5f));
+            Vector3i playerChunk = ChunkMath.calcChunkPos(new Vector3i(localPlayer.getPosition(), RoundingMode.HALF_UP));
             return playerChunk.distanceSquared(chunk);
         }
     }
 
     private class ReadyChunkRelevanceComparator implements Comparator<Chunk> {
-
-        private LocalPlayer localPlayer = CoreRegistry.get(LocalPlayer.class);
 
         @Override
         public int compare(Chunk o1, Chunk o2) {

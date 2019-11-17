@@ -20,12 +20,10 @@ import org.lwjgl.LWJGLUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.terasology.engine.paths.PathManager;
-import org.terasology.rendering.oculusVr.OculusVrHelper;
 
 /**
  * Helper class to have LWJGL loading logic in a central spot
  *
- * @author Rasmus 'Cervator' Praestholm - cervator@gmail.com
  */
 public final class LWJGLHelper {
 
@@ -39,14 +37,8 @@ public final class LWJGLHelper {
      */
     public static void initNativeLibs() {
         initLibraryPaths();
-
-        try {
-            initOculus();
-        } catch (UnsatisfiedLinkError e) {
-            logger.warn("Could not load optional TeraOVR native libraries - Oculus support disabled");
-        }
     }
-    
+
     private static void initLibraryPaths() {
         switch (LWJGLUtil.getPlatform()) {
             case LWJGLUtil.PLATFORM_MACOSX:
@@ -60,12 +52,6 @@ public final class LWJGLHelper {
                 break;
             default:
                 throw new UnsupportedOperationException("Unsupported operating system: " + LWJGLUtil.getPlatformName());
-        }
-    }
-
-    private static void initOculus() {
-        if (LWJGLUtil.getPlatform() == LWJGLUtil.PLATFORM_WINDOWS) {
-            OculusVrHelper.loadNatives();
         }
     }
 }

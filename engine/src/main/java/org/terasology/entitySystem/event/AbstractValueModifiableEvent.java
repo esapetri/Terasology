@@ -20,7 +20,6 @@ import gnu.trove.list.TFloatList;
 import gnu.trove.list.array.TFloatArrayList;
 
 /**
- * @author Marcin Sciesinski <marcins78@gmail.com>
  */
 public abstract class AbstractValueModifiableEvent implements Event {
     private float baseValue;
@@ -70,5 +69,29 @@ public abstract class AbstractValueModifiableEvent implements Event {
             result += postModifierIter.next();
         }
         return result;
+    }
+
+    public TFloatList getModifiers() {
+        return modifiers;
+    }
+
+    public void setModifiers(TFloatList modifiers) {
+        this.modifiers = modifiers;
+    }
+
+    public TFloatList getMultipliers() {
+        return multipliers;
+    }
+
+    public void setMultipliers(TFloatList multipliers) {
+        this.multipliers = multipliers;
+    }
+
+    public TFloatList getPostModifiers() {
+        return postModifiers;
+    }
+
+    public void setPostModifiers(TFloatList postModifiers) {
+        this.postModifiers = postModifiers;
     }
 }

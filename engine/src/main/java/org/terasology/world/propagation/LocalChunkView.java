@@ -16,14 +16,13 @@
 package org.terasology.world.propagation;
 
 import org.terasology.math.ChunkMath;
-import org.terasology.math.TeraMath;
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.world.block.Block;
 import org.terasology.world.chunks.Chunk;
 import org.terasology.world.chunks.ChunkConstants;
 
 /**
- * @author Immortius
+ * Provides a simple view over some chunks using a propagation rule.
  */
 public class LocalChunkView implements PropagatorWorldView {
     private PropagationRules rules;
@@ -34,10 +33,16 @@ public class LocalChunkView implements PropagatorWorldView {
     public LocalChunkView(Chunk[] chunks, PropagationRules rules) {
         this.chunks = chunks;
         this.rules = rules;
+        //TODO fix this to not hardcode 13. This is a ugly smell
         topLeft.set(chunks[13].getPosition().x - 1, chunks[13].getPosition().y - 1, chunks[13].getPosition().z - 1);
-
     }
 
+    /**
+     * Gets the index of the chunk in {@link #chunks}
+     *
+     * @param blockPos The position of the block in world coordinates
+     * @return The index of the chunk in the array
+     */
     private int chunkIndexOf(Vector3i blockPos) {
         return ChunkMath.calcChunkPosX(blockPos.x, ChunkConstants.POWER_X) - topLeft.x
                 + 3 * (ChunkMath.calcChunkPosY(blockPos.y, ChunkConstants.POWER_Y) - topLeft.y

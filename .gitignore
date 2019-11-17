@@ -1,24 +1,50 @@
 # Ignore general
-/.*
-!.gitignore
 *~
 ._*
 *.bak
+/.*
 
-# Ignore Gradle, including local override properties (template file available under /templates)
-/.gradle/
+# Except this stuff
+!.gitattributes
+!.gitignore
+!.github
+
+# Ignore subdirs with their own Git roots. PC Facade and Core module are bundled with the main repo.
+extensions
+/facades/*
+!/facades/PC
+!/facades/TeraEd
+!/facades/subprojects.gradle
+/modules/*
+!/modules/BiomesAPI
+!/modules/Core
+!/modules/CoreSampleGameplay
+!/modules/BuilderSampleGameplay
+!/modules/subprojects.gradle
+/metas/*
+!/metas/subprojects.gradle
+/libs/*
+!/libs/subprojects.gradle
+
+# Ignore Gradle and some transient project config files (template versions available under /templates)
 build/
-gradle.properties
+/gradle.properties
+/override.cfg
 
 # Ignore IntelliJ - could use "/**/*.iml" to catch all .iml files, but that requires a somewhat recent Git version
 /out/
 modules/Core/Core.iml
+modules/CoreSampleGameplay/CoreSampleGameplay.iml
+modules/BuilderSampleGameplay/BuilderSampleGameplay.iml
 facades/PC/PC.iml
+facades/TeraEd/TeraEd.iml
 engine/engine.iml
 engine-tests/engine-tests.iml
 /*.iml
 /*.ipr
 /*.iws
+/projectFilesBackup*
+/**/*.iml
 
 # Ignore Eclipse
 .checkstyle
@@ -33,20 +59,36 @@ facades/PC/Terasology.launch
 
 #Ignore OSX
 Icon
+.DS_Store
+.DS_Store?
+.Spotlight-V100
+.DocumentRevisions-V100
+.TemporaryItems
+.Trashes
+.dbfseventsd
+.fseventsd
+.VolumeIcon.icns
 
 #Ignore Windows
 ehthumbs.db
 Thumbs.db
 
+# Ignore Terasology build output
+/engine/src/main/resources/Credits.md
+
 # Ignore Terasology output
 *.log
 /saves/
+/recordings/
+/configs/
 /screenshots/
 /logs/
 /terasology-server/
 /terasology-2ndclient/
+/terasology-3rdclient/
 config.cfg
 entityDump.txt
+nuiEditorAutosave.json
 
 # Historical Output
 /SAVED_WORLDS/
@@ -54,24 +96,18 @@ entityDump.txt
 /screens/
 /unittesthome/
 
-# Ignore natives (extracted to project root during setup)
+# Ignore stuff we extract for use with Terasology
 /natives/
+config/metrics/
 
-# Ignore subdirs with their own Git roots. PC Facade and Core module are bundled with the main repo.
-extensions
-/facades/*
-!/facades/PC
-!/facades/subprojects.gradle
-/modules/*
-!/modules/Core
-!/modules/subprojects.gradle
-/meta/*
-!/meta/subprojects.gradle
-/libs/*
-!/libs/subprojects.gradle
+# Ignore API files
+API_file.txt
+New_API_file.txt
 
-# Ignore weird stuff that might be obsolete
-.DS_Store
-.DS_Store?
-.Spotlight-V100
-.Trashes
+# Ignore Whitelist and Blacklist files
+whitelist.json
+blacklist.json
+
+# Profiling related
+terasology.jfr
+local.properties

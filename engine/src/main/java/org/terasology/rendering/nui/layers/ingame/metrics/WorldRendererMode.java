@@ -19,12 +19,11 @@ import org.terasology.registry.CoreRegistry;
 import org.terasology.rendering.world.WorldRenderer;
 
 /**
- * @author Immortius
  */
 public class WorldRendererMode extends MetricsMode {
 
     public WorldRendererMode() {
-        super("World Rendering");
+        super("\n- World Rendering -");
     }
 
     @Override

@@ -15,24 +15,32 @@
  */
 package org.terasology.entitySystem.entity.internal;
 
-import org.terasology.asset.AssetType;
-import org.terasology.asset.AssetUri;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.terasology.entitySystem.Component;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.entity.LowLevelEntityManager;
 import org.terasology.entitySystem.event.Event;
 import org.terasology.entitySystem.prefab.Prefab;
+import org.terasology.entitySystem.sectors.SectorSimulationComponent;
 import org.terasology.network.NetworkComponent;
 import org.terasology.persistence.serializers.EntityDataJSONFormat;
 import org.terasology.persistence.serializers.EntitySerializer;
 
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.Collections;
+import java.util.List;
+
+import static org.terasology.entitySystem.entity.internal.EntityScope.CHUNK;
+import static org.terasology.entitySystem.entity.internal.EntityScope.GLOBAL;
+import static org.terasology.entitySystem.entity.internal.EntityScope.SECTOR;
 
 /**
- * @author Immortius
  */
 public abstract class BaseEntityRef extends EntityRef {
 
+    private static final Logger logger = LoggerFactory.getLogger(BaseEntityRef.class);
     protected LowLevelEntityManager entityManager;
 
     public BaseEntityRef(LowLevelEntityManager entityManager) {
@@ -45,28 +53,15 @@ public abstract class BaseEntityRef extends EntityRef {
     }
 
     @Override
-    public void setPersistent(boolean persistent) {
-        if (exists()) {
-            EntityInfoComponent info = getEntityInfo();
-            if (info.persisted != persistent) {
-                info.persisted = persistent;
-                saveComponent(info);
-            }
-        }
-    }
-
-    @Override
     public boolean isAlwaysRelevant() {
-        return isActive() && getEntityInfo().alwaysRelevant;
+        return isActive() && getScope().getAlwaysRelevant();
     }
 
     @Override
     public void setAlwaysRelevant(boolean alwaysRelevant) {
         if (exists()) {
-            EntityInfoComponent info = getEntityInfo();
-            if (info.alwaysRelevant != alwaysRelevant) {
-                info.alwaysRelevant = alwaysRelevant;
-                saveComponent(info);
+            if (alwaysRelevant != isAlwaysRelevant()) {
+                setScope(alwaysRelevant ? GLOBAL : CHUNK);
             }
         }
     }
@@ -91,22 +86,64 @@ public abstract class BaseEntityRef extends EntityRef {
     }
 
     @Override
-    public Prefab getParentPrefab() {
+    public EntityScope getScope() {
         if (exists()) {
-            EntityInfoComponent info = getComponent(EntityInfoComponent.class);
-            if (info != null) {
-                return info.parentPrefab;
-            }
+            return getEntityInfo().scope;
         }
         return null;
     }
 
     @Override
-    public AssetUri getPrefabURI() {
+    public void setScope(EntityScope scope) {
+        if (exists()) {
+            EntityInfoComponent info = getEntityInfo();
+            if (!info.scope.equals(scope)) {
+
+                EngineEntityPool newPool;
+                switch (scope) {
+                    case GLOBAL:
+                    case CHUNK:
+                        newPool = entityManager.getGlobalPool();
+                        removeComponent(SectorSimulationComponent.class);
+                        break;
+                    case SECTOR:
+                        newPool = entityManager.getSectorManager();
+                        if (!hasComponent(SectorSimulationComponent.class)) {
+                            addComponent(new SectorSimulationComponent());
+                        }
+                        break;
+                    default:
+                        logger.error("Unrecognised scope {}.", scope);
+                        return;
+                }
+
+                entityManager.moveToPool(getId(), newPool);
+                info.scope = scope;
+                saveComponent(info);
+            }
+        }
+    }
+
+    @Override
+    public void setSectorScope(long maxDelta) {
+        setSectorScope(maxDelta, maxDelta);
+    }
+
+    @Override
+    public void setSectorScope(long unloadedMaxDelta, long loadedMaxDelta) {
+        setScope(SECTOR);
+        SectorSimulationComponent simulationComponent = getComponent(SectorSimulationComponent.class);
+        simulationComponent.unloadedMaxDelta = unloadedMaxDelta;
+        simulationComponent.loadedMaxDelta = loadedMaxDelta;
+        saveComponent(simulationComponent);
+    }
+
+    @Override
+    public Prefab getParentPrefab() {
         if (exists()) {
             EntityInfoComponent info = getComponent(EntityInfoComponent.class);
-            if (info != null && info.parentPrefab.exists()) {
-                return new AssetUri(AssetType.PREFAB, info.parentPrefab.getName());
+            if (info != null) {
+                return info.parentPrefab;
             }
         }
         return null;
@@ -176,8 +213,26 @@ public abstract class BaseEntityRef extends EntityRef {
     }
 
     @Override
+    public boolean hasAnyComponents(List<Class<? extends Component>> filterComponents) {
+        boolean hasComponents = false;
+        for (Class<? extends Component> component : filterComponents) {
+            hasComponents |= entityManager.hasComponent(getId(), component);
+        }
+        return exists() && hasComponents;
+    }
+
+    @Override
+    public boolean hasAllComponents(List<Class<? extends Component>> filterComponents) {
+        int numPosessedComponents = 0;
+        for (Class<? extends Component> component : filterComponents) {
+            numPosessedComponents += entityManager.hasComponent(getId(), component) ? 1 : 0;
+        }
+        return exists() && (numPosessedComponents == filterComponents.size());
+    }
+
+    @Override
     public String toString() {
-        AssetUri prefabUri = getPrefabURI();
+        Prefab parent = getParentPrefab();
         StringBuilder builder = new StringBuilder();
         builder.append("EntityRef{id = ");
         builder.append(getId());
@@ -186,15 +241,16 @@ public abstract class BaseEntityRef extends EntityRef {
             builder.append(", netId = ");
             builder.append(networkComponent.getNetworkId());
         }
-        if (prefabUri != null) {
+        if (parent != null) {
             builder.append(", prefab = '");
-            builder.append(prefabUri.toSimpleString());
+            builder.append(parent.getUrn());
             builder.append("'");
         }
         builder.append("}");
         return builder.toString();
     }
 
+    @Override
     public void invalidate() {
         entityManager = null;
     }
@@ -209,8 +265,9 @@ public abstract class BaseEntityRef extends EntityRef {
 
     @Override
     public String toFullDescription() {
-        EntitySerializer serializer = new EntitySerializer((EngineEntityManager)entityManager);
+        EntitySerializer serializer = new EntitySerializer((EngineEntityManager) entityManager);
         serializer.setUsingFieldIds(false);
-        return EntityDataJSONFormat.write(serializer.serialize(this));
+        return AccessController.doPrivileged((PrivilegedAction<String>) () ->
+               EntityDataJSONFormat.write(serializer.serialize(this)));
     }
 }

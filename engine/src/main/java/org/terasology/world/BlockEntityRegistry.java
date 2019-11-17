@@ -17,16 +17,27 @@ package org.terasology.world;
 
 import org.terasology.entitySystem.Component;
 import org.terasology.entitySystem.entity.EntityRef;
-import org.terasology.math.Vector3i;
 import org.terasology.math.geom.Vector3f;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.world.block.Block;
 
 /**
  * Manages creation and lookup of entities linked to blocks
- *
- * @author Immortius <immortius@gmail.com>
  */
 public interface BlockEntityRegistry {
+
+    /**
+     * Sets a new entity at the given position.
+     * This new entity is not temporary and will overwrite any existing entity at this point.
+     * <p>
+     * This method will make all interactions with blockPosition default to the entity set.
+     * This has implications for blocks being placed onto that position and destroyed at that position.
+     *
+     * @param blockPosition The position to set the new entity in
+     * @param bockEntity    The new entity to set
+     * @return The previous entity at the location, or a null entity if one didn't exist yet.
+     */
+    EntityRef setPermanentBlockEntity(Vector3i blockPosition, EntityRef bockEntity);
 
     /**
      * This method returns the block entity at the given location, but will not produce a temporary entity if

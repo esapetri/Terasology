@@ -20,11 +20,14 @@ import org.terasology.input.BindButtonEvent;
 import org.terasology.input.DefaultBinding;
 import org.terasology.input.InputType;
 import org.terasology.input.RegisterBindButton;
+import org.terasology.input.ControllerId;
+import org.terasology.module.sandbox.API;
 
 /**
- * @author Immortius
  */
-@RegisterBindButton(id = "useItem", description = "Use Held Item", repeating = true)
+@RegisterBindButton(id = "useItem", description = "${engine:menu#binding-use-item}", repeating = true, category = "interaction")
 @DefaultBinding(type = InputType.MOUSE_BUTTON, id = 1)
+@DefaultBinding(type = InputType.CONTROLLER_BUTTON, id = ControllerId.THREE)
+@API
 public class UseItemButton extends BindButtonEvent {
 }

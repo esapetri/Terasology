@@ -23,10 +23,8 @@ import org.terasology.input.Keyboard;
 import org.terasology.input.RegisterBindButton;
 
 /**
- * @author Immortius
- * @author Florian <florian@fkoeberle.de>
  */
-@RegisterBindButton(id = "toggleSpeedTemporarily", description = "Toggle Speed Temporarily")
+@RegisterBindButton(id = "toggleSpeedTemporarily", description = "${engine:menu#binding-toggle-speed-temporarily}")
 @DefaultBinding(type = InputType.KEY, id = Keyboard.KeyId.LEFT_SHIFT)
 public class ToggleSpeedTemporarilyButton extends BindButtonEvent {
 }

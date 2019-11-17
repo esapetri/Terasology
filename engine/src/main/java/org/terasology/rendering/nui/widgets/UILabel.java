@@ -15,7 +15,7 @@
  */
 package org.terasology.rendering.nui.widgets;
 
-import org.terasology.math.Vector2i;
+import org.terasology.math.geom.Vector2i;
 import org.terasology.rendering.assets.font.Font;
 import org.terasology.rendering.nui.Canvas;
 import org.terasology.rendering.nui.CoreWidget;
@@ -27,7 +27,7 @@ import org.terasology.rendering.nui.databinding.DefaultBinding;
 import java.util.List;
 
 /**
- * @author Immortius
+ * A (multi-line) label widget.
  */
 public class UILabel extends CoreWidget {
 
@@ -61,6 +61,9 @@ public class UILabel extends CoreWidget {
         this.text = text;
     }
 
+    /**
+     * @return The text on the label.
+     */
     public String getText() {
         if (text.get() == null) {
             return "";
@@ -68,6 +71,17 @@ public class UILabel extends CoreWidget {
         return text.get();
     }
 
+    @Override
+    public String getMode() {
+        if (isEnabled()) {
+            return DEFAULT_MODE;
+        }
+        return DISABLED_MODE;
+    }
+
+    /**
+     * @param text The new text to show.
+     */
     public void setText(String text) {
         this.text.set(text);
     }

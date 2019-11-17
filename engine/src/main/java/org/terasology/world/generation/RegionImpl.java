@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * @author Immortius
  */
 public class RegionImpl implements Region, GeneratingRegion {
 
@@ -46,12 +45,10 @@ public class RegionImpl implements Region, GeneratingRegion {
     public <T extends WorldFacet> T getFacet(Class<T> dataType) {
         T facet = generatedFacets.get(dataType);
         if (facet == null) {
-            for (FacetProvider provider : facetProviderChains.get(dataType)) {
-                if (!processedProviders.contains(provider)) {
-                    provider.process(this);
-                    processedProviders.add(provider);
-                }
-            }
+            facetProviderChains.get(dataType).stream().filter(provider -> !processedProviders.contains(provider)).forEach(provider -> {
+                provider.process(this);
+                processedProviders.add(provider);
+            });
             facet = generatingFacets.get(dataType);
             generatedFacets.put(dataType, facet);
         }

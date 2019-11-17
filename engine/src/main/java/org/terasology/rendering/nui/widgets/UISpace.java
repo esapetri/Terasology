@@ -15,13 +15,13 @@
  */
 package org.terasology.rendering.nui.widgets;
 
-import org.terasology.math.Vector2i;
+import org.terasology.math.geom.Vector2i;
 import org.terasology.rendering.nui.Canvas;
 import org.terasology.rendering.nui.CoreWidget;
 import org.terasology.rendering.nui.LayoutConfig;
 
 /**
- * @author Immortius
+ * A simple spacing widget
  */
 public class UISpace extends CoreWidget {
 
@@ -35,10 +35,16 @@ public class UISpace extends CoreWidget {
         this.size.set(size);
     }
 
+    /**
+     * @return The width and height of the space in a vector..
+     */
     public Vector2i getSize() {
         return size;
     }
 
+    /**
+     * @param size The new width and height in a vector.
+     */
     public void setSize(Vector2i size) {
         this.size.set(size);
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MovingBlocks
+ * Copyright 2018 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,13 +18,14 @@ package org.terasology.core.logic.door;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.terasology.asset.Assets;
 import org.terasology.audio.AudioManager;
-import org.terasology.audio.StaticSound;
+import org.terasology.audio.events.PlaySoundEvent;
 import org.terasology.entitySystem.entity.EntityManager;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.event.ReceiveEvent;
+import org.terasology.entitySystem.metadata.EntitySystemLibrary;
 import org.terasology.entitySystem.systems.BaseComponentSystem;
+import org.terasology.entitySystem.systems.RegisterMode;
 import org.terasology.entitySystem.systems.RegisterSystem;
 import org.terasology.logic.common.ActivateEvent;
 import org.terasology.logic.inventory.InventoryManager;
@@ -32,9 +33,11 @@ import org.terasology.logic.inventory.ItemComponent;
 import org.terasology.logic.location.LocationComponent;
 import org.terasology.math.Region3i;
 import org.terasology.math.Side;
-import org.terasology.math.Vector3i;
 import org.terasology.math.geom.Vector3f;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.registry.In;
+import org.terasology.rendering.logic.MeshComponent;
+import org.terasology.utilities.Assets;
 import org.terasology.world.BlockEntityRegistry;
 import org.terasology.world.WorldProvider;
 import org.terasology.world.block.Block;
@@ -45,10 +48,7 @@ import org.terasology.world.block.regions.BlockRegionComponent;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * @author Immortius
- */
-@RegisterSystem
+@RegisterSystem(RegisterMode.AUTHORITY)
 public class DoorSystem extends BaseComponentSystem {
     private static final Logger logger = LoggerFactory.getLogger(DoorSystem.class);
 
@@ -62,6 +62,8 @@ public class DoorSystem extends BaseComponentSystem {
     private AudioManager audioManager;
     @In
     private InventoryManager inventoryManager;
+    @In
+    private EntitySystemLibrary entitySystemLibrary;
 
     @ReceiveEvent(components = {DoorComponent.class, ItemComponent.class})
     public void placeDoor(ActivateEvent event, EntityRef entity) {
@@ -81,10 +83,10 @@ public class DoorSystem extends BaseComponentSystem {
         }
 
         Vector3f offset = new Vector3f(event.getHitPosition());
-        offset.sub(targetBlockComp.getPosition().toVector3f());
+        offset.sub(targetBlockComp.position.toVector3f());
         Side offsetDir = Side.inDirection(offset);
 
-        Vector3i primePos = new Vector3i(targetBlockComp.getPosition());
+        Vector3i primePos = new Vector3i(targetBlockComp.position);
         primePos.add(offsetDir.getVector3i());
         Block primeBlock = worldProvider.getBlock(primePos);
         if (!primeBlock.isReplacementAllowed()) {
@@ -119,8 +121,8 @@ public class DoorSystem extends BaseComponentSystem {
             closedSide = attachSide.yawClockwise(1);
         }
 
-        Block newBottomBlock = door.bottomBlockFamily.getBlockForPlacement(worldProvider, blockEntityRegistry, bottomBlockPos, closedSide, Side.TOP);
-        Block newTopBlock = door.topBlockFamily.getBlockForPlacement(worldProvider, blockEntityRegistry, bottomBlockPos, closedSide, Side.TOP);
+        Block newBottomBlock = door.bottomBlockFamily.getBlockForPlacement(bottomBlockPos, closedSide, Side.TOP);
+        Block newTopBlock = door.topBlockFamily.getBlockForPlacement(bottomBlockPos, closedSide, Side.TOP);
 
         Map<Vector3i, Block> blockMap = new HashMap<>();
         blockMap.put(bottomBlockPos, newBottomBlock);
@@ -129,7 +131,8 @@ public class DoorSystem extends BaseComponentSystem {
         worldProvider.getWorldEntity().send(blockEvent);
 
         if (!blockEvent.isConsumed()) {
-            EntityRef newDoor = entityManager.copy(entity);
+            EntityRef newDoor = entityManager.create(door.doorRegionPrefab);
+            entity.removeComponent(MeshComponent.class);
             newDoor.addComponent(new BlockRegionComponent(Region3i.createBounded(bottomBlockPos, topBlockPos)));
             Vector3f doorCenter = bottomBlockPos.toVector3f();
             doorCenter.y += 0.5f;
@@ -139,10 +142,10 @@ public class DoorSystem extends BaseComponentSystem {
             newDoorComp.openSide = attachSide.reverse();
             newDoorComp.isOpen = false;
             newDoor.saveComponent(newDoorComp);
-            newDoor.removeComponent(ItemComponent.class);
-            audioManager.playSound(Assets.getSound("engine:PlaceBlock"), 0.5f);
+            newDoor.send(new PlaySoundEvent(Assets.getSound("engine:PlaceBlock").get(), 0.5f));
             logger.info("Closed Side: {}", newDoorComp.closedSide);
             logger.info("Open Side: {}", newDoorComp.openSide);
+            newDoor.send(new DoorPlacedEvent(event.getInstigator()));
         }
     }
 
@@ -178,19 +181,43 @@ public class DoorSystem extends BaseComponentSystem {
     @ReceiveEvent(components = {DoorComponent.class, BlockRegionComponent.class, LocationComponent.class})
     public void onFrob(ActivateEvent event, EntityRef entity) {
         DoorComponent door = entity.getComponent(DoorComponent.class);
-        Side newSide = (door.isOpen) ? door.closedSide : door.openSide;
-        BlockRegionComponent regionComp = entity.getComponent(BlockRegionComponent.class);
-        Block bottomBlock = door.bottomBlockFamily.getBlockForPlacement(worldProvider, blockEntityRegistry, regionComp.region.min(), newSide, Side.TOP);
-        worldProvider.setBlock(regionComp.region.min(), bottomBlock);
-        Block topBlock = door.topBlockFamily.getBlockForPlacement(worldProvider, blockEntityRegistry, regionComp.region.max(), newSide, Side.TOP);
-        worldProvider.setBlock(regionComp.region.max(), topBlock);
-        StaticSound sound = (door.isOpen) ? door.closeSound : door.openSound;
-        if (sound != null) {
-            LocationComponent loc = entity.getComponent(LocationComponent.class);
-            audioManager.playSound(sound, loc.getWorldPosition(), 10, 1);
+        if (door.isOpen) {
+            event.getInstigator().send(new CloseDoorEvent(entity));
+        } else {
+            event.getInstigator().send(new OpenDoorEvent(entity));
         }
+    }
 
-        door.isOpen = !door.isOpen;
+    @ReceiveEvent
+    public void closeDoor(CloseDoorEvent event, EntityRef player) {
+        EntityRef entity = event.getDoorEntity();
+        DoorComponent door = entity.getComponent(DoorComponent.class);
+        Side newSide = door.closedSide;
+        BlockRegionComponent regionComp = entity.getComponent(BlockRegionComponent.class);
+        Block bottomBlock = door.bottomBlockFamily.getBlockForPlacement(regionComp.region.min(), newSide, Side.TOP);
+        worldProvider.setBlock(regionComp.region.min(), bottomBlock);
+        Block topBlock = door.topBlockFamily.getBlockForPlacement(regionComp.region.max(), newSide, Side.TOP);
+        worldProvider.setBlock(regionComp.region.max(), topBlock);
+        if (door.closeSound != null) {
+            entity.send(new PlaySoundEvent(door.closeSound, 1f));
+        }
+        door.isOpen = false;
         entity.saveComponent(door);
+    }
+
+    @ReceiveEvent
+    public void openDoor(OpenDoorEvent event, EntityRef player) {
+        EntityRef entity = event.getDoorEntity();
+        DoorComponent door = entity.getComponent(DoorComponent.class);
+        Side newSide = door.openSide;
+        BlockRegionComponent regionComp = entity.getComponent(BlockRegionComponent.class);
+        Block bottomBlock = door.bottomBlockFamily.getBlockForPlacement(regionComp.region.min(), newSide, Side.TOP);
+        worldProvider.setBlock(regionComp.region.min(), bottomBlock);
+        Block topBlock = door.topBlockFamily.getBlockForPlacement(regionComp.region.max(), newSide, Side.TOP);
+        worldProvider.setBlock(regionComp.region.max(), topBlock);
+        if (door.openSound != null) {
+            entity.send(new PlaySoundEvent(door.openSound, 1f));
+        }
+        door.isOpen = true;
     }
 }

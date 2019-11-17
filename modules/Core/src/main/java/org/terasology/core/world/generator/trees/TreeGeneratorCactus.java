@@ -23,7 +23,6 @@ import org.terasology.world.chunks.CoreChunk;
 /**
  * Cactus generator.
  *
- * @author Benjamin Glatzel <benjamin.glatzel@me.com>
  */
 public class TreeGeneratorCactus extends AbstractTreeGenerator {
 

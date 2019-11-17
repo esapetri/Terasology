@@ -1,10 +1,9 @@
 {
-    "DisplayName" : {
-        "name" : "Coal"
+    "DisplayName": {
+        "name": "Coal"
     },
-    "Item" : {
-        "icon" : "engine:items.coal",
-        "renderWithIcon" : true,
-        "stackId" : "coal"
+    "Item": {
+        "icon": "engine:items#coal",
+        "stackId": "coal"
     }
 }

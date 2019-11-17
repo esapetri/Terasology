@@ -15,13 +15,12 @@
  */
 package org.terasology.logic.console.commandSystem;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
 
 /**
  * Classes extending this interface occur in command method parameter definition
- *
- * @author Limeth
  */
+@FunctionalInterface
 interface Parameter {
     Optional<? extends Class<?>> getProvidedType();
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2014 MovingBlocks
+ * Copyright 2017 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,17 +16,18 @@
 package org.terasology.engine.subsystem.headless.renderer;
 
 import com.google.common.collect.Lists;
-
 import org.terasology.config.Config;
-import org.terasology.logic.players.LocalPlayer;
+import org.terasology.context.Context;
 import org.terasology.logic.players.LocalPlayerSystem;
 import org.terasology.math.Region3i;
-import org.terasology.math.Vector3i;
 import org.terasology.math.geom.Vector3f;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.monitoring.PerformanceMonitor;
-import org.terasology.registry.CoreRegistry;
+import org.terasology.rendering.assets.material.Material;
 import org.terasology.rendering.cameras.Camera;
-import org.terasology.rendering.world.ViewDistance;
+import org.terasology.rendering.cameras.SubmersibleCamera;
+import org.terasology.rendering.dag.RenderGraph;
+import org.terasology.rendering.world.viewDistance.ViewDistance;
 import org.terasology.rendering.world.WorldRenderer;
 import org.terasology.world.WorldProvider;
 import org.terasology.world.chunks.ChunkConstants;
@@ -45,7 +46,7 @@ public class HeadlessWorldRenderer implements WorldRenderer {
     private WorldProvider worldProvider;
     private ChunkProvider chunkProvider;
 
-    private Camera noCamera = new NullCamera();
+    private Camera noCamera = new NullCamera(null, null);
 
     /* CHUNKS */
     private boolean pendingChunks;
@@ -54,12 +55,27 @@ public class HeadlessWorldRenderer implements WorldRenderer {
 
     private Config config;
 
-    public HeadlessWorldRenderer(WorldProvider worldProvider, ChunkProvider chunkProvider, LocalPlayerSystem localPlayerSystem) {
-        this.worldProvider = worldProvider;
-        this.chunkProvider = chunkProvider;
-
+    public HeadlessWorldRenderer(Context context) {
+        this.worldProvider = context.get(WorldProvider.class);
+        this.chunkProvider = context.get(ChunkProvider.class);
+        LocalPlayerSystem localPlayerSystem = context.get(LocalPlayerSystem.class);
         localPlayerSystem.setPlayerCamera(noCamera);
-        config = CoreRegistry.get(Config.class);
+        config = context.get(Config.class);
+    }
+
+    @Override
+    public float getSecondsSinceLastFrame() {
+        return 0;
+    }
+
+    @Override
+    public Material getMaterial(String assetId) {
+        return null;
+    }
+
+    @Override
+    public boolean isFirstRenderingStageForCurrentFrame() {
+        return false;
     }
 
     @Override
@@ -73,29 +89,13 @@ public class HeadlessWorldRenderer implements WorldRenderer {
     }
 
     @Override
-    public Camera getActiveCamera() {
-        return noCamera;
+    public SubmersibleCamera getActiveCamera() {
+        return (SubmersibleCamera) noCamera;
     }
 
     @Override
     public Camera getLightCamera() {
         return noCamera;
-    }
-
-    @Override
-    public ChunkProvider getChunkProvider() {
-        return chunkProvider;
-    }
-
-    @Override
-    public WorldProvider getWorldProvider() {
-        return worldProvider;
-    }
-
-    @Override
-    public void setPlayer(LocalPlayer localPlayer) {
-        // TODO Auto-generated method stub
-
     }
 
     @Override
@@ -115,8 +115,22 @@ public class HeadlessWorldRenderer implements WorldRenderer {
     }
 
     @Override
-    public void render(WorldRenderingStage mono) {
+    public void increaseTrianglesCount(int increase) {
+        // we are not going to count triangles in headless
+    }
+
+    @Override
+    public void increaseNotReadyChunkCount(int increase) {
+        // we are not going to count not ready chunks in headless
+    }
+
+    @Override
+    public void render(RenderingStage mono) {
         // TODO Auto-generated method stub
+    }
+
+    @Override
+    public void requestTaskListRefresh() {
 
     }
 
@@ -133,67 +147,43 @@ public class HeadlessWorldRenderer implements WorldRenderer {
     }
 
     @Override
-    public void changeViewDistance(ViewDistance viewDistance) {
+    public void setViewDistance(ViewDistance viewDistance) {
         // TODO Auto-generated method stub
 
     }
 
     @Override
-    public float getSunlightValue() {
-        // TODO Auto-generated method stub
-        return 0;
-    }
-
-    @Override
-    public float getBlockLightValue() {
+    public float getRenderingLightIntensityAt(Vector3f vector3f) {
         // TODO Auto-generated method stub
         return 0;
     }
 
     @Override
-    public float getRenderingLightValueAt(Vector3f vector3f) {
+    public float getMainLightIntensityAt(Vector3f worldPos) {
         // TODO Auto-generated method stub
         return 0;
     }
 
     @Override
-    public float getSunlightValueAt(Vector3f worldPos) {
+    public float getBlockLightIntensityAt(Vector3f worldPos) {
         // TODO Auto-generated method stub
         return 0;
     }
 
     @Override
-    public float getBlockLightValueAt(Vector3f worldPos) {
+    public float getTimeSmoothedMainLightIntensity() {
         // TODO Auto-generated method stub
         return 0;
     }
 
     @Override
-    public float getSmoothedPlayerSunlightValue() {
+    public float getMillisecondsSinceRenderingStart() {
         // TODO Auto-generated method stub
         return 0;
     }
 
     @Override
-    public boolean isHeadUnderWater() {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    @Override
-    public Vector3f getTint() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
-    public float getTick() {
-        // TODO Auto-generated method stub
-        return 0;
-    }
-
-    @Override
-    public WorldRenderingStage getCurrentRenderStage() {
+    public RenderingStage getCurrentRenderStage() {
         // TODO Auto-generated method stub
         return null;
     }
@@ -201,6 +191,11 @@ public class HeadlessWorldRenderer implements WorldRenderer {
     @Override
     public String getMetrics() {
         return "";
+    }
+
+    @Override
+    public RenderGraph getRenderGraph() {
+        return null;
     }
 
     /**
@@ -275,17 +270,17 @@ public class HeadlessWorldRenderer implements WorldRenderer {
                 (int) (getActiveCamera().getPosition().z / ChunkConstants.SIZE_Z));
     }
 
-    private static float distanceToCamera(RenderableChunk chunk) {
+    private float distanceToCamera(RenderableChunk chunk) {
         Vector3f result = new Vector3f((chunk.getPosition().x + 0.5f) * ChunkConstants.SIZE_X, 0, (chunk.getPosition().z + 0.5f) * ChunkConstants.SIZE_Z);
 
-        Vector3f cameraPos = CoreRegistry.get(WorldRenderer.class).getActiveCamera().getPosition();
+        Vector3f cameraPos = getActiveCamera().getPosition();
         result.x -= cameraPos.x;
         result.z -= cameraPos.z;
 
         return result.length();
     }
 
-    private static class ChunkFrontToBackComparator implements Comparator<RenderableChunk> {
+    private class ChunkFrontToBackComparator implements Comparator<RenderableChunk> {
 
         @Override
         public int compare(RenderableChunk o1, RenderableChunk o2) {
@@ -305,5 +300,4 @@ public class HeadlessWorldRenderer implements WorldRenderer {
             return distance2 > distance ? -1 : 1;
         }
     }
-
 }

@@ -22,11 +22,11 @@ varying vec3 waterNormalViewSpace;
 const vec3 normalDiffOffset = vec3(-1.0, 0.0, 1.0);
 const vec2 normalDiffSize = vec2(2.0, 0.0);
 
-uniform float waveIntensFalloff;
+uniform float waveIntensityFalloff;
 uniform float waveSizeFalloff;
 uniform float waveSpeedFalloff;
 uniform float waveSize;
-uniform float waveIntens;
+uniform float waveIntensity;
 uniform float waveSpeed;
 uniform float waterOffsetY;
 uniform float waveOverallScale;
@@ -54,14 +54,14 @@ float calcWaterHeightAtOffset(vec2 worldPos) {
     float height = 0.0;
 
     float size = waveSize;
-    float intens = waveIntens;
+    float intens = waveIntensity;
     float timeFactor = waveSpeed;
     for (int i=0; i<OCEAN_OCTAVES; ++i) {
         height += (smoothTriangleWave(timeToTick(time, timeFactor) + worldPos.x * waveDirections[i].x
             * size + worldPos.y * waveDirections[i].y * size) * 2.0 - 1.0) * intens;
 
         size *= waveSizeFalloff;
-        intens *= waveIntensFalloff;
+        intens *= waveIntensityFalloff;
         timeFactor *= waveSpeedFalloff;
     }
 
@@ -94,6 +94,7 @@ varying mat3 normalMatrix;
 uniform float blockScale = 1.0;
 uniform vec3 chunkPositionWorld;
 
+// waving blocks
 uniform bool animated;
 
 varying vec3 normal;
@@ -111,11 +112,20 @@ void main()
 {
 	gl_TexCoord[0] = gl_MultiTexCoord0;
 	blockHint = int(gl_TexCoord[0].z);
+	/*int*/ float animationFrameCount = gl_TexCoord[0].w;
 
     gl_TexCoord[1] = gl_MultiTexCoord1;
 
 	vertexViewPos = gl_ModelViewMatrix * gl_Vertex;
 	vertexWorldPos = gl_Vertex.xyz + chunkPositionWorld.xyz;
+	
+	if (animationFrameCount > 0) {
+	    /*int*/ float globalFrameIndex = floor(time * 6 *60*60*24/48); // 6Hz at default world time scale
+	    /*int*/ float frameIndex = mod(globalFrameIndex, animationFrameCount);
+	    gl_TexCoord[0].x += frameIndex * TEXTURE_OFFSET;
+	    gl_TexCoord[0].y += floor(gl_TexCoord[0].x) * TEXTURE_OFFSET;
+	    gl_TexCoord[0].x = mod(gl_TexCoord[0].x, 1);
+    }
 
 	sunVecView = (gl_ModelViewMatrix * vec4(sunVec.x, sunVec.y, sunVec.z, 0.0)).xyz;
 
@@ -159,7 +169,7 @@ void main()
         vec4 normalAndOffset = calcWaterNormalAndOffset(vertexWorldPos.xz);
 
         waterNormalViewSpace = gl_NormalMatrix * normalAndOffset.xyz;
-        vertexViewPos.y += normalAndOffset.w + waterOffsetY;
+        vertexViewPos += gl_ModelViewMatrix[1] * (normalAndOffset.w + waterOffsetY);
     }
 #else
     waterNormalViewSpace = gl_NormalMatrix * vec3(0.0, 1.0, 0.0);

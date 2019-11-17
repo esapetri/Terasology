@@ -26,7 +26,6 @@ import java.nio.FloatBuffer;
 /**
  * Collection of matrix utilities.
  *
- * @author Benjamin Glatzel <benjamin.glatzel@me.com>
  */
 public final class MatrixUtils {
 
@@ -194,7 +193,7 @@ public final class MatrixUtils {
     public static Matrix4f createPerspectiveProjectionMatrix(float fovY, float aspectRatio, float zNear, float zFar) {
         Matrix4f m = new Matrix4f();
 
-        float f = 1.0f / (float) Math.tan(fovY * 0.5f);
+        float f = 1.0f / (float) Math.tan((double) fovY * 0.5f);
 
         m.m00 = f / aspectRatio;
         m.m10 = 0;

@@ -15,13 +15,12 @@
  */
 package org.terasology.logic.health;
 
-import org.terasology.asset.Assets;
+import org.terasology.utilities.Assets;
 import org.terasology.entitySystem.prefab.Prefab;
 
 /**
  * Helper enum for getting engine damage type prefabs.
- *
- * @author Immortius
+ * TODO: Should this really be an engine mechanism?
  */
 public enum EngineDamageTypes {
     /**
@@ -38,12 +37,12 @@ public enum EngineDamageTypes {
 
     private String prefabId;
 
-    private EngineDamageTypes(String prefabId) {
+    EngineDamageTypes(String prefabId) {
         this.prefabId = prefabId;
     }
 
     public Prefab get() {
-        return Assets.getPrefab(prefabId);
+        return Assets.getPrefab(prefabId).get();
     }
 
 }

@@ -21,7 +21,6 @@ import org.terasology.entitySystem.Component;
 import java.util.Map;
 
 /**
- * @author Immortius
  */
 public class BlockDamageModifierComponent implements Component {
 
@@ -29,5 +28,6 @@ public class BlockDamageModifierComponent implements Component {
     public float blockAnnihilationChance;
     public boolean skipPerBlockEffects;
     public boolean directPickup;
+    public float impulsePower;
 
 }

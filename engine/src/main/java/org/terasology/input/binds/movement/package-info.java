@@ -17,7 +17,7 @@
 
 @API
 @InputCategory(id = "movement",
-        displayName = "Movement",
+        displayName = "${engine:menu#category-movement}",
         ordering = {
                 "engine:forwards",
                 "engine:backwards",
@@ -25,6 +25,8 @@
                 "engine:right",
                 "engine:toggleSpeedPermanently",
                 "engine:toggleSpeedTemporarily",
+                "engine:autoMoveMode",
+                "engine:crouchMode",
                 "engine:jump",
                 "engine:crouch"
         }) package org.terasology.input.binds.movement;

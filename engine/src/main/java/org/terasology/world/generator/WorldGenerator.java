@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MovingBlocks
+ * Copyright 2015 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,26 +15,80 @@
  */
 package org.terasology.world.generator;
 
-import com.google.common.base.Optional;
+
 import org.terasology.engine.SimpleUri;
+import org.terasology.entitySystem.entity.EntityRef;
+import org.terasology.logic.spawner.FixedSpawner;
+import org.terasology.math.geom.Vector3f;
 import org.terasology.world.chunks.CoreChunk;
+import org.terasology.world.generation.EntityBuffer;
 import org.terasology.world.generation.World;
+import org.terasology.world.zones.Zone;
+
+import java.util.List;
 
 /**
- * @author Immortius
+ * World generator is an interface responsible for generating worlds from their seed
  */
 public interface WorldGenerator {
+    /**
+     * @return Uri of the current world generator instance
+     */
     SimpleUri getUri();
 
+    /**
+     * @return Seed used for creating this world generator
+     */
+    String getWorldSeed();
+
+    /**
+     * Sets the seed to use for creating of the world made by this world generator.
+     * <p>
+     * NOTE: this is a String value. The long value used in {@link org.terasology.world.generation.BaseFacetedWorldGenerator},
+     * which is the most commonly used implementation of this interface, is calculated as hash of this String value.
+     *
+     * @param seed Value of the seed
+     */
     void setWorldSeed(String seed);
 
-    void createChunk(CoreChunk chunk);
+    /**
+     * Generates all contents of given chunk
+     * @param chunk Chunk to generate
+     * @param buffer Buffer to queue entities to spawn to
+     */
+    void createChunk(CoreChunk chunk, EntityBuffer buffer);
 
+    /**
+     * Performs any additional steps required for setting itself up before generating world
+     */
     void initialize();
 
-    Optional<WorldConfigurator> getConfigurator();
+    /**
+     * @return Associated world configurator
+     */
+    WorldConfigurator getConfigurator();
 
+    /**
+     * @return Generated world
+     */
     World getWorld();
 
-    void setConfigurator(WorldConfigurator newConfigurator);
+    default List<Zone> getZones() {
+        return null;
+    }
+
+    default Zone getNamedZone(String name) {
+        return null;
+    }
+
+    /**
+     * Determines a spawn position suitable for this world, such as that used to spawn the initial player.
+     * The default implementation simply picks a position in the very center of the world.
+     *
+     * @param entity the entity related to spawning, if needed (or not). Can be ignored.
+     * @return the chosen position
+     */
+    default Vector3f getSpawnPosition(EntityRef entity) {
+        return new FixedSpawner(0, 0).getSpawnPosition(getWorld(), entity);
+    }
 }

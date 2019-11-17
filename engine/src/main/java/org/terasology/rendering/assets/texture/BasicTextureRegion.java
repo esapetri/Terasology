@@ -15,14 +15,13 @@
  */
 package org.terasology.rendering.assets.texture;
 
-import org.terasology.math.Rect2f;
-import org.terasology.math.Rect2i;
+import org.terasology.math.geom.Rect2f;
+import org.terasology.math.geom.Rect2i;
 import org.terasology.math.TeraMath;
-import org.terasology.math.Vector2i;
 import org.terasology.math.geom.Vector2f;
+import org.terasology.math.geom.Vector2i;
 
 /**
- * @author Immortius
  */
 public class BasicTextureRegion implements TextureRegion {
     private Texture texture;
@@ -64,7 +63,7 @@ public class BasicTextureRegion implements TextureRegion {
 
     @Override
     public Rect2i getPixelRegion() {
-        return Rect2i.createFromMinAndSize(TeraMath.floorToInt(region.minX() * texture.getWidth())
-                , TeraMath.floorToInt(region.minY() * texture.getHeight()), getWidth(), getHeight());
+        return Rect2i.createFromMinAndSize(TeraMath.floorToInt(region.minX() * texture.getWidth()),
+                TeraMath.floorToInt(region.minY() * texture.getHeight()), getWidth(), getHeight());
     }
 }

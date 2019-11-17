@@ -20,23 +20,26 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Queues;
-import com.google.common.collect.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.terasology.asset.AssetManager;
-import org.terasology.asset.AssetType;
-import org.terasology.asset.AssetUri;
-import org.terasology.asset.Assets;
+import org.terasology.assets.ResourceUrn;
+import org.terasology.assets.management.AssetManager;
+import org.terasology.assets.module.ModuleAwareAssetTypeManager;
+import org.terasology.config.Config;
+import org.terasology.config.RenderingConfig;
+import org.terasology.context.Context;
 import org.terasology.engine.SimpleUri;
-import org.terasology.engine.Time;
 import org.terasology.engine.module.ModuleManager;
+import org.terasology.engine.subsystem.DisplayDevice;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.event.EventPriority;
 import org.terasology.entitySystem.event.ReceiveEvent;
 import org.terasology.entitySystem.systems.BaseComponentSystem;
+import org.terasology.i18n.TranslationSystem;
 import org.terasology.input.BindButtonEvent;
-import org.terasology.input.Keyboard;
-import org.terasology.input.Mouse;
+import org.terasology.input.InputSystem;
+import org.terasology.input.device.KeyboardDevice;
+import org.terasology.input.device.MouseDevice;
 import org.terasology.input.events.KeyEvent;
 import org.terasology.input.events.MouseAxisEvent;
 import org.terasology.input.events.MouseButtonEvent;
@@ -44,65 +47,93 @@ import org.terasology.input.events.MouseWheelEvent;
 import org.terasology.logic.players.LocalPlayer;
 import org.terasology.module.ModuleEnvironment;
 import org.terasology.network.ClientComponent;
-import org.terasology.reflection.copy.CopyStrategyLibrary;
 import org.terasology.reflection.metadata.ClassLibrary;
-import org.terasology.reflection.reflect.ReflectFactory;
-import org.terasology.registry.CoreRegistry;
 import org.terasology.registry.InjectionHelper;
+import org.terasology.rendering.nui.AbstractWidget;
 import org.terasology.rendering.nui.ControlWidget;
 import org.terasology.rendering.nui.CoreScreenLayer;
 import org.terasology.rendering.nui.NUIManager;
 import org.terasology.rendering.nui.ScreenLayerClosedEvent;
+import org.terasology.rendering.nui.SortOrderSystem;
+import org.terasology.rendering.nui.TabbingManager;
 import org.terasology.rendering.nui.UIScreenLayer;
 import org.terasology.rendering.nui.UIWidget;
-import org.terasology.rendering.nui.asset.UIData;
 import org.terasology.rendering.nui.asset.UIElement;
+import org.terasology.rendering.nui.events.NUIKeyEvent;
 import org.terasology.rendering.nui.layers.hud.HUDScreenLayer;
+import org.terasology.rendering.nui.layers.ingame.OnlinePlayersOverlay;
+import org.terasology.utilities.Assets;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.file.FileSystems;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardWatchEventKinds;
-import java.nio.file.WatchEvent;
-import java.nio.file.WatchKey;
-import java.nio.file.WatchService;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
+import java.util.ArrayList;
 import java.util.Deque;
-import java.util.List;
+import java.util.LinkedList;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
- * @author Immortius
  */
-public class NUIManagerInternal extends BaseComponentSystem implements NUIManager {
+public class NUIManagerInternal extends BaseComponentSystem implements NUIManager, PropertyChangeListener {
     private Logger logger = LoggerFactory.getLogger(NUIManagerInternal.class);
     private Deque<UIScreenLayer> screens = Queues.newArrayDeque();
-    private HUDScreenLayer hudScreenLayer = new HUDScreenLayer();
-    private BiMap<AssetUri, UIScreenLayer> screenLookup = HashBiMap.create();
+    private HUDScreenLayer hudScreenLayer;
+    private BiMap<ResourceUrn, UIScreenLayer> screenLookup = HashBiMap.create();
     private CanvasControl canvas;
     private WidgetLibrary widgetsLibrary;
     private UIWidget focus;
-    private boolean autoReloadEnabled;
-    private Set<AssetUri> autoReloadingScreensUris;
-    private Map<Path, AssetUri> filePathToAssetUriMap;
-    private Map<WatchKey, Path> watchKeyToPathMap;
-    private Set<Path> watchedDirectories;
-    private WatchService autoReloadWatchService;
-
+    private KeyboardDevice keyboard;
+    private MouseDevice mouse;
+    private DisplayDevice display;
     private boolean forceReleaseMouse;
+    private boolean updateFrozen;
+    private RenderingConfig renderingConfig;
+    private float uiScale = 1f;
 
-    private Map<AssetUri, ControlWidget> overlays = Maps.newLinkedHashMap();
+    private Map<ResourceUrn, ControlWidget> overlays = Maps.newLinkedHashMap();
+    private Context context;
+    private AssetManager assetManager;
 
-    public NUIManagerInternal(CanvasRenderer renderer) {
-        this.canvas = new CanvasImpl(this, CoreRegistry.get(Time.class), renderer);
+    public NUIManagerInternal(CanvasRenderer renderer, Context context) {
+        this.context = context;
+        this.hudScreenLayer = new HUDScreenLayer();
+        InjectionHelper.inject(hudScreenLayer, context);
+        this.canvas = new CanvasImpl(this, context, renderer);
+        this.keyboard = context.get(InputSystem.class).getKeyboard();
+        this.mouse = context.get(InputSystem.class).getMouseDevice();
+
+        this.renderingConfig = context.get(Config.class).getRendering();
+        this.uiScale = this.renderingConfig.getUiScale() / 100f;
+        this.renderingConfig.subscribe(RenderingConfig.UI_SCALE, this);
+
+        this.display = context.get(DisplayDevice.class);
+        this.assetManager = context.get(AssetManager.class);
+        refreshWidgetsLibrary();
+
+        TranslationSystem system = context.get(TranslationSystem.class);
+        system.subscribe(proj -> invalidate());
+
+        // All UIElement instances are disposed so that they are not automatically reloaded
+        // by the AssetTypeManager. Reloading would not trigger the initialise() method
+        // and UI screens should be created on demand anyway.
+        ModuleAwareAssetTypeManager maaTypeManager = context.get(ModuleAwareAssetTypeManager.class);
+        maaTypeManager.getAssetType(UIElement.class).ifPresent(type -> type.disposeAll());
+    }
+
+    @Override
+    public Deque<UIScreenLayer> getScreens() {
+        return screens;
+    }
+
+    @Override
+    public void setScreens(Deque<UIScreenLayer> toSet) {
+        screens = toSet;
     }
 
     public void refreshWidgetsLibrary() {
-        widgetsLibrary = new WidgetLibrary(CoreRegistry.get(ReflectFactory.class), CoreRegistry.get(CopyStrategyLibrary.class));
-        ModuleEnvironment environment = CoreRegistry.get(ModuleManager.class).getEnvironment();
+        widgetsLibrary = new WidgetLibrary(context);
+        ModuleEnvironment environment = context.get(ModuleManager.class).getEnvironment();
         for (Class<? extends UIWidget> type : environment.getSubtypesOf(UIWidget.class)) {
             widgetsLibrary.register(new SimpleUri(environment.getModuleProviding(type), type.getSimpleName()), type);
         }
@@ -131,44 +162,43 @@ public class NUIManagerInternal extends BaseComponentSystem implements NUIManage
         }
     }
 
-
     @Override
     public boolean isOpen(String screenUri) {
-        return isOpen(new AssetUri(AssetType.UI_ELEMENT, screenUri));
+        return isOpen(new ResourceUrn(screenUri));
     }
 
     @Override
-    public boolean isOpen(AssetUri screenUri) {
+    public boolean isOpen(ResourceUrn screenUri) {
         return screenLookup.containsKey(screenUri);
     }
 
     @Override
     public boolean isOpen(UIElement element) {
-        return isOpen(element.getURI());
+        return isOpen(element.getUrn());
     }
 
     @Override
-    public UIScreenLayer getScreen(AssetUri screenUri) {
+    public UIScreenLayer getScreen(ResourceUrn screenUri) {
         return screenLookup.get(screenUri);
     }
 
     @Override
     public UIScreenLayer getScreen(String screenUri) {
-        return getScreen(new AssetUri(AssetType.UI_ELEMENT, screenUri));
+        return getScreen(new ResourceUrn(screenUri));
     }
 
     @Override
     public void closeScreen(String screenUri) {
-        closeScreen(new AssetUri(AssetType.UI_ELEMENT, screenUri));
+        closeScreen(new ResourceUrn(screenUri));
     }
 
     @Override
-    public void closeScreen(AssetUri screenUri) {
+    public void closeScreen(ResourceUrn screenUri) {
         boolean sendEvents = true;
         closeScreen(screenUri, sendEvents);
     }
 
-    private void closeScreen(AssetUri screenUri, boolean sendEvents) {
+    private void closeScreen(ResourceUrn screenUri, boolean sendEvents) {
         UIScreenLayer screen = screenLookup.remove(screenUri);
         if (screen != null) {
             screens.remove(screen);
@@ -176,23 +206,28 @@ public class NUIManagerInternal extends BaseComponentSystem implements NUIManage
         }
     }
 
-    private void closeScreenWithoutEvent(AssetUri screenUri) {
+    private void closeScreenWithoutEvent(ResourceUrn screenUri) {
         boolean sendEvents = false;
         closeScreen(screenUri, sendEvents);
     }
 
     @Override
+    public ResourceUrn getUri(UIScreenLayer screen) {
+        BiMap<ResourceUrn, UIScreenLayer> lookup =  HashBiMap.create(screenLookup);
+        return lookup.inverse().remove(screen);
+    }
+    @Override
     public void closeScreen(UIScreenLayer screen) {
         if (screens.remove(screen)) {
-            AssetUri screenUri = screenLookup.inverse().remove(screen);
+            ResourceUrn screenUri = screenLookup.inverse().remove(screen);
             onCloseScreen(screen, screenUri, true);
         }
     }
 
-    private void onCloseScreen(UIScreenLayer screen, AssetUri screenUri, boolean sendEvents) {
+    private void onCloseScreen(UIScreenLayer screen, ResourceUrn screenUri, boolean sendEvents) {
         screen.onClosed();
         if (sendEvents) {
-            LocalPlayer localPlayer = CoreRegistry.get(LocalPlayer.class);
+            LocalPlayer localPlayer = context.get(LocalPlayer.class);
             if (localPlayer != null) {
                 localPlayer.getClientEntity().send(new ScreenLayerClosedEvent(screenUri));
             }
@@ -201,16 +236,25 @@ public class NUIManagerInternal extends BaseComponentSystem implements NUIManage
 
     @Override
     public void closeScreen(UIElement element) {
-        closeScreen(element.getURI());
+        closeScreen(element.getUrn());
+    }
+
+    @Override
+    public void closeAllScreens() {
+        for (UIScreenLayer screen : screens) {
+            if (screen.isLowerLayerVisible()) {
+                closeScreen(screen);
+            }
+        }
     }
 
     @Override
     public void toggleScreen(String screenUri) {
-        toggleScreen(new AssetUri(AssetType.UI_ELEMENT, screenUri));
+        toggleScreen(new ResourceUrn(screenUri));
     }
 
     @Override
-    public void toggleScreen(AssetUri screenUri) {
+    public void toggleScreen(ResourceUrn screenUri) {
         if (isOpen(screenUri)) {
             closeScreen(screenUri);
         } else {
@@ -220,71 +264,124 @@ public class NUIManagerInternal extends BaseComponentSystem implements NUIManage
 
     @Override
     public void toggleScreen(UIElement element) {
-        toggleScreen(element.getURI());
+        toggleScreen(element.getUrn());
     }
 
     @Override
-    public UIScreenLayer pushScreen(AssetUri screenUri) {
-        UIElement element = Assets.get(screenUri, UIElement.class);
-        return pushScreen(element);
+    public UIScreenLayer createScreen(String screenUri) {
+        return createScreen(screenUri, CoreScreenLayer.class);
     }
 
     @Override
-    public UIScreenLayer pushScreen(String screenUri) {
-        UIElement element = Assets.getUIElement(screenUri);
-        if (element != null) {
-            return pushScreen(element);
+    public UIScreenLayer createScreen(ResourceUrn screenUri) {
+        return createScreen(screenUri, CoreScreenLayer.class);
+    }
+
+    @Override
+    public <T extends CoreScreenLayer> T createScreen(String screenUri, Class<T> expectedType) {
+        Set<ResourceUrn> urns = assetManager.resolve(screenUri, UIElement.class);
+        switch (urns.size()) {
+            case 0:
+                logger.warn("No asset found for screen '{}'", screenUri);
+                return null;
+            case 1:
+                ResourceUrn urn = urns.iterator().next();
+                return createScreen(urn, expectedType);
+            default:
+                logger.warn("Multiple matches for screen '{}': {}", screenUri, urns);
+                return null;
+        }
+    }
+
+    @Override
+    public <T extends CoreScreenLayer> T createScreen(ResourceUrn screenUri, Class<T> expectedType) {
+        boolean existsAlready = !screenUri.isInstance() && assetManager.isLoaded(screenUri, UIElement.class);
+
+        Optional<UIElement> opt = Assets.get(screenUri, UIElement.class);
+        if (!opt.isPresent()) {
+            logger.error("Can't find screen '{}'", screenUri);
         } else {
-            logger.error("Can't find screen " + screenUri);
+            UIElement element = opt.get();
+            UIWidget root = element.getRootWidget();
+            if (expectedType.isInstance(root)) {
+                T screen = expectedType.cast(root);
+                if (!existsAlready) {
+                    initialiseScreen(screen, screenUri);
+                }
+                return screen;
+            } else {
+                logger.error("Screen '{}' is a '{}' and not a '{}'", screenUri, root.getClass(), expectedType);
+            }
         }
         return null;
     }
 
     @Override
-    public UIScreenLayer pushScreen(UIElement element) {
-        if (element != null && element.getRootWidget() instanceof CoreScreenLayer) {
-            CoreScreenLayer result = (CoreScreenLayer) element.getRootWidget();
-            if (!screens.contains(result)) {
-                result.setId(element.getURI().toString());
-                pushScreen(result, element.getURI());
-            }
+    public CoreScreenLayer pushScreen(ResourceUrn screenUri) {
+        return pushScreen(screenUri, CoreScreenLayer.class);
+    }
+
+    @Override
+    public <T extends CoreScreenLayer> T pushScreen(ResourceUrn screenUri, Class<T> expectedType) {
+        T layer = createScreen(screenUri, expectedType);
+        if (layer != null) {
+            pushScreen(layer);
+        }
+        return layer;
+    }
+
+    @Override
+    public CoreScreenLayer pushScreen(String screenUri) {
+        return pushScreen(screenUri, CoreScreenLayer.class);
+    }
+
+    @Override
+    public <T extends CoreScreenLayer> T pushScreen(String screenUri, Class<T> expectedType) {
+        T screen = createScreen(screenUri, expectedType);
+        if (screen != null) {
+            pushScreen(screen);
+        }
+        return screen;
+    }
+
+    @Override
+    public CoreScreenLayer pushScreen(UIElement element) {
+        return pushScreen(element, CoreScreenLayer.class);
+    }
+
+    @Override
+    public <T extends CoreScreenLayer> T pushScreen(UIElement element, Class<T> expectedType) {
+        if (element != null && expectedType.isInstance(element.getRootWidget())) {
+            @SuppressWarnings("unchecked")
+            T result = (T) element.getRootWidget();
+            initialiseScreen(result, element.getUrn());
+            pushScreen(result);
             return result;
         }
         return null;
     }
 
-    @Override
-    public <T extends CoreScreenLayer> T pushScreen(AssetUri screenUri, Class<T> expectedType) {
-        UIScreenLayer result = pushScreen(screenUri);
-        if (expectedType.isInstance(result)) {
-            return expectedType.cast(result);
-        }
-        return null;
-    }
-
-    @Override
-    public <T extends CoreScreenLayer> T pushScreen(String screenUri, Class<T> expectedType) {
-        UIScreenLayer result = pushScreen(screenUri);
-        if (expectedType.isInstance(result)) {
-            return expectedType.cast(result);
-        }
-        return null;
-    }
-
-    @Override
-    public <T extends CoreScreenLayer> T pushScreen(UIElement element, Class<T> expectedType) {
-        UIScreenLayer result = pushScreen(element);
-        if (expectedType.isInstance(result)) {
-            return expectedType.cast(result);
-        }
-        return null;
-    }
-
-    private void pushScreen(CoreScreenLayer screen, AssetUri uri) {
+    private void initialiseScreen(CoreScreenLayer screen, ResourceUrn uri) {
+        InjectionHelper.inject(screen);
+        screen.setId(uri.toString());
         screen.setManager(this);
-        prepare(screen);
+        screen.initialise();
+    }
+
+    @Override
+    public void pushScreen(UIScreenLayer screen) {
+        TabbingManager.setInitialized(false);
+        if (!screen.isLowerLayerVisible()) {
+            UIScreenLayer current = screens.peek();
+            if (current != null) {
+                current.onHide();
+            }
+        }
         screens.push(screen);
-        if (uri != null) {
+        screen.onOpened();
+        String id = screen.getId();
+        if (ResourceUrn.isValid(id)) {
+            ResourceUrn uri = new ResourceUrn(id);
             screenLookup.put(uri, screen);
         }
     }
@@ -292,54 +389,94 @@ public class NUIManagerInternal extends BaseComponentSystem implements NUIManage
     @Override
     public void popScreen() {
         if (!screens.isEmpty()) {
-            UIScreenLayer popped = screens.pop();
-            screenLookup.inverse().remove(popped);
-            popped.onClosed();
+            UIScreenLayer top = screens.peek();
+            closeScreen(top);
+            if (!top.isLowerLayerVisible()) {
+                UIScreenLayer current = screens.peek();
+                if (current != null) {
+                    current.onShow();
+                }
+            }
         }
     }
 
     @Override
-    public <T extends ControlWidget> T addOverlay(String screenUri, Class<T> expectedType) {
-        UIElement element = Assets.getUIElement(screenUri);
-        return addOverlay(element, expectedType);
+    public <T extends ControlWidget> T addOverlay(String overlayUri, Class<T> expectedType) {
+        Set<ResourceUrn> urns = assetManager.resolve(overlayUri, UIElement.class);
+        switch (urns.size()) {
+            case 0:
+                logger.warn("No asset found for overlay '{}'", overlayUri);
+                return null;
+            case 1:
+                ResourceUrn urn = urns.iterator().next();
+                return addOverlay(urn, expectedType);
+            default:
+                logger.warn("Multiple matches for overlay '{}': {}", overlayUri, urns);
+                return null;
+        }
     }
 
     @Override
-    public <T extends ControlWidget> T addOverlay(AssetUri screenUri, Class<T> expectedType) {
-        UIElement element = Assets.get(screenUri, UIElement.class);
-        return addOverlay(element, expectedType);
+    public <T extends ControlWidget> T addOverlay(ResourceUrn overlayUri, Class<T> expectedType) {
+        boolean existsAlready = assetManager.isLoaded(overlayUri, UIElement.class);
+
+        Optional<UIElement> opt = Assets.get(overlayUri, UIElement.class);
+        if (!opt.isPresent()) {
+            logger.error("Can't find overlay '{}'", overlayUri);
+        } else {
+            UIElement element = opt.get();
+            UIWidget root = element.getRootWidget();
+            if (expectedType.isInstance(root)) {
+                T overlay = expectedType.cast(root);
+                if (!existsAlready) {
+                    initialiseOverlay(overlay, overlayUri);
+                }
+                addOverlay(overlay, overlayUri);
+                return overlay;
+            } else {
+                logger.error("Screen '{}' is a '{}' and not a '{}'", overlayUri, root.getClass(), expectedType);
+            }
+        }
+        return null;
+    }
+
+    private <T extends ControlWidget> void initialiseOverlay(T overlay, ResourceUrn screenUri) {
+        InjectionHelper.inject(overlay);
+        overlay.initialise();
     }
 
     @Override
     public <T extends ControlWidget> T addOverlay(UIElement element, Class<T> expectedType) {
         if (element != null && expectedType.isInstance(element.getRootWidget())) {
             T result = expectedType.cast(element.getRootWidget());
-            addOverlay(result, element.getURI());
+            addOverlay(result, element.getUrn());
             return result;
         }
         return null;
     }
 
-    private void addOverlay(ControlWidget overlay, AssetUri uri) {
-        prepare(overlay);
-        overlays.put(uri, overlay);
-    }
-
-    @Override
-    public void removeOverlay(UIElement overlay) {
-        removeOverlay(overlay.getURI());
-    }
-
-    @Override
-    public void removeOverlay(String uri) {
-        AssetUri assetUri = Assets.resolveAssetUri(AssetType.UI_ELEMENT, uri);
-        if (assetUri != null) {
-            removeOverlay(assetUri);
+    private void addOverlay(ControlWidget overlay, ResourceUrn uri) {
+        if (!AbstractWidget.getShiftPressed() || !SortOrderSystem.getControlPressed() || !overlay.getClass().equals(OnlinePlayersOverlay.class)) {
+            overlay.onOpened();
+            overlays.put(uri, overlay);
         }
     }
 
     @Override
-    public void removeOverlay(AssetUri uri) {
+    public void removeOverlay(UIElement overlay) {
+        removeOverlay(overlay.getUrn());
+    }
+
+    @Override
+    public void removeOverlay(String uri) {
+        Set<ResourceUrn> assetUri = Assets.resolveAssetUri(uri, UIElement.class);
+        if (assetUri.size() == 1) {
+            removeOverlay(assetUri.iterator().next());
+        }
+    }
+
+    @Override
+    public void removeOverlay(ResourceUrn uri) {
         ControlWidget widget = overlays.remove(uri);
         if (widget != null) {
             widget.onClosed();
@@ -348,14 +485,10 @@ public class NUIManagerInternal extends BaseComponentSystem implements NUIManage
 
     @Override
     public void clear() {
-        for (ControlWidget overlay : overlays.values()) {
-            overlay.onClosed();
-        }
+        overlays.values().forEach(ControlWidget::onClosed);
         overlays.clear();
         hudScreenLayer.clear();
-        for (ControlWidget screen : screens) {
-            screen.onClosed();
-        }
+        screens.forEach(ControlWidget::onClosed);
         screens.clear();
         screenLookup.clear();
         focus = null;
@@ -383,101 +516,20 @@ public class NUIManagerInternal extends BaseComponentSystem implements NUIManage
 
     @Override
     public void update(float delta) {
-        canvas.processMousePosition(Mouse.getPosition());
+        canvas.processMousePosition(mouse.getPosition());
 
-        for (UIScreenLayer screen : screens) {
+        // part of the update could be adding/removing screens
+        // modifying a collection while iterating of it is typically not supported
+        for (UIScreenLayer screen : new ArrayList<>(screens)) {
             screen.update(delta);
         }
 
         for (ControlWidget widget : overlays.values()) {
             widget.update(delta);
         }
+        InputSystem inputSystem = context.get(InputSystem.class);
+        inputSystem.getMouseDevice().setGrabbed(inputSystem.isCapturingMouse() && !(this.isReleasingMouse()));
 
-        if (autoReloadEnabled) {
-            try {
-                if (autoReloadWatchService == null) {
-                    autoReloadWatchService = FileSystems.getDefault().newWatchService();
-                    // TODO dispose watch service properly. As it is only for debugging it does not matter much.
-                    autoReloadingScreensUris = Sets.newHashSet();
-                    watchedDirectories = Sets.newHashSet();
-                    watchKeyToPathMap = Maps.newHashMap();
-                    filePathToAssetUriMap = Maps.newHashMap();
-                }
-                registerCurrentScreensForAutoReloading();
-                reloadChangedScreens();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            } catch (URISyntaxException e) {
-                throw new RuntimeException();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
-    }
-
-    private void registerCurrentScreensForAutoReloading() throws URISyntaxException, IOException {
-        for (AssetUri uri: screenLookup.keySet()) {
-            if (!autoReloadingScreensUris.contains(uri)) {
-                autoReloadingScreensUris.add(uri);
-                List<URL> urls = CoreRegistry.get(AssetManager.class).getAssetURLs(uri);
-                URL firstURL = urls.get(0);
-                Path filePath = Paths.get(firstURL.toURI());
-                Path directory = filePath.getParent();
-                if (!watchedDirectories.contains(directory)) {
-                    watchedDirectories.add(directory);
-                    WatchKey watchKey = directory.register(autoReloadWatchService, StandardWatchEventKinds.ENTRY_MODIFY,
-                            StandardWatchEventKinds.ENTRY_CREATE);
-                    watchKeyToPathMap.put(watchKey, directory);
-                    logger.info("Watching directory {} for screen ui file changes", directory);
-                }
-
-                filePathToAssetUriMap.put(filePath, uri);
-            }
-        }
-    }
-
-    private void reloadChangedScreens() throws InterruptedException {
-        while (true) {
-            WatchKey key = autoReloadWatchService.poll();
-            if (key == null) {
-                return;
-            }
-            Path directory = watchKeyToPathMap.get(key);
-            for (WatchEvent<?> event: key.pollEvents()) {
-                WatchEvent.Kind<?> kind = event.kind();
-                Path relativePath = (Path) event.context();
-                if (kind == StandardWatchEventKinds.OVERFLOW) {
-                    logger.warn("Can't keep up with screen changes");
-                    continue;
-                } else if (kind == StandardWatchEventKinds.ENTRY_MODIFY
-                        || kind == StandardWatchEventKinds.ENTRY_CREATE) {
-                    /*
-                     * Reason for ENTRY_CREATE watching: Create events get also sent at renames.
-                     * Some editors perform a rename when they save to do it atomically
-                     */
-
-                    Path fullPath = directory.resolve(relativePath);
-                    logger.info("File in folder with screens changed: {}", fullPath);
-
-                    AssetUri uri = filePathToAssetUriMap.get(fullPath);
-                    if (uri != null) {
-
-                        UIData uiData = CoreRegistry.get(AssetManager.class).loadAssetData(uri, UIData.class);
-                        if (uiData != null) {
-                            CoreRegistry.get(AssetManager.class).generateAsset(uri, uiData);
-
-                            closeScreenWithoutEvent(uri);
-                            pushScreen(uri);
-
-                            logger.info("Reloaded screen {}", uri);
-                        } else {
-                            logger.error("Failed to reload screen {}", uri);
-                        }
-                    }
-                }
-            }
-            key.reset();
-        }
     }
 
     @Override
@@ -523,7 +575,7 @@ public class NUIManagerInternal extends BaseComponentSystem implements NUIManage
 
     @Override
     public void setForceReleasingMouse(boolean value) {
-       forceReleaseMouse = value;
+        forceReleaseMouse = value;
     }
 
     /*
@@ -541,7 +593,7 @@ public class NUIManagerInternal extends BaseComponentSystem implements NUIManage
     //mouse button events
     @ReceiveEvent(components = ClientComponent.class, priority = EventPriority.PRIORITY_HIGH)
     public void mouseButtonEvent(MouseButtonEvent event, EntityRef entity) {
-        if (!Mouse.isVisible()) {
+        if (!mouse.isVisible()) {
             return;
         }
         if (focus != null) {
@@ -567,7 +619,7 @@ public class NUIManagerInternal extends BaseComponentSystem implements NUIManage
     //mouse wheel events
     @ReceiveEvent(components = ClientComponent.class, priority = EventPriority.PRIORITY_HIGH)
     public void mouseWheelEvent(MouseWheelEvent event, EntityRef entity) {
-        if (!Mouse.isVisible()) {
+        if (!mouse.isVisible()) {
             return;
         }
 
@@ -577,7 +629,10 @@ public class NUIManagerInternal extends BaseComponentSystem implements NUIManage
                 return;
             }
         }
-        if (canvas.processMouseWheel(event.getWheelTurns(), Mouse.getPosition())) {
+
+
+
+        if (canvas.processMouseWheel(event.getWheelTurns(), mouse.getPosition())) {
             event.consume();
         }
         if (isReleasingMouse()) {
@@ -587,25 +642,26 @@ public class NUIManagerInternal extends BaseComponentSystem implements NUIManage
 
     //raw input events
     @ReceiveEvent(components = ClientComponent.class, priority = EventPriority.PRIORITY_HIGH)
-    public void keyEvent(KeyEvent event, EntityRef entity) {
+    public void keyEvent(KeyEvent ev, EntityRef entity) {
+        NUIKeyEvent nuiEvent = new NUIKeyEvent(mouse, keyboard, ev.getKey(), ev.getKeyCharacter(), ev.getState());
         if (focus != null) {
-            focus.onKeyEvent(event);
-        }
-        if (event.isDown() && !event.isConsumed() && event.getKey() == Keyboard.Key.ESCAPE) {
-            for (UIScreenLayer screen : screens) {
-                if (screen.isEscapeToCloseAllowed()) {
-                    closeScreen(screen);
-                    event.consume();
-                    break;
-                } else if (screen.isModal()) {
-                    break;
-                }
+            if (focus.onKeyEvent(nuiEvent)) {
+                ev.consume();
             }
         }
-        for (UIScreenLayer screen : screens) {
-            if (screen.isModal()) {
-//                event.consume();
-                return;
+
+        // send event to screen stack if not yet consumed
+        if (!ev.isConsumed()) {
+            for (UIScreenLayer screen : screens) {
+                if (screen != focus) {    // explicit identity check
+                    if (screen.onKeyEvent(nuiEvent)) {
+                        ev.consume();
+                        break;
+                    }
+                }
+                if (screen.isModal()) {
+                    break;
+                }
             }
         }
     }
@@ -634,13 +690,40 @@ public class NUIManagerInternal extends BaseComponentSystem implements NUIManage
         }
     }
 
-    private void prepare(ControlWidget screen) {
-        InjectionHelper.inject(screen);
-        screen.onOpened();
+    @Override
+    public void invalidate() {
+        assetManager.getLoadedAssets(UIElement.class).forEach(UIElement::dispose);
+
+        boolean hudVisible = isHUDVisible();
+        if (hudVisible) {
+            setHUDVisible(false);
+        }
+
+        Deque<ResourceUrn> reverseUrns = new LinkedList<>();
+        Map<UIScreenLayer, ResourceUrn> inverseLookup = screenLookup.inverse();
+        for (UIScreenLayer screen : screens) {
+            screen.onClosed();
+            reverseUrns.addFirst(inverseLookup.get(screen));
+        }
+
+        screens.clear();
+        screenLookup.clear();
+
+        reverseUrns.forEach(this::pushScreen);
+
+        if (hudVisible) {
+            setHUDVisible(true);
+        }
+    }
+    @Override
+    public CanvasControl getCanvas() {
+        return canvas;
     }
 
     @Override
-    public void enableAutoReload() {
-        this.autoReloadEnabled = true;
+    public void propertyChange(PropertyChangeEvent evt) {
+        if (evt.getPropertyName().equals(RenderingConfig.UI_SCALE)) {
+            this.uiScale = this.renderingConfig.getUiScale() / 100f;
+        }
     }
 }

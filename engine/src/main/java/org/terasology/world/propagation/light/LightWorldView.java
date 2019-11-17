@@ -15,13 +15,14 @@
  */
 package org.terasology.world.propagation.light;
 
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.world.chunks.ChunkProvider;
 import org.terasology.world.chunks.LitChunk;
 import org.terasology.world.propagation.AbstractFullWorldView;
 
 /**
- * @author Immortius
+ * Basic world view that provides access to the standard lighting in the world.
+ * Simply delegates to getting the value from the provided chunk
  */
 public class LightWorldView extends AbstractFullWorldView {
 

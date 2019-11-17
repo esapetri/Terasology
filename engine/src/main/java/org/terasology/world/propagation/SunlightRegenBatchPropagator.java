@@ -16,10 +16,9 @@
 package org.terasology.world.propagation;
 
 import com.google.common.collect.Sets;
-
 import org.terasology.math.ChunkMath;
 import org.terasology.math.Side;
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.world.block.Block;
 import org.terasology.world.chunks.ChunkConstants;
 import org.terasology.world.chunks.LitChunk;
@@ -30,7 +29,6 @@ import java.util.Set;
 /**
  * Batch propagator that works on a set of changed blocks
  *
- * @author Immortius
  */
 public class SunlightRegenBatchPropagator implements BatchPropagator {
 
@@ -111,9 +109,7 @@ public class SunlightRegenBatchPropagator implements BatchPropagator {
         for (byte depth = 0; depth <= regenRules.getMaxValue(); depth++) {
             Set<Vector3i> toProcess = reduceQueues[depth];
 
-            for (Vector3i pos : toProcess) {
-                purge(pos);
-            }
+            toProcess.forEach(this::purge);
             toProcess.clear();
         }
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 MovingBlocks
+ * Copyright 2015 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,28 +15,27 @@
  */
 package org.terasology.world.generation;
 
-import com.google.common.base.Optional;
-import com.google.common.collect.Sets;
 import org.terasology.engine.SimpleUri;
-import org.terasology.math.Rect2i;
-import org.terasology.math.Region3i;
-import org.terasology.math.Vector3i;
-import org.terasology.rendering.nui.Color;
 import org.terasology.world.chunks.CoreChunk;
-import org.terasology.world.generation.facets.base.ColorSummaryFacet;
 import org.terasology.world.generator.WorldConfigurator;
 import org.terasology.world.generator.WorldGenerator;
-import org.terasology.world.generator.WorldGenerator2DPreview;
+import org.terasology.world.zones.Zone;
 
-import java.util.Map;
-import java.util.Set;
+import java.util.List;
 
-public abstract class BaseFacetedWorldGenerator implements WorldGenerator, WorldGenerator2DPreview {
+/**
+ * The most commonly used implementation of {@link WorldGenerator} based on the idea of Facets
+ */
+public abstract class BaseFacetedWorldGenerator implements WorldGenerator {
+
+    protected WorldBuilder worldBuilder;
 
     private final SimpleUri uri;
+
     private String worldSeed;
-    private WorldBuilder worldBuilder;
     private World world;
+
+    private FacetedWorldConfigurator configurator;
 
     public BaseFacetedWorldGenerator(SimpleUri uri) {
         this.uri = uri;
@@ -48,14 +47,23 @@ public abstract class BaseFacetedWorldGenerator implements WorldGenerator, World
     }
 
     @Override
+    public String getWorldSeed() {
+        return worldSeed;
+    }
+
+    @Override
     public void setWorldSeed(final String seed) {
         worldSeed = seed;
-        worldBuilder = createWorld(worldSeed.hashCode());
+        getWorldBuilder().setSeed(seed.hashCode());
+
         // reset the world to lazy load it again later
         world = null;
     }
 
-    protected abstract WorldBuilder createWorld(long seed);
+    /**
+     * @return New {@link WorldBuilder} for building the current world
+     */
+    protected abstract WorldBuilder createWorld();
 
     @Override
     public void initialize() {
@@ -63,56 +71,45 @@ public abstract class BaseFacetedWorldGenerator implements WorldGenerator, World
     }
 
     @Override
-    public void createChunk(CoreChunk chunk) {
-        world.rasterizeChunk(chunk);
+    public void createChunk(CoreChunk chunk, EntityBuffer buffer) {
+        world.rasterizeChunk(chunk, buffer);
     }
 
     @Override
-    public Optional<WorldConfigurator> getConfigurator() {
-        FacetedWorldConfigurator worldConfigurator = worldBuilder.createConfigurator();
-        addConfiguration(worldConfigurator);
-        return Optional.of((WorldConfigurator) worldConfigurator);
-    }
-
-    protected void addConfiguration(FacetedWorldConfigurator worldConfigurator) {
-    }
-
-    @Override
-    public void setConfigurator(WorldConfigurator newConfigurator) {
-        if (newConfigurator instanceof FacetedWorldConfigurator) {
-            worldBuilder.setConfigurator((FacetedWorldConfigurator) newConfigurator);
+    public WorldConfigurator getConfigurator() {
+        if (configurator == null) {
+            configurator = getWorldBuilder().createConfigurator();
         }
+        return configurator;
     }
-
 
     @Override
     public World getWorld() {
         // build the world as late as possible so that we can do configuration and 2d previews
         if (world == null) {
-            world = worldBuilder.build();
+            world = getWorldBuilder().build();
         }
         return world;
     }
 
-    @Override
-    public Color get(String layerName, Rect2i area) {
-        Map<String, Class<? extends WorldFacet>> namedFacets = getWorld().getNamedFacets();
-        Class<? extends WorldFacet> facetType = namedFacets.get(layerName);
-        Region3i area3d = Region3i.createFromMinAndSize(new Vector3i(area.minX(), 0, area.minY()), new Vector3i(area.sizeX(), 1, area.sizeY()));
-        Region region = getWorld().getWorldData(area3d);
-        ColorSummaryFacet colorSummaryFacet = (ColorSummaryFacet) region.getFacet(facetType);
-        return colorSummaryFacet.getColor();
-    }
-
-    @Override
-    public Iterable<String> getLayers() {
-        Set<String> layerNames = Sets.newHashSet();
-        for (Map.Entry<String, Class<? extends WorldFacet>> namedFacet : getWorld().getNamedFacets().entrySet()) {
-            if (ColorSummaryFacet.class.isAssignableFrom(namedFacet.getValue())) {
-                layerNames.add(namedFacet.getKey());
-            }
+    /**
+     * Returns current {@link WorldBuilder} or a new one if none has been created so far
+     * @return WorldBuilder used by this WorldGenerator
+     */
+    private WorldBuilder getWorldBuilder() {
+        if (worldBuilder == null) {
+            worldBuilder = createWorld();
         }
-        return layerNames;
+        return worldBuilder;
     }
 
+    @Override
+    public List<Zone> getZones() {
+        return getWorldBuilder().getChildZones();
+    }
+
+    @Override
+    public Zone getNamedZone(String name) {
+        return getWorldBuilder().getChildZone(name);
+    }
 }

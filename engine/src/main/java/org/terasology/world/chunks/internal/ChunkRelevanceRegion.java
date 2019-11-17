@@ -18,12 +18,11 @@ package org.terasology.world.chunks.internal;
 
 import com.google.common.base.Objects;
 import com.google.common.collect.Sets;
-
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.logic.location.LocationComponent;
 import org.terasology.math.ChunkMath;
 import org.terasology.math.Region3i;
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.world.chunks.Chunk;
 import org.terasology.world.chunks.ChunkRegionListener;
 
@@ -31,15 +30,14 @@ import java.util.Iterator;
 import java.util.Set;
 
 /**
- * @author Immortius
  */
 public class ChunkRelevanceRegion {
     private EntityRef entity;
     private Vector3i relevanceDistance = new Vector3i();
     private boolean dirty;
     private Vector3i center = new Vector3i();
-    private Region3i currentRegion = Region3i.EMPTY;
-    private Region3i previousRegion = Region3i.EMPTY;
+    private Region3i currentRegion = Region3i.empty();
+    private Region3i previousRegion = Region3i.empty();
     private ChunkRegionListener listener;
 
     private Set<Vector3i> relevantChunks = Sets.newLinkedHashSet();
@@ -125,7 +123,7 @@ public class ChunkRelevanceRegion {
             Vector3i extents = new Vector3i(relevanceDistance.x / 2, relevanceDistance.y / 2, relevanceDistance.z / 2);
             return Region3i.createFromCenterExtents(ChunkMath.calcChunkPos(loc.getWorldPosition()), extents);
         }
-        return Region3i.EMPTY;
+        return Region3i.empty();
     }
 
     private Vector3i calculateCenter() {
@@ -169,7 +167,17 @@ public class ChunkRelevanceRegion {
         return Objects.hashCode(entity);
     }
 
-    public void chunkReady(Chunk chunk) {
+    /**
+     * Checks if the chunk belongs to this relevance region and adds it to it if it is relevant.
+     *
+     * This method does explictly not care for the readyness of the chunk (light calcualted) or not: The light
+     * calculation gets only performed once the adjacent chunks got loaded. So if wait for the light calculation
+     * before we mark a chunk as relevant for a client then we would transfer less chunks to the client then the
+     * relevance region is large. the client would then again perform the light calculation too based on that
+     * reduced chunk count and would reduce the view distance again. That is why it makes sense to detect
+     * chunks as relevant even when no light calculation has been performed yet.
+     */
+    public void checkIfChunkIsRelevant(Chunk chunk) {
         if (currentRegion.encompasses(chunk.getPosition()) && !relevantChunks.contains(chunk.getPosition())) {
             relevantChunks.add(chunk.getPosition());
             sendChunkRelevant(chunk);
@@ -177,12 +185,7 @@ public class ChunkRelevanceRegion {
     }
 
     public Iterable<Vector3i> getNeededChunks() {
-        return new Iterable<Vector3i>() {
-            @Override
-            public Iterator<Vector3i> iterator() {
-                return new NeededChunksIterator();
-            }
-        };
+        return NeededChunksIterator::new;
     }
 
     public void chunkUnloaded(Vector3i pos) {
@@ -196,7 +199,7 @@ public class ChunkRelevanceRegion {
         Vector3i nextChunkPos;
         Iterator<Vector3i> regionPositions = currentRegion.iterator();
 
-        public NeededChunksIterator() {
+        NeededChunksIterator() {
             calculateNext();
         }
 

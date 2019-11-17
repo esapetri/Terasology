@@ -15,16 +15,13 @@
  */
 package org.terasology.logic.console.commandSystem;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Queues;
 import com.google.common.collect.Sets;
 import com.google.common.primitives.Primitives;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.terasology.context.Context;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.logic.console.commandSystem.exceptions.CommandExecutionException;
 import org.terasology.logic.console.commandSystem.exceptions.CommandInitializationException;
@@ -34,21 +31,23 @@ import org.terasology.logic.permission.PermissionManager;
 import org.terasology.naming.Name;
 import org.terasology.utilities.reflection.SpecificAccessibleObject;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * The core ICommand implementation and command information
  *
- * @author Limeth
  */
 public abstract class AbstractCommand implements ConsoleCommand {
 
-    private static final Logger logger = LoggerFactory.getLogger(AbstractCommand.class);
     private final Name name;
     private final String requiredPermission;
     private final boolean runOnServer;
@@ -61,19 +60,19 @@ public abstract class AbstractCommand implements ConsoleCommand {
     private String usage;
 
     public AbstractCommand(Name name, String requiredPermission, boolean runOnServer, String description, String helpText,
-                           SpecificAccessibleObject<Method> executionMethod) {
+                           SpecificAccessibleObject<Method> executionMethod, Context context) {
         Preconditions.checkNotNull(executionMethod);
         Preconditions.checkNotNull(description);
         Preconditions.checkNotNull(helpText);
 
         this.name = name;
-        this.requiredPermission = requiredPermission != null ? requiredPermission : PermissionManager.OPERATOR_PERMISSION;
+        this.requiredPermission = requiredPermission != null ? requiredPermission : PermissionManager.DEBUG_PERMISSION;
         this.runOnServer = runOnServer;
         this.description = description;
         this.helpText = helpText;
         this.executionMethod = executionMethod;
 
-        constructParametersNotNull();
+        constructParametersNotNull(context);
         registerParameters();
         validateExecutionMethod();
         initUsage();
@@ -82,10 +81,10 @@ public abstract class AbstractCommand implements ConsoleCommand {
     /**
      * @return A list of parameter types provided to the execution method.
      */
-    protected abstract List<Parameter> constructParameters();
+    protected abstract List<Parameter> constructParameters(Context context);
 
-    private void constructParametersNotNull() {
-        List<Parameter> constructedParameters = constructParameters();
+    private void constructParametersNotNull(Context context) {
+        List<Parameter> constructedParameters = constructParameters(context);
 
         if (constructedParameters == null || constructedParameters.size() <= 0) {
             commandParameters = ImmutableList.of();
@@ -238,8 +237,14 @@ public abstract class AbstractCommand implements ConsoleCommand {
             Object result = executionMethod.getAccessibleObject().invoke(executionMethod.getTarget(), processedParameters);
 
             return result != null ? String.valueOf(result) : null;
-        } catch (Throwable t) {
-            throw new CommandExecutionException(t.getCause()); //Skip InvocationTargetException
+        } catch (InvocationTargetException t) {
+            if (t.getCause() != null) {
+                throw new CommandExecutionException(t.getCause()); //Skip InvocationTargetException
+            } else {
+                throw new CommandExecutionException(t);
+            }
+        } catch (IllegalAccessException | RuntimeException t) {
+            throw new CommandExecutionException(t);
         }
     }
 
@@ -282,11 +287,8 @@ public abstract class AbstractCommand implements ConsoleCommand {
 
         Set<Object> result = null;
 
-        try {
-            result = suggestedParameter.suggest(sender, processedParameters);
-        } catch (Throwable t) {
-            throw new CommandSuggestionException(t.getCause()); //Skip InvocationTargetException
-        }
+        result = suggestedParameter.suggest(sender, processedParameters);
+
 
         if (result == null) {
             return Sets.newHashSet();
@@ -309,22 +311,12 @@ public abstract class AbstractCommand implements ConsoleCommand {
         Set<String> stringSuggestions = convertToString(result, suggestedParameter);
 
         //Only return results starting with currentValue
-        return Sets.filter(stringSuggestions, new Predicate<String>() {
-            @Override
-            public boolean apply(String input) {
-                return input != null && (currentValue == null || input.startsWith(currentValue));
-            }
-        });
+        return Sets.filter(stringSuggestions, input ->
+                input != null && (currentValue == null || input.startsWith(currentValue)));
     }
 
     private static Set<String> convertToString(Set<Object> collection, CommandParameter parameter) {
-        Set<String> result = Sets.newHashSetWithExpectedSize(collection.size());
-
-        for (Object component : collection) {
-            result.add(parameter.convertToString(component));
-        }
-
-        return result;
+        return collection.stream().map(parameter::convertToString).collect(Collectors.toCollection(HashSet::new));
     }
 
     @Override
@@ -347,6 +339,7 @@ public abstract class AbstractCommand implements ConsoleCommand {
         return helpText;
     }
 
+    @Override
     public String getUsage() {
         return usage;
     }
@@ -356,10 +349,12 @@ public abstract class AbstractCommand implements ConsoleCommand {
         return name;
     }
 
+    @Override
     public int getRequiredParameterCount() {
         return requiredParameterCount;
     }
 
+    @Override
     public boolean endsWithVarargs() {
         return commandParameters.size() > 0 && commandParameters.get(commandParameters.size() - 1).isArray();
     }

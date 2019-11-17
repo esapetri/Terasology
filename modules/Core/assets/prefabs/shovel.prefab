@@ -4,8 +4,7 @@
         "name": "Shovel"
     },
     "Item": {
-        "icon": "engine:items.shovel",
-        "renderWithIcon": true,
+        "icon": "engine:items#shovel",
         "damageType": "shovelDamage"
     }
 }

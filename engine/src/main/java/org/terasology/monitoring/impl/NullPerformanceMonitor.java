@@ -20,7 +20,6 @@ import gnu.trove.map.hash.TObjectDoubleHashMap;
 import org.terasology.monitoring.Activity;
 
 /**
- * @author Immortius <immortius@gmail.com>
  */
 public class NullPerformanceMonitor implements PerformanceMonitorInternal {
     private static final NullActivity NULL_ACTIVITY = new NullActivity();

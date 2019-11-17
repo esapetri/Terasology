@@ -15,14 +15,11 @@
  */
 package org.terasology.rendering;
 
-import org.terasology.asset.Assets;
+import org.terasology.rendering.dag.nodes.RefractiveReflectiveBlocksNode;
 import org.terasology.math.geom.Vector2f;
 import org.terasology.math.geom.Vector3f;
-import org.terasology.rendering.opengl.GLSLMaterial;
-import org.terasology.rendering.shader.ShaderParametersChunk;
 
 /**
- * @author Benjamin Glatzel <benjamin.glatzel@me.com>
  */
 public final class RenderHelper {
 
@@ -73,25 +70,22 @@ public final class RenderHelper {
     public static float evaluateOceanHeightAtPosition(Vector3f position, float days) {
         float height = 0.0f;
 
-        GLSLMaterial chunkMaterial = (GLSLMaterial) Assets.getMaterial("engine:prog.chunk");
-        ShaderParametersChunk chunkParameters = (ShaderParametersChunk) chunkMaterial.getShaderParameters();
-
-        float size = chunkParameters.waveSize;
-        float intens = chunkParameters.waveIntens;
-        float timeFactor = chunkParameters.waveSpeed;
+        float waveSize = RefractiveReflectiveBlocksNode.waveSize;
+        float waveIntensity = RefractiveReflectiveBlocksNode.waveIntensity;
+        float timeFactor = RefractiveReflectiveBlocksNode.waveSpeed;
 
         for (int i = 0; i < OCEAN_OCTAVES; ++i) {
-            height += (smoothTriangleWave(timeToTick(days,
-                    timeFactor) + position.x * OCEAN_WAVE_DIRECTIONS[i].x * size + position.z * OCEAN_WAVE_DIRECTIONS[i].y * size) * 2.0 - 1.0) * intens;
+            height += (float) (smoothTriangleWave(timeToTick(days,
+                    timeFactor) + position.x * OCEAN_WAVE_DIRECTIONS[i].x * waveSize + position.z * OCEAN_WAVE_DIRECTIONS[i].y * waveSize) * 2.0 - 1.0) * waveIntensity;
 
-            size *= chunkParameters.waveSizeFalloff;
-            intens *= chunkParameters.waveIntensFalloff;
-            timeFactor *= chunkParameters.waveSpeedFalloff;
+            waveSize *= RefractiveReflectiveBlocksNode.waveSizeFalloff;
+            waveIntensity *= RefractiveReflectiveBlocksNode.waveIntensityFalloff;
+            timeFactor *= RefractiveReflectiveBlocksNode.waveSpeedFalloff;
         }
 
         height /= OCEAN_OCTAVES;
 
-        return height + chunkParameters.waterOffsetY;
+        return height + RefractiveReflectiveBlocksNode.waterOffsetY;
     }
 
 }

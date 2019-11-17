@@ -1,11 +1,11 @@
 /*
- * Copyright 2014 MovingBlocks
+ * Copyright 2016 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,19 +16,24 @@
 package org.terasology.rendering.nui;
 
 import com.google.common.collect.Lists;
-
+import org.terasology.engine.SimpleUri;
+import org.terasology.input.BindButtonEvent;
+import org.terasology.input.ButtonState;
+import org.terasology.input.MouseInput;
+import org.terasology.input.events.MouseButtonEvent;
 import org.terasology.rendering.nui.databinding.Binding;
 import org.terasology.rendering.nui.databinding.DefaultBinding;
 import org.terasology.rendering.nui.databinding.ReadOnlyBinding;
 import org.terasology.rendering.nui.skin.UISkin;
+import org.terasology.rendering.nui.widgets.UIDropdown;
 import org.terasology.rendering.nui.widgets.UILabel;
+import org.terasology.rendering.nui.widgets.UIList;
+import org.terasology.rendering.nui.widgets.UIRadialSection;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
-/**
- * @author Immortius
- */
 public abstract class AbstractWidget implements UIWidget {
 
     @LayoutConfig
@@ -49,7 +54,14 @@ public abstract class AbstractWidget implements UIWidget {
     @LayoutConfig
     private float tooltipDelay = 0.5f;
 
+    protected int depth = new DefaultBinding<Integer>(SortOrderSystem.DEFAULT_DEPTH).get();
+
     private boolean focused;
+
+    private static boolean shiftPressed;
+
+    @LayoutConfig
+    private Binding<Boolean> enabled = new DefaultBinding<>(true);
 
     public AbstractWidget() {
         id = "";
@@ -61,7 +73,10 @@ public abstract class AbstractWidget implements UIWidget {
 
     @Override
     public String getMode() {
-        return DEFAULT_MODE;
+        if (this.isEnabled()) {
+            return DEFAULT_MODE;
+        }
+        return DISABLED_MODE;
     }
 
     @Override
@@ -118,6 +133,11 @@ public abstract class AbstractWidget implements UIWidget {
     }
 
     @Override
+    public <T extends UIWidget> Optional<T> tryFind(String id, Class<T> type) {
+        return Optional.ofNullable(find(id, type));
+    }
+
+    @Override
     public final <T extends UIWidget> Collection<T> findAll(Class<T> type) {
         List<T> results = Lists.newArrayList();
         findAll(type, this, results);
@@ -142,6 +162,33 @@ public abstract class AbstractWidget implements UIWidget {
         this.visible.set(visible);
     }
 
+    public boolean isEnabled() {
+        return enabled.get();
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled.set(enabled);
+
+        for (UIWidget child : this) {
+            if (child instanceof AbstractWidget) {
+                AbstractWidget widget = (AbstractWidget) child;
+                widget.setEnabled(this.isEnabled());
+            }
+        }
+
+    }
+
+    public void bindEnabled(Binding<Boolean> binding) {
+        enabled = binding;
+
+        for (UIWidget child : this) {
+            if (child instanceof AbstractWidget) {
+                AbstractWidget widget = (AbstractWidget) child;
+                widget.bindEnabled(binding);
+            }
+        }
+    }
+
     public void bindVisible(Binding<Boolean> bind) {
         this.visible = bind;
     }
@@ -153,11 +200,16 @@ public abstract class AbstractWidget implements UIWidget {
     @Override
     public void onGainFocus() {
         focused = true;
+        this.onMouseButtonEvent(new MouseButtonEvent(MouseInput.MOUSE_LEFT, ButtonState.UP, 0));
     }
 
     @Override
     public void onLoseFocus() {
         focused = false;
+
+        if (TabbingManager.focusedWidget != null && TabbingManager.focusedWidget.equals(this)) {
+            TabbingManager.unfocusWidget();
+        }
     }
 
     public final boolean isFocused() {
@@ -192,6 +244,15 @@ public abstract class AbstractWidget implements UIWidget {
     }
 
     @Override
+    public void setTooltip(String value) {
+        if (value != null && !value.isEmpty()) {
+            setTooltip(new UILabel(value));
+        } else {
+            tooltip = new DefaultBinding<>(null);
+        }
+    }
+
+    @Override
     public void setTooltip(UIWidget val) {
         tooltip.set(val);
     }
@@ -199,15 +260,6 @@ public abstract class AbstractWidget implements UIWidget {
     @Override
     public void bindTooltipString(Binding<String> bind) {
         bindTooltip(new TooltipLabelBinding(bind));
-    }
-
-    @Override
-    public void setTooltip(String value) {
-        if (value != null && !value.isEmpty()) {
-            setTooltip(new UILabel(value));
-        } else {
-            tooltip = new DefaultBinding<>(null);
-        }
     }
 
     @Override
@@ -223,7 +275,7 @@ public abstract class AbstractWidget implements UIWidget {
 
         private UILabel tooltipLabel = new UILabel();
 
-        public TooltipLabelBinding(Binding<String> stringBind) {
+        TooltipLabelBinding(Binding<String> stringBind) {
             tooltipLabel.bindText(stringBind);
         }
 
@@ -234,5 +286,70 @@ public abstract class AbstractWidget implements UIWidget {
             }
             return tooltipLabel;
         }
+    }
+
+    @Override
+    public void onBindEvent(BindButtonEvent event) {
+        if (event.getState().equals(ButtonState.DOWN) && !SortOrderSystem.containsConsole()) {
+
+            if (event.getId().equals(new SimpleUri("engine:tabbingModifier"))) {
+                shiftPressed = true;
+            }
+
+            if (event.getId().equals(new SimpleUri("engine:tabbingUI"))) {
+                if (!TabbingManager.isInitialized()) {
+                    TabbingManager.init();
+                }
+                if (TabbingManager.getOpenScreen().getManager().getFocus() == null) {
+                    if (TabbingManager.getWidgetsList().size() > 0) {
+                        TabbingManager.resetCurrentNum();
+                        TabbingManager.focusedWidget = TabbingManager.getWidgetsList().get(0);
+                    }
+                }
+                TabbingManager.focusSetThrough = true;
+                TabbingManager.changeCurrentNum(!shiftPressed);
+
+                for (WidgetWithOrder widget : TabbingManager.getWidgetsList()) {
+                    if (widget.getOrder() == TabbingManager.getCurrentNum()) {
+                        if (!widget.isEnabled()) {
+                            TabbingManager.changeCurrentNum(true);
+                        } else {
+                            widget.onGainFocus();
+                            TabbingManager.focusedWidget = widget;
+                            TabbingManager.getOpenScreen().getManager().setFocus(widget);
+                        }
+                    } else {
+                        widget.onLoseFocus();
+
+                        if (widget instanceof UIRadialSection) {
+                            ((UIRadialSection) widget).setSelected(false);
+                        }
+                    }
+                }
+
+                event.prepare(new SimpleUri("engine:tabbingUI"), ButtonState.UP, event.getDelta());
+            } else if (event.getId().equals(new SimpleUri("engine:activate"))) {
+                if (TabbingManager.focusedWidget instanceof UIDropdown) {
+                    UIDropdown dropdown = ((UIDropdown) TabbingManager.focusedWidget);
+                    if (dropdown.isOpened()) {
+                        dropdown.setOpenedReverse(true);
+                    }
+                } else if  (TabbingManager.focusedWidget instanceof ActivatableWidget) {
+                    ((ActivatableWidget) TabbingManager.focusedWidget).activateWidget();
+                }
+
+                event.prepare(new SimpleUri("engine:activate"), ButtonState.UP, event.getDelta());
+            }
+        }
+        if (event.getState().equals(ButtonState.UP) && !SortOrderSystem.containsConsole()) {
+
+            if (event.getId().equals(new SimpleUri("engine:tabbingModifier"))) {
+                shiftPressed = false;
+            }
+        }
+    }
+
+    public static boolean getShiftPressed() {
+        return shiftPressed;
     }
 }

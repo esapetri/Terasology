@@ -15,12 +15,51 @@
  */
 package org.terasology.engine.subsystem;
 
-public interface DisplayDevice {
-    boolean isActive();
+import org.terasology.rendering.nui.layers.mainMenu.videoSettings.DisplayModeSetting;
+import org.terasology.utilities.subscribables.Subscribable;
+
+import java.util.List;
+
+public interface DisplayDevice extends Subscribable {
+
+    boolean hasFocus();
 
     boolean isCloseRequested();
 
     void setFullscreen(boolean state);
+
+    boolean isFullscreen();
+
+    void setDisplayModeSetting(DisplayModeSetting displayModeSetting);
+
+    DisplayModeSetting getDisplayModeSetting();
+
+    /**
+     * @return currently active full-screen resolution.
+     */
+    Resolution getResolution();
+
+    /**
+     * @return list of available full-screen resolutions.
+     */
+    List<Resolution> getResolutions();
+
+    /**
+     * @return display width
+     */
+    int getDisplayWidth();
+
+    /**
+     * @return display height
+     */
+    int getDisplayHeight();
+
+    /**
+     * Change currently active full-screen resolution.
+     *
+     * @param resolution resolution to set.
+     */
+    void setResolution(Resolution resolution);
 
     // TODO: this breaks the nice API we have so far.
     // From the lwjgl docs:
@@ -34,5 +73,7 @@ public interface DisplayDevice {
 
     // TODO: another method that possibly doesn't need to exist, but I need to check with Immortius on this
     void prepareToRender();
+
+    void update();
 
 }

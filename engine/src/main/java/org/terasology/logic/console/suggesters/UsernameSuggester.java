@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 MovingBlocks
+ * Copyright 2015 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,25 +20,25 @@ import org.terasology.entitySystem.entity.EntityManager;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.logic.common.DisplayNameComponent;
 import org.terasology.logic.console.commandSystem.CommandParameterSuggester;
-import org.terasology.network.ClientComponent;
-import org.terasology.registry.CoreRegistry;
+import org.terasology.network.ClientInfoComponent;
 
 import java.util.Set;
 
 /**
- * @author Limeth
+ * Suggests user names of all users even if they aren't online.
  */
-public class UsernameSuggester implements CommandParameterSuggester<String> {
+public final class UsernameSuggester implements CommandParameterSuggester<String> {
+    private final EntityManager entityManager;
+
+    public UsernameSuggester(EntityManager entityManager) {
+        this.entityManager = entityManager;
+    }
+
     @Override
     public Set<String> suggest(EntityRef sender, Object... resolvedParameters) {
-        EntityManager entityManager = CoreRegistry.get(EntityManager.class);
-        Iterable<EntityRef> clients = entityManager.getEntitiesWith(ClientComponent.class);
         Set<String> clientNames = Sets.newHashSet();
-
-        for (EntityRef client : clients) {
-            ClientComponent clientComponent = client.getComponent(ClientComponent.class);
-            DisplayNameComponent displayNameComponent = clientComponent.clientInfo.getComponent(DisplayNameComponent.class);
-
+        for (EntityRef clientInfo : entityManager.getEntitiesWith(ClientInfoComponent.class)) {
+            DisplayNameComponent displayNameComponent = clientInfo.getComponent(DisplayNameComponent.class);
             clientNames.add(displayNameComponent.name);
         }
 

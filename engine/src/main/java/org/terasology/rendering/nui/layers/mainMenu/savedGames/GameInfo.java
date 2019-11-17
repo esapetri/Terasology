@@ -17,12 +17,13 @@ package org.terasology.rendering.nui.layers.mainMenu.savedGames;
 
 import org.terasology.game.GameManifest;
 
+import java.nio.file.Path;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
 /**
- * @author Immortius
+ * Contains information about saved game.
  */
 public class GameInfo {
 
@@ -30,12 +31,15 @@ public class GameInfo {
 
     private Date timestamp;
     private GameManifest manifest;
+    private Path savePath;
 
-    public GameInfo(GameManifest manifest, Date timestamp) {
+    public GameInfo(GameManifest manifest, Date timestamp, Path savePath) {
         this.manifest = manifest;
         this.timestamp = timestamp;
+        this.savePath = savePath;
     }
 
+    @Override
     public String toString() {
         DateFormat format = new SimpleDateFormat(DATE_FORMAT);
         return manifest.getTitle() + "\n" + format.format(timestamp);
@@ -47,5 +51,9 @@ public class GameInfo {
 
     public GameManifest getManifest() {
         return manifest;
+    }
+
+    public Path getSavePath() {
+        return savePath;
     }
 }

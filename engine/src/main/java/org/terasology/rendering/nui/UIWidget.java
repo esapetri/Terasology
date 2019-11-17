@@ -1,11 +1,11 @@
 /*
- * Copyright 2014 MovingBlocks
+ * Copyright 2016 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,17 +16,17 @@
 package org.terasology.rendering.nui;
 
 import org.terasology.input.BindButtonEvent;
-import org.terasology.input.events.KeyEvent;
 import org.terasology.input.events.MouseButtonEvent;
 import org.terasology.input.events.MouseWheelEvent;
-import org.terasology.math.Vector2i;
+import org.terasology.math.geom.Vector2i;
 import org.terasology.rendering.nui.databinding.Binding;
+import org.terasology.rendering.nui.events.NUIKeyEvent;
 import org.terasology.rendering.nui.skin.UISkin;
 
 import java.util.Collection;
+import java.util.Optional;
 
 /**
- * @author Immortius
  */
 public interface UIWidget extends Iterable<UIWidget> {
 
@@ -35,6 +35,7 @@ public interface UIWidget extends Iterable<UIWidget> {
     String FOCUSED_MODE = "focused";
     String ACTIVE_MODE = "active";
     String BASE_PART = "base";
+    String DISABLED_MODE = "disabled";
 
     String getId();
 
@@ -55,6 +56,10 @@ public interface UIWidget extends Iterable<UIWidget> {
      */
     boolean isVisible();
 
+    boolean isEnabled();
+
+    void setEnabled(boolean enabled);
+
     /**
      * Finds a widget with the given id and type, within the current widget and its contents.
      *
@@ -64,6 +69,15 @@ public interface UIWidget extends Iterable<UIWidget> {
      * @return The widget with the given id and type, or null.
      */
     <T extends UIWidget> T find(String id, Class<T> type);
+
+    /**
+     * Try to find a widget with the given id and type, within the current widget and its contents.
+     *
+     * @param id of widget to search
+     * @param <T> type of widget to cast
+     * @return optional widget with the given id and type
+     */
+    <T extends UIWidget> Optional<T> tryFind(String id, Class<T> type);
 
     <T extends UIWidget> Collection<T> findAll(Class<T> type);
 
@@ -79,10 +93,22 @@ public interface UIWidget extends Iterable<UIWidget> {
 
     void onMouseWheelEvent(MouseWheelEvent event);
 
-    void onKeyEvent(KeyEvent event);
+
+    /**
+     *
+     * @return Whether the input should be consumed, and thus not propagated to other interaction regions
+     */
+    boolean onKeyEvent(NUIKeyEvent event);
 
     void onBindEvent(BindButtonEvent event);
 
+    /**
+     * Returns the preferred content size of this widget.
+     *
+     * @param canvas A {@link Canvas} on which this widget is drawn.
+     * @param sizeHint A {@link Vector2i} representing how much available space is for this widget.
+     * @return A {@link Vector2i} which represents the preferred size of this widget.
+     */
     Vector2i getPreferredContentSize(Canvas canvas, Vector2i sizeHint);
 
     Vector2i getMaxContentSize(Canvas canvas);
@@ -102,5 +128,4 @@ public interface UIWidget extends Iterable<UIWidget> {
     void setTooltip(String value);
 
     float getTooltipDelay();
-
 }

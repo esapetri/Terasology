@@ -15,7 +15,6 @@
  */
 package org.terasology.world.block.items;
 
-import org.terasology.asset.Assets;
 import org.terasology.entitySystem.Component;
 import org.terasology.entitySystem.entity.EntityBuilder;
 import org.terasology.entitySystem.entity.EntityManager;
@@ -26,8 +25,9 @@ import org.terasology.logic.inventory.ItemComponent;
 import org.terasology.rendering.logic.LightComponent;
 import org.terasology.world.block.family.BlockFamily;
 
+import java.util.Optional;
+
 /**
- * @author Immortius <immortius@gmail.com>
  */
 public class BlockItemFactory {
     private EntityManager entityManager;
@@ -53,9 +53,9 @@ public class BlockItemFactory {
         }
 
         // Copy the components from block prefab into the block item
-        Prefab prefab = Assets.getPrefab(blockFamily.getArchetypeBlock().getPrefab());
-        if (prefab != null) {
-            for (Component component : prefab.iterateComponents()) {
+        Optional<Prefab> prefab = blockFamily.getArchetypeBlock().getPrefab();
+        if (prefab.isPresent()) {
+            for (Component component : prefab.get().iterateComponents()) {
                 if (component.getClass().getAnnotation(AddToBlockBasedItem.class) != null) {
                     builder.addComponent(entityManager.getComponentLibrary().copy(component));
                 }
@@ -85,4 +85,37 @@ public class BlockItemFactory {
         return builder.build();
     }
 
+    public EntityRef newInstance(BlockFamily blockFamily, EntityRef blockEntity) {
+        if (blockFamily == null) {
+            return EntityRef.NULL;
+        }
+
+        EntityBuilder builder = entityManager.newBuilder("engine:blockItemBase");
+        if (blockFamily.getArchetypeBlock().getLuminance() > 0) {
+            builder.addComponent(new LightComponent());
+        }
+
+        // Copy the components from block prefab into the block item
+        for (Component component : blockEntity.iterateComponents()) {
+            if (component.getClass().getAnnotation(AddToBlockBasedItem.class) != null) {
+                builder.addComponent(entityManager.getComponentLibrary().copy(component));
+            }
+        }
+
+        DisplayNameComponent displayNameComponent = builder.getComponent(DisplayNameComponent.class);
+        if (displayNameComponent != null) {
+            displayNameComponent.name = blockFamily.getDisplayName();
+        }
+
+        ItemComponent item = builder.getComponent(ItemComponent.class);
+        if (blockFamily.getArchetypeBlock().isStackable()) {
+            item.stackId = "block:" + blockFamily.getURI().toString();
+            item.stackCount = (byte) 1;
+        }
+
+        BlockItemComponent blockItem = builder.getComponent(BlockItemComponent.class);
+        blockItem.blockFamily = blockFamily;
+
+        return builder.build();
+    }
 }

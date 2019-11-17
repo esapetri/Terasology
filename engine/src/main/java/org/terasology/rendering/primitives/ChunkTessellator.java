@@ -16,34 +16,23 @@
 package org.terasology.rendering.primitives;
 
 import com.google.common.base.Stopwatch;
-import com.google.common.collect.Maps;
-
 import gnu.trove.iterator.TIntIterator;
-
 import org.lwjgl.BufferUtils;
 import org.terasology.engine.subsystem.lwjgl.GLBufferPool;
 import org.terasology.math.Direction;
-import org.terasology.math.Side;
 import org.terasology.math.TeraMath;
-import org.terasology.math.Vector3i;
 import org.terasology.math.geom.Vector3f;
-import org.terasology.math.geom.Vector4f;
 import org.terasology.monitoring.PerformanceMonitor;
 import org.terasology.rendering.RenderMath;
 import org.terasology.world.ChunkView;
-import org.terasology.world.biomes.Biome;
 import org.terasology.world.block.Block;
-import org.terasology.world.block.BlockAppearance;
-import org.terasology.world.block.BlockPart;
 import org.terasology.world.chunks.ChunkConstants;
 
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
  * Generates tessellated chunk meshes from chunks.
  *
- * @author Benjamin Glatzel <benjamin.glatzel@me.com>
  */
 public final class ChunkTessellator {
 
@@ -64,11 +53,9 @@ public final class ChunkTessellator {
         for (int x = 0; x < ChunkConstants.SIZE_X; x++) {
             for (int z = 0; z < ChunkConstants.SIZE_Z; z++) {
                 for (int y = verticalOffset; y < verticalOffset + meshHeight; y++) {
-                    Biome biome = chunkView.getBiome(x, y, z);
-
                     Block block = chunkView.getBlock(x, y, z);
-                    if (block != null && !block.isInvisible()) {
-                        generateBlockVertices(chunkView, mesh, x, y, z, biome);
+                    if (block != null && block.getMeshGenerator() != null) {
+                        block.getMeshGenerator().generateChunkMesh(chunkView, mesh, x, y, z);
                     }
                 }
             }
@@ -95,36 +82,37 @@ public final class ChunkTessellator {
             // Vertices double to account for light info
             elements.finalVertices = BufferUtils.createIntBuffer(
                     elements.vertices.size() + /* POSITION */
-                            elements.tex.size() + /* TEX0 (UV0 and flags) */
-                            elements.tex.size() + /* TEX1 (lighting data) */
-                            elements.flags.size() + /* FLAGS */
-                            elements.color.size() + /* COLOR */
-                            elements.normals.size()  /* NORMALS */
+                    elements.tex.size() + /* TEX0.xy (texture coords) */
+                    elements.flags.size() + /* TEX0.z (flags) */
+                    elements.frames.size() + /* TEX0.w (animation frame counts) */
+                    elements.vertexCount*3 + /* TEX1 (lighting data) */
+                    elements.color.size() + /* COLOR */
+                    elements.normals.size() /* NORMALS */
             );
 
-            int cTex = 0;
-            int cColor = 0;
-            int cFlags = 0;
-            for (int i = 0; i < elements.vertices.size(); i += 3, cTex += 2, cColor += 4, cFlags++) {
+            for (int i = 0; i < elements.vertexCount; i ++) {
                 Vector3f vertexPos = new Vector3f(
-                        elements.vertices.get(i),
-                        elements.vertices.get(i + 1),
-                        elements.vertices.get(i + 2));
+                        elements.vertices.get(i*3),
+                        elements.vertices.get(i*3 + 1),
+                        elements.vertices.get(i*3 + 2));
 
                 /* POSITION */
                 elements.finalVertices.put(Float.floatToIntBits(vertexPos.x));
                 elements.finalVertices.put(Float.floatToIntBits(vertexPos.y));
                 elements.finalVertices.put(Float.floatToIntBits(vertexPos.z));
 
-                /* UV0 - TEX DATA 0 */
-                elements.finalVertices.put(Float.floatToIntBits(elements.tex.get(cTex)));
-                elements.finalVertices.put(Float.floatToIntBits(elements.tex.get(cTex + 1)));
+                /* UV0 - TEX DATA 0.xy */
+                elements.finalVertices.put(Float.floatToIntBits(elements.tex.get(i*2)));
+                elements.finalVertices.put(Float.floatToIntBits(elements.tex.get(i*2 + 1)));
 
-                /* FLAGS */
-                elements.finalVertices.put(Float.floatToIntBits(elements.flags.get(cFlags)));
+                /* FLAGS - TEX DATA 0.z */
+                elements.finalVertices.put(Float.floatToIntBits(elements.flags.get(i)));
+                
+                /* ANIMATION FRAME COUNT - TEX DATA 0.w*/
+                elements.finalVertices.put(Float.floatToIntBits(elements.frames.get(i)));
 
                 float[] result = new float[3];
-                Vector3f normal = new Vector3f(elements.normals.get(i), elements.normals.get(i + 1), elements.normals.get(i + 2));
+                Vector3f normal = new Vector3f(elements.normals.get(i*3), elements.normals.get(i*3 + 1), elements.normals.get(i*3 + 2));
                 calcLightingValuesForVertexPos(chunkView, vertexPos, result, normal);
 
                 /* LIGHTING DATA / TEX DATA 1 */
@@ -134,10 +122,10 @@ public final class ChunkTessellator {
 
                 /* PACKED COLOR */
                 final int packedColor = RenderMath.packColor(
-                        elements.color.get(cColor),
-                        elements.color.get(cColor + 1),
-                        elements.color.get(cColor + 2),
-                        elements.color.get(cColor + 3));
+                        elements.color.get(i*4),
+                        elements.color.get(i*4 + 1),
+                        elements.color.get(i*4 + 2),
+                        elements.color.get(i*4 + 3));
                 elements.finalVertices.put(packedColor);
 
                 /* NORMALS */
@@ -253,123 +241,6 @@ public final class ChunkTessellator {
 
         output[2] = (float) resultAmbientOcclusion;
         PerformanceMonitor.endActivity();
-    }
-
-    private void generateBlockVertices(ChunkView view, ChunkMesh mesh, int x, int y, int z, Biome biome) {
-        Block block = view.getBlock(x, y, z);
-
-        // TODO: Needs review - too much hardcoded special cases and corner cases resulting from this.
-        ChunkVertexFlag vertexFlag = ChunkVertexFlag.NORMAL;
-        if (block.isWater()) {
-            if (view.getBlock(x, y + 1, z).isWater()) {
-                vertexFlag = ChunkVertexFlag.WATER;
-            } else {
-                vertexFlag = ChunkVertexFlag.WATER_SURFACE;
-            }
-        } else if (block.isLava()) {
-            vertexFlag = ChunkVertexFlag.LAVA;
-        } else if (block.isWaving() && block.isDoubleSided()) {
-            vertexFlag = ChunkVertexFlag.WAVING;
-        } else if (block.isWaving()) {
-            vertexFlag = ChunkVertexFlag.WAVING_BLOCK;
-        }
-
-        // Gather adjacent blocks
-        Map<Side, Block> adjacentBlocks = Maps.newEnumMap(Side.class);
-        for (Side side : Side.values()) {
-            Vector3i offset = side.getVector3i();
-            Block blockToCheck = view.getBlock(x + offset.x, y + offset.y, z + offset.z);
-            adjacentBlocks.put(side, blockToCheck);
-        }
-
-        BlockAppearance blockAppearance = block.getAppearance(adjacentBlocks);
-
-        /*
-         * Determine the render process.
-         */
-        ChunkMesh.RenderType renderType = ChunkMesh.RenderType.TRANSLUCENT;
-
-        if (!block.isTranslucent()) {
-            renderType = ChunkMesh.RenderType.OPAQUE;
-        }
-        // TODO: Review special case, or alternatively compare uris.
-        if (block.isWater() || block.isIce()) {
-            renderType = ChunkMesh.RenderType.WATER_AND_ICE;
-        }
-        if (block.isDoubleSided()) {
-            renderType = ChunkMesh.RenderType.BILLBOARD;
-        }
-
-        if (blockAppearance.getPart(BlockPart.CENTER) != null) {
-            Vector4f colorOffset = block.calcColorOffsetFor(BlockPart.CENTER, biome);
-            blockAppearance.getPart(BlockPart.CENTER).appendTo(mesh, x, y, z, colorOffset, renderType, vertexFlag);
-        }
-
-        boolean[] drawDir = new boolean[6];
-
-        for (Side side : Side.values()) {
-            drawDir[side.ordinal()] = blockAppearance.getPart(BlockPart.fromSide(side)) != null && isSideVisibleForBlockTypes(adjacentBlocks.get(side), block, side);
-        }
-
-        // If the block is lowered, some more faces may have to be drawn
-        if (block.isLiquid()) {
-            Block bottomBlock = adjacentBlocks.get(Side.BOTTOM);
-            // Draw horizontal sides if visible from below
-            for (Side side : Side.horizontalSides()) {
-                Vector3i offset = side.getVector3i();
-                Block adjacentBelow = view.getBlock(x + offset.x, y - 1, z + offset.z);
-                Block adjacent = adjacentBlocks.get(side);
-
-                boolean visible = (blockAppearance.getPart(BlockPart.fromSide(side)) != null
-                        && isSideVisibleForBlockTypes(adjacentBelow, block, side) && !isSideVisibleForBlockTypes(bottomBlock, adjacent, side.reverse()));
-                drawDir[side.ordinal()] |= visible;
-            }
-
-            // Draw the top if below a non-lowered block
-            // TODO: Don't need to render the top if each side and the block above each side are either liquid or opaque solids.
-            Block blockToCheck = adjacentBlocks.get(Side.TOP);
-            drawDir[Side.TOP.ordinal()] |= !blockToCheck.isLiquid();
-
-            if (bottomBlock.isLiquid() || bottomBlock.isInvisible()) {
-                for (Side dir : Side.values()) {
-                    if (drawDir[dir.ordinal()]) {
-                        Vector4f colorOffset = block.calcColorOffsetFor(BlockPart.fromSide(dir), biome);
-                        block.getLoweredLiquidMesh(dir).appendTo(mesh, x, y, z, colorOffset, renderType, vertexFlag);
-                    }
-                }
-                return;
-            }
-        }
-
-        for (Side dir : Side.values()) {
-            if (drawDir[dir.ordinal()]) {
-                Vector4f colorOffset = block.calcColorOffsetFor(BlockPart.fromSide(dir), biome);
-                // TODO: Needs review since the new per-vertex flags introduce a lot of special scenarios - probably a per-side setting?
-                if (block.isGrass() && dir != Side.TOP && dir != Side.BOTTOM) {
-                    blockAppearance.getPart(BlockPart.fromSide(dir)).appendTo(mesh, x, y, z, colorOffset, renderType, ChunkVertexFlag.COLOR_MASK);
-                } else {
-                    blockAppearance.getPart(BlockPart.fromSide(dir)).appendTo(mesh, x, y, z, colorOffset, renderType, vertexFlag);
-                }
-            }
-        }
-    }
-
-    /**
-     * Returns true if the side should be rendered adjacent to the second side provided.
-     *
-     * @param blockToCheck The block to check
-     * @param currentBlock The current block
-     * @return True if the side is visible for the given block types
-     */
-    private boolean isSideVisibleForBlockTypes(Block blockToCheck, Block currentBlock, Side side) {
-        // Liquids can be transparent but there should be no visible adjacent faces
-        if (currentBlock.isLiquid() && blockToCheck.isLiquid()) {
-            return false;
-        }
-
-        return currentBlock.isWaving() != blockToCheck.isWaving() || blockToCheck.isInvisible()
-                || !blockToCheck.isFullSide(side.reverse()) || (!currentBlock.isTranslucent() && blockToCheck.isTranslucent());
-
     }
 
     public static int getVertexArrayUpdateCount() {

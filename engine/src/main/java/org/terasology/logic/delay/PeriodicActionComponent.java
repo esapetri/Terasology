@@ -26,7 +26,6 @@ import java.util.Set;
 
 /**
  * Not for public use. Use DelayManager instead.
- * @author Marcin Sciesinski <marcins78@gmail.com>
  */
 @ForceBlockActive
 public final class PeriodicActionComponent implements Component {
@@ -44,7 +43,7 @@ public final class PeriodicActionComponent implements Component {
     }
 
     public void removeScheduledActionId(String actionId) {
-        final long removedWakeUp = actionIdsWakeUp.remove(actionId);
+        final Long removedWakeUp = actionIdsWakeUp.remove(actionId);
         actionIdsPeriod.remove(actionId);
         if (removedWakeUp == lowestWakeUp) {
             lowestWakeUp = findSmallestWakeUp();

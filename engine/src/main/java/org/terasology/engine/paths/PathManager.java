@@ -17,10 +17,11 @@
 package org.terasology.engine.paths;
 
 import com.google.common.collect.ImmutableList;
-import org.lwjgl.LWJGLUtil;
-import org.terasology.engine.paths.windows.SavedGamesPathFinder;
+import com.sun.jna.platform.win32.KnownFolders;
+import com.sun.jna.platform.win32.Shell32Util;
 
-import javax.swing.*;
+import org.lwjgl.LWJGLUtil;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -30,39 +31,57 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
+import javax.swing.JFileChooser;
+
 /**
- * @author Immortius
+ * Manager class that keeps track of the game's various paths and save directories.
  */
 public final class PathManager {
-    public static final String TERASOLOGY_FOLDER_NAME = "Terasology";
-    public static final Path LINUX_HOME_SUBPATH = Paths.get(".local", "share", "terasology");
+    private static final String TERASOLOGY_FOLDER_NAME = "Terasology";
+    private static final Path LINUX_HOME_SUBPATH = Paths.get(".local", "share", "terasology");
 
     private static final String SAVED_GAMES_DIR = "saves";
+    private static final String RECORDINGS_LIBRARY_DIR = "recordings";
     private static final String LOG_DIR = "logs";
     private static final String SHADER_LOG_DIR = "shaders";
     private static final String MOD_DIR = "modules";
     private static final String SCREENSHOT_DIR = "screenshots";
     private static final String NATIVES_DIR = "natives";
+    private static final String CONFIGS_DIR = "configs";
+    private static final String SANDBOX_DIR = "sandbox";
+    private static final String REGEX = "[^A-Za-z0-9-_ ]";
 
     private static PathManager instance;
     private Path installPath;
     private Path homePath;
     private Path savesPath;
+    private Path recordingsPath;
     private Path logPath;
     private Path shaderLogPath;
     private Path currentWorldPath;
+    private Path sandboxPath;
 
     private ImmutableList<Path> modPaths = ImmutableList.of();
     private Path screenshotPath;
     private Path nativesPath;
+    private Path configsPath;
 
     private PathManager() {
         // By default, the path should be the code location (where terasology.jar is)
         try {
             URL urlToSource = PathManager.class.getProtectionDomain().getCodeSource().getLocation();
 
+            // TODO: Probably remove this after a while, confirming via logs that this is no longer needed
             Path codeLocation = Paths.get(urlToSource.toURI());
-            System.out.println("codeLocation: " + codeLocation);
+            System.out.println("PathManager being initialized. Initial code location is " + codeLocation.toAbsolutePath());
+
+            // Theory that whatever reason we needed to get the path that way isn't needed anymore - try just current dir ...
+            codeLocation = Paths.get("").toAbsolutePath();
+            System.out.println("Switched it to expected working dir: " + codeLocation.toAbsolutePath());
+
+            // If that fails in some situations a different approach could test for the following in the path:
+            // if (codeLocation.toString().contains(".gradle") || codeLocation.toString().contains(".m2")) {
+
             if (Files.isRegularFile(codeLocation)) {
                 installPath = findNativesHome(codeLocation.getParent(), 5);
                 if (installPath == null) {
@@ -116,6 +135,10 @@ public final class PathManager {
         return null;
     }
 
+    /**
+     *
+     * @return An instance of the path manager for this execution.
+     */
     public static PathManager getInstance() {
         if (instance == null) {
             instance = new PathManager();
@@ -123,11 +146,20 @@ public final class PathManager {
         return instance;
     }
 
+    /**
+     * Uses the given path as the home instead of the default home path.
+     * @param rootPath Path to use as the home path.
+     * @throws IOException Thrown when required directories cannot be accessed.
+     */
     public void useOverrideHomePath(Path rootPath) throws IOException {
         this.homePath = rootPath;
         updateDirs();
     }
 
+    /**
+     * Uses a platform-specific default home path for this execution.
+     * @throws IOException Thrown when required directories cannot be accessed.
+     */
     public void useDefaultHomePath() throws IOException {
         switch (LWJGLUtil.getPlatform()) {
             case LWJGLUtil.PLATFORM_LINUX:
@@ -137,9 +169,9 @@ public final class PathManager {
                 homePath = Paths.get(System.getProperty("user.home"), "Library", "Application Support", TERASOLOGY_FOLDER_NAME);
                 break;
             case LWJGLUtil.PLATFORM_WINDOWS:
-                String savedGamesPath = SavedGamesPathFinder.findSavedGamesPath();
+                String savedGamesPath = Shell32Util.getKnownFolderPath(KnownFolders.FOLDERID_SavedGames);
                 if (savedGamesPath == null) {
-                    savedGamesPath = SavedGamesPathFinder.findDocumentsPath();
+                    savedGamesPath = Shell32Util.getKnownFolderPath(KnownFolders.FOLDERID_Documents);
                 }
                 Path rawPath;
                 if (savedGamesPath != null) {
@@ -156,42 +188,104 @@ public final class PathManager {
         updateDirs();
     }
 
+    /**
+     *
+     * @return This execution's home path.
+     */
     public Path getHomePath() {
         return homePath;
     }
 
+    /**
+     *
+     * @return The path of the running installation.
+     */
     public Path getInstallPath() {
         return installPath;
     }
 
+    /**
+     *
+     * @return Path in which world saves are saved.
+     */
     public Path getSavesPath() {
         return savesPath;
     }
 
+    /**
+     *
+     * @return Path in which recordings are saved.
+     */
+    public Path getRecordingsPath() {
+        return recordingsPath;
+    }
+
+    /**
+     *
+     * @return Path in which this execution's logs are saved.
+     */
     public Path getLogPath() {
         return logPath;
     }
 
+    /**
+     *
+     * @return Path in which this execution's shader logs are saved.
+     */
     public Path getShaderLogPath() {
         return shaderLogPath;
     }
 
+    /**
+     *
+     * @return List of paths to all of the modules.
+     */
     public List<Path> getModulePaths() {
         return modPaths;
     }
 
+    /**
+     *
+     * @return Path in which this execution's screen-shots are saved.
+     */
     public Path getScreenshotPath() {
         return screenshotPath;
     }
 
+    /**
+     *
+     * @return Path in which the game's native libraries are saved.
+     */
     public Path getNativesPath() {
         return nativesPath;
     }
 
+    /**
+     *
+     * @return Path in which the game's config files are saved.
+     */
+    public Path getConfigsPath() {
+        return configsPath;
+    }
+
+    /**
+     *
+     * @return Path in which the modules are allowed to save files.
+     */
+    public Path getSandboxPath() {
+        return sandboxPath;
+    }
+
+    /**
+     * Updates all of the path manager's file/directory references to match the path settings. Creates directories if they don't already exist.
+     * @throws IOException Thrown when required directories cannot be accessed.
+     */
     private void updateDirs() throws IOException {
         Files.createDirectories(homePath);
         savesPath = homePath.resolve(SAVED_GAMES_DIR);
         Files.createDirectories(savesPath);
+        recordingsPath = homePath.resolve(RECORDINGS_LIBRARY_DIR);
+        Files.createDirectories(recordingsPath);
         logPath = homePath.resolve(LOG_DIR);
         Files.createDirectories(logPath);
         shaderLogPath = logPath.resolve(SHADER_LOG_DIR);
@@ -208,9 +302,12 @@ public final class PathManager {
         screenshotPath = homePath.resolve(SCREENSHOT_DIR);
         Files.createDirectories(screenshotPath);
         nativesPath = installPath.resolve(NATIVES_DIR);
+        configsPath = homePath.resolve(CONFIGS_DIR);
         if (currentWorldPath == null) {
             currentWorldPath = homePath;
         }
+        sandboxPath = homePath.resolve(SANDBOX_DIR);
+        Files.createDirectories(sandboxPath);
     }
 
     public Path getHomeModPath() {
@@ -218,6 +315,14 @@ public final class PathManager {
     }
 
     public Path getSavePath(String title) {
-        return savesPath.resolve(title.replaceAll("[^A-Za-z0-9-_ ]", ""));
+        return getSavesPath().resolve(title.replaceAll(REGEX, ""));
+    }
+
+    public Path getRecordingPath(String title) {
+        return getRecordingsPath().resolve(title.replaceAll(REGEX, ""));
+    }
+
+    public Path getSandboxPath(String title) {
+        return getSandboxPath().resolve(title.replaceAll(REGEX, ""));
     }
 }

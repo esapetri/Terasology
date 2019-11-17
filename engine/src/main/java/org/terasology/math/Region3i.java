@@ -16,17 +16,26 @@
 
 package org.terasology.math;
 
+import org.terasology.math.geom.BaseVector3f;
+import org.terasology.math.geom.BaseVector3i;
 import org.terasology.math.geom.Vector3f;
+import org.terasology.math.geom.Vector3i;
 
 import java.util.Iterator;
 
 /**
  * Describes an axis-aligned bounded space in 3D integer.
  *
- * @author Immortius
  */
 public final class Region3i implements Iterable<Vector3i> {
-    public static final Region3i EMPTY = new Region3i();
+
+    /**
+     * @deprecated As of 24 sep 2018, because it is error prone.
+     * Everyone can change this instance and destroy the invariant properties.
+     * Some methods used to return this instance silently on special cases.
+     */
+    @Deprecated
+    public static final Region3i EMPTY = Region3i.empty();
 
     private final Vector3i min = new Vector3i();
     private final Vector3i size = new Vector3i();
@@ -37,43 +46,77 @@ public final class Region3i implements Iterable<Vector3i> {
     private Region3i() {
     }
 
-    private Region3i(Vector3i min, Vector3i size) {
+    private Region3i(BaseVector3i min, BaseVector3i size) {
         this.min.set(min);
         this.size.set(size);
     }
 
-    public static Region3i createFromMinAndSize(Vector3i min, Vector3i size) {
-        if (size.x <= 0 || size.y <= 0 || size.z <= 0) {
-            return EMPTY;
+    /**
+     * An empty Region with size (0,0,0).
+     * @return An empty Region3i
+     */
+    public static Region3i empty() {
+        return new Region3i();
+    }
+
+    /**
+     * @param min the min point of the region
+     * @param size the size of the region
+     * @return a new region base on the min point and region size, empty if the size is negative
+     */
+    public static Region3i createFromMinAndSize(BaseVector3i min, BaseVector3i size) {
+        if (size.x() <= 0 || size.y() <= 0 || size.z() <= 0) {
+            return empty();
         }
         return new Region3i(min, size);
     }
 
-    public static Region3i createFromCenterExtents(Vector3f center, Vector3f extents) {
-        Vector3f min = new Vector3f(center.x - extents.x, center.y - extents.y, center.z - extents.z);
-        Vector3f max = new Vector3f(center.x + extents.x, center.y + extents.y, center.z + extents.z);
+    /**
+     * Create a region with center point and x,y,z coordinate extents size
+     * @param center the center point of region
+     * @param extents the extents size of each side of region
+     * @return a new region base on the center point and extents size
+     */
+    public static Region3i createFromCenterExtents(BaseVector3f center, BaseVector3f extents) {
+        Vector3f min = new Vector3f(center.x() - extents.x(), center.y() - extents.y(), center.z() - extents.z());
+        Vector3f max = new Vector3f(center.x() + extents.x(), center.y() + extents.y(), center.z() + extents.z());
         max.x = max.x - Math.ulp(max.x);
         max.y = max.y - Math.ulp(max.y);
         max.z = max.z - Math.ulp(max.z);
-        return createFromMinMax(new Vector3i(min),
-                new Vector3i(max));
+        return createFromMinMax(new Vector3i(min), new Vector3i(max));
     }
 
-    public static Region3i createFromCenterExtents(Vector3i center, Vector3i extents) {
-        Vector3i min = new Vector3i(center.x - extents.x, center.y - extents.y, center.z - extents.z);
-        Vector3i max = new Vector3i(center.x + extents.x, center.y + extents.y, center.z + extents.z);
-        return createFromMinMax(min,
-                max);
+    /**
+     * Create a region with center point and x,y,z coordinate extents size
+     * @param center the center point of region
+     * @param extents the extents size of each side of region
+     * @return a new region base on the center point and extents size
+     */
+    public static Region3i createFromCenterExtents(BaseVector3i center, BaseVector3i extents) {
+        Vector3i min = new Vector3i(center.x() - extents.x(), center.y() - extents.y(), center.z() - extents.z());
+        Vector3i max = new Vector3i(center.x() + extents.x(), center.y() + extents.y(), center.z() + extents.z());
+        return createFromMinMax(min, max);
     }
 
-    public static Region3i createFromCenterExtents(Vector3i center, int extent) {
-        Vector3i min = new Vector3i(center.x - extent, center.y - extent, center.z - extent);
-        Vector3i max = new Vector3i(center.x + extent, center.y + extent, center.z + extent);
-        return createFromMinMax(min,
-                max);
+    /**
+     * Create a region with center point and extents size
+     * @param center the center point of region
+     * @param extent the extents size of region
+     * @return a new region base on the center point and extents size
+     */
+    public static Region3i createFromCenterExtents(BaseVector3i center, int extent) {
+        Vector3i min = new Vector3i(center.x() - extent, center.y() - extent, center.z() - extent);
+        Vector3i max = new Vector3i(center.x() + extent, center.y() + extent, center.z() + extent);
+        return createFromMinMax(min, max);
     }
 
-    public static Region3i createBounded(Vector3i a, Vector3i b) {
+    /**
+     * Create a region by two point
+     * @param a vertex a
+     * @param b the diagonal vertex of a
+     * @return a new region base on vertex a and b
+     */
+    public static Region3i createBounded(BaseVector3i a, BaseVector3i b) {
         Vector3i min = new Vector3i(a);
         min.min(b);
         Vector3i max = new Vector3i(a);
@@ -81,10 +124,16 @@ public final class Region3i implements Iterable<Vector3i> {
         return createFromMinMax(min, max);
     }
 
-    public static Region3i createFromMinMax(Vector3i min, Vector3i max) {
-        Vector3i size = new Vector3i(max.x - min.x + 1, max.y - min.y + 1, max.z - min.z + 1);
+    /**
+     * Create a region by two point
+     * @param min the min point of the region
+     * @param max the max point of the region
+     * @return a new region base on min and max point
+     */
+    public static Region3i createFromMinMax(BaseVector3i min, BaseVector3i max) {
+        Vector3i size = new Vector3i(max.x() - min.x() + 1, max.y() - min.y() + 1, max.z() - min.z() + 1);
         if (size.x <= 0 || size.y <= 0 || size.z <= 0) {
-            return EMPTY;
+            return empty();
         }
         return new Region3i(min, size);
     }
@@ -133,7 +182,6 @@ public final class Region3i implements Iterable<Vector3i> {
         return new Vector3i(size);
     }
 
-
     public int sizeX() {
         return size.x;
     }
@@ -171,7 +219,7 @@ public final class Region3i implements Iterable<Vector3i> {
     /**
      * @param other
      * @return The region that is encompassed by both this and other. If they
-     *         do not overlap then the empty region is returned
+     * do not overlap then the empty region is returned
      */
     public Region3i intersect(Region3i other) {
         Vector3i intersectMin = min();
@@ -204,7 +252,7 @@ public final class Region3i implements Iterable<Vector3i> {
         return createFromMinMax(expandedMin, expandedMax);
     }
 
-    public Region3i expand(Vector3i amount) {
+    public Region3i expand(BaseVector3i amount) {
         Vector3i expandedMin = min();
         expandedMin.sub(amount);
         Vector3i expandedMax = max();
@@ -212,7 +260,7 @@ public final class Region3i implements Iterable<Vector3i> {
         return createFromMinMax(expandedMin, expandedMax);
     }
 
-    public Region3i expandToContain(Vector3i adjPos) {
+    public Region3i expandToContain(BaseVector3i adjPos) {
         Vector3i expandedMin = min();
         expandedMin.min(adjPos);
         Vector3i expandedMax = max();
@@ -235,7 +283,7 @@ public final class Region3i implements Iterable<Vector3i> {
      * @param offset
      * @return A copy of the region offset by the given value
      */
-    public Region3i move(Vector3i offset) {
+    public Region3i move(BaseVector3i offset) {
         Vector3i newMin = min();
         newMin.add(offset);
         return Region3i.createFromMinAndSize(newMin, size);
@@ -245,8 +293,8 @@ public final class Region3i implements Iterable<Vector3i> {
      * @param pos
      * @return Whether this region includes pos
      */
-    public boolean encompasses(Vector3i pos) {
-        return encompasses(pos.x, pos.y, pos.z);
+    public boolean encompasses(BaseVector3i pos) {
+        return encompasses(pos.getX(), pos.getY(), pos.getZ());
     }
 
     public boolean encompasses(int x, int y, int z) {
@@ -257,7 +305,7 @@ public final class Region3i implements Iterable<Vector3i> {
      * @param pos
      * @return The nearest position within the region to the given pos.
      */
-    public Vector3i getNearestPointTo(Vector3i pos) {
+    public Vector3i getNearestPointTo(BaseVector3i pos) {
         Vector3i result = new Vector3i(pos);
         result.min(max());
         result.max(min);
@@ -297,7 +345,7 @@ public final class Region3i implements Iterable<Vector3i> {
     private class Region3iIterator implements Iterator<Vector3i> {
         Vector3i pos;
 
-        public Region3iIterator() {
+         Region3iIterator() {
             this.pos = new Vector3i();
         }
 
@@ -332,7 +380,7 @@ public final class Region3i implements Iterable<Vector3i> {
         private Vector3i next;
         private Region3i other;
 
-        public SubtractiveIterator(Region3i other) {
+         SubtractiveIterator(Region3i other) {
             this.other = other;
             innerIterator = iterator();
             updateNext();

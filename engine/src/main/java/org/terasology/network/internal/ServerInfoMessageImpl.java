@@ -16,10 +16,8 @@
 
 package org.terasology.network.internal;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.terasology.naming.Name;
@@ -29,13 +27,13 @@ import org.terasology.network.ServerInfoMessage;
 import org.terasology.protobuf.NetData;
 import org.terasology.world.internal.WorldInfo;
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Default implementation of {@link ServerInfoMessage}.
  * Wraps the Protocol Buffer implementation
- * @author Martin Steiger
  */
 class ServerInfoMessageImpl implements ServerInfoMessage {
 
@@ -45,12 +43,16 @@ class ServerInfoMessageImpl implements ServerInfoMessage {
 
     ServerInfoMessageImpl(NetData.ServerInfoMessage pbInfo) {
         this.info = pbInfo;
-        this.info.getBlockIdList();
     }
 
     @Override
     public String getGameName() {
         return info.getGameName();
+    }
+
+    @Override
+    public String getMOTD() {
+        return info.getMOTD();
     }
 
     @Override
@@ -83,6 +85,11 @@ class ServerInfoMessageImpl implements ServerInfoMessage {
     }
 
     @Override
+    public int getOnlinePlayersAmount() {
+        return info.getOnlinePlayersAmount();
+    }
+
+    @Override
     public List<NameVersion> getModuleList() {
         List<NameVersion> result = Lists.newArrayList();
 
@@ -109,20 +116,4 @@ class ServerInfoMessageImpl implements ServerInfoMessage {
 
         return result;
     }
-
-    @Override
-    public Map<Short, String> getBiomeIds() {
-        Map<Short, String> result = Maps.newHashMap();
-
-        for (int i = 0; i < info.getBiomeIdCount(); ++i) {
-            int biomeShortId = info.getBiomeShortId(i);
-            if (biomeShortId > Short.MAX_VALUE) {
-                throw new IllegalStateException("Received an invalid biome id from the server: " + biomeShortId);
-            }
-            result.put((short) biomeShortId, info.getBiomeId(i));
-        }
-
-        return result;
-    }
-
 }

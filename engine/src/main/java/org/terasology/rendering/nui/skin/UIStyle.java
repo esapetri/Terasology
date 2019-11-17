@@ -15,7 +15,7 @@
  */
 package org.terasology.rendering.nui.skin;
 
-import org.terasology.asset.Assets;
+import org.terasology.utilities.Assets;
 import org.terasology.math.Border;
 import org.terasology.rendering.assets.texture.TextureRegion;
 import org.terasology.rendering.assets.font.Font;
@@ -25,7 +25,6 @@ import org.terasology.rendering.nui.ScaleMode;
 import org.terasology.rendering.nui.VerticalAlign;
 
 /**
- * @author Immortius
  */
 public class UIStyle {
     private TextureRegion background;
@@ -44,12 +43,14 @@ public class UIStyle {
 
     private ScaleMode textureScaleMode = ScaleMode.STRETCH;
 
-    private Font font = Assets.getFont("engine:default");
+    private Font font = Assets.getFont("engine:NotoSans-Regular").get();
     private Color textColor = Color.WHITE;
     private Color textShadowColor = Color.BLACK;
+    private Color hintTextColor = Color.GREY;
     private HorizontalAlign textAlignmentH = HorizontalAlign.CENTER;
     private VerticalAlign textAlignmentV = VerticalAlign.MIDDLE;
     private boolean textShadowed;
+    private boolean textUnderlined;
 
     public UIStyle() {
     }
@@ -76,8 +77,10 @@ public class UIStyle {
         this.textColor = other.textColor;
         this.textShadowColor = other.textShadowColor;
         this.textShadowed = other.textShadowed;
+        this.hintTextColor = other.hintTextColor;
         this.textAlignmentH = other.textAlignmentH;
         this.textAlignmentV = other.textAlignmentV;
+        this.textUnderlined = other.textUnderlined;
     }
 
     /**
@@ -180,6 +183,17 @@ public class UIStyle {
     }
 
     /**
+    * @return The color of the hint text
+     */
+    public Color getHintTextColor() {
+        return hintTextColor;
+    }
+
+    public void setHintTextColor(Color hintTextColor) {
+        this.hintTextColor = hintTextColor;
+    }
+
+    /**
      * @return How any drawn text should be horizontally aligned within its region
      */
     public HorizontalAlign getHorizontalTextAlignment() {
@@ -210,6 +224,17 @@ public class UIStyle {
 
     public void setTextShadowed(boolean textShadowed) {
         this.textShadowed = textShadowed;
+    }
+
+    /**
+     * @return Whether drawn text should be underlined
+     */
+    public boolean isTextUnderlined() {
+        return textUnderlined;
+    }
+
+    public void setTextUnderlined(boolean textUnderlined) {
+        this.textUnderlined = textUnderlined;
     }
 
     public void setFixedWidth(int fixedWidth) {

@@ -18,11 +18,11 @@ package org.terasology.core.logic.door;
 
 import org.terasology.audio.StaticSound;
 import org.terasology.entitySystem.Component;
+import org.terasology.entitySystem.prefab.Prefab;
 import org.terasology.math.Side;
 import org.terasology.world.block.family.BlockFamily;
 
 /**
- * @author Immortius
  */
 public class DoorComponent implements Component {
     public BlockFamily topBlockFamily;
@@ -31,6 +31,7 @@ public class DoorComponent implements Component {
     public Side openSide;
     public StaticSound openSound;
     public StaticSound closeSound;
+    public Prefab doorRegionPrefab;
 
     public boolean isOpen;
 }

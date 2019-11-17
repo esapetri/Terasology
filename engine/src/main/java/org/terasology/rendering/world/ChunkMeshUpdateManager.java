@@ -17,17 +17,12 @@ package org.terasology.rendering.world;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Queues;
-import com.google.common.collect.Sets;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.terasology.config.Config;
 import org.terasology.math.ChunkMath;
-import org.terasology.math.TeraMath;
-import org.terasology.math.Vector3i;
 import org.terasology.math.geom.Vector3f;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.monitoring.chunk.ChunkMonitor;
-import org.terasology.registry.CoreRegistry;
 import org.terasology.rendering.primitives.ChunkMesh;
 import org.terasology.rendering.primitives.ChunkTessellator;
 import org.terasology.utilities.concurrency.TaskMaster;
@@ -38,6 +33,7 @@ import org.terasology.world.chunks.RenderableChunk;
 import org.terasology.world.chunks.pipeline.ChunkTask;
 import org.terasology.world.chunks.pipeline.ShutdownChunkTask;
 
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
@@ -47,7 +43,6 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Provides the mechanism for updating and generating chunk meshes.
  *
- * @author Benjamin Glatzel <benjamin.glatzel@me.com>
  */
 public final class ChunkMeshUpdateManager {
     private static final int NUM_TASK_THREADS = 8;
@@ -55,7 +50,7 @@ public final class ChunkMeshUpdateManager {
     private static final Logger logger = LoggerFactory.getLogger(ChunkMeshUpdateManager.class);
 
     /* CHUNK UPDATES */
-    private final Set<RenderableChunk> chunksProcessing = Sets.newSetFromMap(new ConcurrentHashMap<RenderableChunk, Boolean>());
+    private final Set<RenderableChunk> chunksProcessing = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private final BlockingDeque<RenderableChunk> chunksComplete = Queues.newLinkedBlockingDeque();
 
@@ -142,7 +137,7 @@ public final class ChunkMeshUpdateManager {
         private WorldProvider worldProvider;
         private ChunkMeshUpdateManager chunkMeshUpdateManager;
 
-        public ChunkUpdateTask(RenderableChunk chunk, ChunkTessellator tessellator, WorldProvider worldProvider, ChunkMeshUpdateManager chunkMeshUpdateManager) {
+        ChunkUpdateTask(RenderableChunk chunk, ChunkTessellator tessellator, WorldProvider worldProvider, ChunkMeshUpdateManager chunkMeshUpdateManager) {
             this.chunkMeshUpdateManager = chunkMeshUpdateManager;
             this.c = chunk;
             this.tessellator = tessellator;
@@ -169,11 +164,17 @@ public final class ChunkMeshUpdateManager {
             ChunkMesh newMesh;
             ChunkView chunkView = worldProvider.getLocalView(c.getPosition());
             if (chunkView != null) {
+                /*
+                 * Important set dirty flag first, so that a concurrent modification of the chunk in the mean time we
+                 * will end up with a dirty chunk.
+                 */
                 c.setDirty(false);
-                newMesh = tessellator.generateMesh(chunkView, ChunkConstants.SIZE_Y, 0);
+                if (chunkView.isValidView()) {
+                    newMesh = tessellator.generateMesh(chunkView, ChunkConstants.SIZE_Y, 0);
 
-                c.setPendingMesh(newMesh);
-                ChunkMonitor.fireChunkTessellated(c.getPosition(), newMesh);
+                    c.setPendingMesh(newMesh);
+                    ChunkMonitor.fireChunkTessellated(c.getPosition(), newMesh);
+                }
 
             }
             chunkMeshUpdateManager.finishedProcessing(c);

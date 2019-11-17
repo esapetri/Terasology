@@ -15,35 +15,50 @@
  */
 package org.terasology.engine.modes.loadProcesses;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.terasology.context.Context;
 import org.terasology.engine.ComponentSystemManager;
 import org.terasology.entitySystem.systems.ComponentSystem;
-import org.terasology.registry.CoreRegistry;
 
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
-/**
- * @author Immortius
- */
 public class PostBeginSystems extends StepBasedLoadProcess {
+
+    private static final Logger logger = LoggerFactory.getLogger(PostBeginSystems.class);
+
+    private final Context context;
 
     private Iterator<ComponentSystem> componentSystems;
 
+    private ComponentSystem currentSystem;
+
+    public PostBeginSystems(Context context) {
+        this.context = context;
+    }
+
     @Override
     public String getMessage() {
-        return "Post-Initialise Systems";
+        return "${engine:menu#post-initialise-systems}";
     }
 
     @Override
     public boolean step() {
         if (componentSystems.hasNext()) {
-            componentSystems.next().postBegin();
+            try {
+                currentSystem = componentSystems.next();
+                currentSystem.postBegin();
+            } catch (NoSuchElementException e) {
+                logger.error("Failed to load system : '" + currentSystem.toString() + "'");
+            }
         }
         return !componentSystems.hasNext();
     }
 
     @Override
     public void begin() {
-        ComponentSystemManager csm = CoreRegistry.get(ComponentSystemManager.class);
+        ComponentSystemManager csm = context.get(ComponentSystemManager.class);
         componentSystems = csm.iterateAll().iterator();
     }
 

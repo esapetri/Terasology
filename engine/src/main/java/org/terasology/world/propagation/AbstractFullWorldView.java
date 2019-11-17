@@ -16,8 +16,7 @@
 package org.terasology.world.propagation;
 
 import org.terasology.math.ChunkMath;
-import org.terasology.math.TeraMath;
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.world.block.Block;
 import org.terasology.world.chunks.Chunk;
 import org.terasology.world.chunks.ChunkProvider;
@@ -26,8 +25,6 @@ import org.terasology.world.chunks.LitChunk;
 
 /**
  * A base world view implementation sitting on ChunkProvider.
- *
- * @author Immortius
  */
 public abstract class AbstractFullWorldView implements PropagatorWorldView {
 
@@ -37,6 +34,12 @@ public abstract class AbstractFullWorldView implements PropagatorWorldView {
         this.chunkProvider = chunkProvider;
     }
 
+    /**
+     * Get's the chunk for a given position
+     *
+     * @param pos The position in the world
+     * @return The chunk for that position
+     */
     private Chunk getChunk(Vector3i pos) {
 
         return chunkProvider.getChunk(ChunkMath.calcChunkPos(pos));
@@ -54,7 +57,7 @@ public abstract class AbstractFullWorldView implements PropagatorWorldView {
     /**
      * Obtains the relevant value from the given chunk
      *
-     * @param chunk
+     * @param chunk The chunk containing the position
      * @param pos   The internal position of the chunk to get the value from
      * @return The relevant value for this view
      */
@@ -74,7 +77,7 @@ public abstract class AbstractFullWorldView implements PropagatorWorldView {
     /**
      * Sets the relevant value for the given chunk
      *
-     * @param chunk
+     * @param chunk The chunk containing the position
      * @param pos   The internal position of the chunk to set the value of
      * @param value The new value
      */

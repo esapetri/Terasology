@@ -25,7 +25,6 @@ import java.util.List;
 /**
  * When activated, plays a random sound
  *
- * @author Immortius <immortius@gmail.com>
  */
 public class PlaySoundActionComponent implements Component {
     public List<StaticSound> sounds = Lists.newArrayList();
@@ -35,6 +34,10 @@ public class PlaySoundActionComponent implements Component {
     public PlaySoundActionComponent() {
     }
 
+    /**
+     * Creates new instance of PlaySoundActionComponent
+     * @param sounds provided sounds via vararg
+     */
     public PlaySoundActionComponent(StaticSound... sounds) {
         this.sounds.addAll(Arrays.asList(sounds));
     }

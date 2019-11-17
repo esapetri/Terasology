@@ -16,16 +16,15 @@
 
 package org.terasology.math;
 
-import com.bulletphysics.BulletGlobals;
-
 import org.terasology.math.geom.Vector3f;
+import org.terasology.physics.engine.PhysicsEngineManager;
 
 /**
- * @author Immortius
  */
 public final class Vector3fUtil {
     private Vector3fUtil() {
     }
+
 
     /**
      * @return The reflection of direction against normal
@@ -57,9 +56,11 @@ public final class Vector3fUtil {
     }
 
     public static Vector3f safeNormalize(Vector3f v, Vector3f out) {
+        final float EPSILON = 0.000001f;
+
         out.set(v);
         out.normalize();
-        if (out.length() < BulletGlobals.SIMD_EPSILON) {
+        if (out.length() < EPSILON) {
             out.set(0, 0, 0);
         }
         return out;

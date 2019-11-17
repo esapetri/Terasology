@@ -15,38 +15,45 @@
  */
 package org.terasology.rendering.assets.texture.subtexture;
 
-import org.terasology.asset.AbstractAsset;
-import org.terasology.asset.AssetUri;
-import org.terasology.math.Rect2f;
-import org.terasology.math.Rect2i;
+import org.terasology.assets.Asset;
+import org.terasology.assets.AssetType;
+import org.terasology.assets.ResourceUrn;
+import org.terasology.math.geom.Rect2f;
+import org.terasology.math.geom.Rect2i;
 import org.terasology.math.TeraMath;
-import org.terasology.math.Vector2i;
-import org.terasology.rendering.assets.texture.TextureRegionAsset;
+import org.terasology.math.geom.Vector2i;
 import org.terasology.rendering.assets.texture.Texture;
+import org.terasology.rendering.assets.texture.TextureRegionAsset;
+
+import java.util.Optional;
 
 /**
- * @author Immortius
  */
-public class Subtexture extends AbstractAsset<SubtextureData> implements TextureRegionAsset<SubtextureData> {
+public class Subtexture extends TextureRegionAsset<SubtextureData> {
 
     private Texture texture;
     private Rect2f subregion;
+    private Runnable disposalAction;
 
-    public Subtexture(AssetUri uri, SubtextureData data) {
-        super(uri);
-        onReload(data);
+    public Subtexture(ResourceUrn urn, AssetType<?, SubtextureData> assetType, SubtextureData data) {
+        super(urn, assetType);
+        disposalAction = this::dispose;
+        reload(data);
     }
 
     @Override
-    protected void onReload(SubtextureData data) {
+    protected void doReload(SubtextureData data) {
+        data.getTexture().subscribeToDisposal(disposalAction);
+        if (texture != null) {
+              texture.unsubscribeToDisposal(disposalAction);
+        }
         this.texture = data.getTexture();
         this.subregion = data.getRegion();
-
     }
 
     @Override
-    protected void onDispose() {
-        texture = null;
+    protected Optional<? extends Asset<SubtextureData>> doCreateCopy(ResourceUrn instanceUrn, AssetType<?, SubtextureData> parentAssetType) {
+        return Optional.of(new Subtexture(instanceUrn, parentAssetType, new SubtextureData(texture, subregion)));
     }
 
     @Override
@@ -61,8 +68,8 @@ public class Subtexture extends AbstractAsset<SubtextureData> implements Texture
 
     @Override
     public Rect2i getPixelRegion() {
-        return Rect2i.createFromMinAndSize(TeraMath.floorToInt(subregion.minX() * texture.getWidth())
-                , TeraMath.floorToInt(subregion.minY() * texture.getHeight()), getWidth(), getHeight());
+        return Rect2i.createFromMinAndSize(TeraMath.floorToInt(subregion.minX() * texture.getWidth()),
+                TeraMath.floorToInt(subregion.minY() * texture.getHeight()), getWidth(), getHeight());
     }
 
     @Override

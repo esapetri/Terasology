@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,7 +31,6 @@ import java.nio.file.attribute.BasicFileAttributes;
 /**
  * Helper class for methods around {@link SaveTransaction}s that are also needed outside of the save transaction.
  *
- * @author Florian <florian@fkoeberle.de>
  */
 public class SaveTransactionHelper {
     private static final Logger logger = LoggerFactory.getLogger(SaveTransactionHelper.class);
@@ -53,8 +53,8 @@ public class SaveTransactionHelper {
             }
 
             @Override
-            public FileVisitResult postVisitDirectory(Path directory, IOException exc) throws IOException {
-                Files.delete(directory);
+            public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                Files.delete(dir);
                 return FileVisitResult.CONTINUE;
             }
         });
@@ -63,7 +63,7 @@ public class SaveTransactionHelper {
     /**
      * Merges all outstanding changes into the save game. If this operation gets interrupted it can be started again
      * without any file corruption when the file system supports atomic moves.
-     * <p/>
+     * <br><br>
      * The write lock for the save directory should be acquired before this method gets called.
      */
     public void mergeChanges() throws IOException {
@@ -101,7 +101,23 @@ public class SaveTransactionHelper {
 
             @Override
             public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-                Files.delete(dir);
+                try {
+                    Files.delete(dir);
+                } catch (DirectoryNotEmptyException e) {
+                    /**
+                     * Happens rarely for some players on windows (See issue #2160). Exact reason for this behavior is
+                     * unknown. Maybe they have some kind of background task that processes that creates a temporary
+                     * files in new directories to store some intermediate scan result.
+                     */
+                    logger.warn("The save job could not cleanup a temporarly created directory, it will retry once in one second");
+                    try {
+                        Thread.sleep(1000L);
+                    } catch (InterruptedException e1) {
+                        // Reset flag and ignore it
+                        Thread.currentThread().interrupt();
+                    }
+                    Files.delete(dir);
+                }
                 return FileVisitResult.CONTINUE;
             }
         });

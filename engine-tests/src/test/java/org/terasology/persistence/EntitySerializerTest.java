@@ -19,17 +19,19 @@ import com.google.common.collect.Lists;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.terasology.asset.AssetFactory;
-import org.terasology.asset.AssetManager;
-import org.terasology.asset.AssetType;
-import org.terasology.asset.AssetUri;
-import org.terasology.asset.Assets;
+import org.terasology.assets.AssetFactory;
+import org.terasology.assets.ResourceUrn;
+import org.terasology.assets.management.AssetManager;
+import org.terasology.assets.module.ModuleAwareAssetTypeManager;
+import org.terasology.context.Context;
+import org.terasology.context.internal.ContextImpl;
 import org.terasology.engine.SimpleUri;
-import org.terasology.engine.bootstrap.EntitySystemBuilder;
+import org.terasology.engine.bootstrap.EntitySystemSetupUtil;
 import org.terasology.engine.module.ModuleManager;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.entity.internal.EngineEntityManager;
 import org.terasology.entitySystem.entity.internal.EntityInfoComponent;
+import org.terasology.entitySystem.entity.internal.EntityScope;
 import org.terasology.entitySystem.metadata.ComponentLibrary;
 import org.terasology.entitySystem.prefab.Prefab;
 import org.terasology.entitySystem.prefab.PrefabData;
@@ -41,44 +43,52 @@ import org.terasology.entitySystem.stubs.StringComponent;
 import org.terasology.network.NetworkSystem;
 import org.terasology.persistence.serializers.EntitySerializer;
 import org.terasology.protobuf.EntityData;
-import org.terasology.reflection.reflect.ReflectionReflectFactory;
+import org.terasology.recording.RecordAndReplayCurrentStatus;
 import org.terasology.registry.CoreRegistry;
 import org.terasology.testUtil.ModuleManagerFactory;
+import org.terasology.utilities.Assets;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.terasology.entitySystem.entity.internal.EntityScope.CHUNK;
+import static org.terasology.entitySystem.entity.internal.EntityScope.GLOBAL;
 
 /**
- * @author Immortius <immortius@gmail.com>
  */
 public class EntitySerializerTest {
 
+    private static Context context;
     private static ModuleManager moduleManager;
     private ComponentLibrary componentLibrary;
     private EngineEntityManager entityManager;
     private EntitySerializer entitySerializer;
     private Prefab prefab;
 
+
     @BeforeClass
     public static void setupClass() throws Exception {
+        context = new ContextImpl();
+        CoreRegistry.setContext(context);
+        context.put(RecordAndReplayCurrentStatus.class, new RecordAndReplayCurrentStatus());
         moduleManager = ModuleManagerFactory.create();
-        AssetManager assetManager = new AssetManager(moduleManager.getEnvironment());
-        assetManager.setAssetFactory(AssetType.PREFAB, new AssetFactory<PrefabData, Prefab>() {
-            @Override
-            public Prefab buildAsset(AssetUri uri, PrefabData data) {
-                return new PojoPrefab(uri, data);
-            }
-        });
-        CoreRegistry.put(AssetManager.class, assetManager);
+        context.put(ModuleManager.class, moduleManager);
+
+        ModuleAwareAssetTypeManager assetTypeManager = new ModuleAwareAssetTypeManager();
+        assetTypeManager.registerCoreAssetType(Prefab.class,
+                (AssetFactory<Prefab, PrefabData>) PojoPrefab::new, "prefabs");
+        assetTypeManager.switchEnvironment(moduleManager.getEnvironment());
+        context.put(AssetManager.class, assetTypeManager.getAssetManager());
     }
 
     @Before
     public void setup() {
+        context.put(NetworkSystem.class, mock(NetworkSystem.class));
 
-        EntitySystemBuilder builder = new EntitySystemBuilder();
-        entityManager = builder.build(moduleManager.getEnvironment(), mock(NetworkSystem.class), new ReflectionReflectFactory());
+        EntitySystemSetupUtil.addReflectionBasedLibraries(context);
+        EntitySystemSetupUtil.addEntityManagementRelatedClasses(context);
+        entityManager = context.get(EngineEntityManager.class);
         entityManager.getComponentLibrary().register(new SimpleUri("test", "gettersetter"), GetterSetterComponent.class);
         entityManager.getComponentLibrary().register(new SimpleUri("test", "string"), StringComponent.class);
         entityManager.getComponentLibrary().register(new SimpleUri("test", "integer"), IntegerComponent.class);
@@ -87,7 +97,7 @@ public class EntitySerializerTest {
 
         PrefabData prefabData = new PrefabData();
         prefabData.addComponent(new StringComponent("Value"));
-        prefab = Assets.generateAsset(new AssetUri(AssetType.PREFAB, "test:Test"), prefabData, Prefab.class);
+        prefab = Assets.generateAsset(new ResourceUrn("test:Test"), prefabData, Prefab.class);
     }
 
     @Test
@@ -234,14 +244,28 @@ public class EntitySerializerTest {
     public void testAlwaysRelevantPersisted() throws Exception {
         EntityRef entity = entityManager.create(prefab);
         boolean defaultSetting = entity.isAlwaysRelevant();
-        entity.setAlwaysRelevant(!defaultSetting);
+        EntityScope newScope = defaultSetting ? CHUNK : GLOBAL;
+        entity.setScope(newScope);
 
         EntityData.Entity entityData = entitySerializer.serialize(entity);
         long nextId = entityManager.getNextId();
         entityManager.clear();
         entityManager.setNextId(nextId);
         EntityRef newEntity = entitySerializer.deserialize(entityData);
+        assertEquals(newScope, newEntity.getScope());
         assertEquals(!defaultSetting, newEntity.isAlwaysRelevant());
+    }
+
+    @Test
+    public void testScopePersisted() {
+        EntityRef entity = entityManager.create(prefab);
+        for (EntityScope scope : EntityScope.values()) {
+            entity.setScope(scope);
+
+            entity = serializeDeserializeEntity(entity);
+
+            assertEquals(scope, entity.getScope());
+        }
     }
 
     @Test
@@ -259,4 +283,13 @@ public class EntitySerializerTest {
         assertTrue(loadedEntity.exists());
         assertTrue(loadedEntity.hasComponent(MappedTypeComponent.class));
     }
+
+    private EntityRef serializeDeserializeEntity(EntityRef entity) {
+        EntityData.Entity entityData = entitySerializer.serialize(entity);
+        long nextId = entityManager.getNextId();
+        entityManager.clear();
+        entityManager.setNextId(nextId);
+        return entitySerializer.deserialize(entityData);
+    }
+
 }

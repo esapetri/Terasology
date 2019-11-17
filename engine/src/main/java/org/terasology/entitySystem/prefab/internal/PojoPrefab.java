@@ -18,16 +18,17 @@ package org.terasology.entitySystem.prefab.internal;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import org.terasology.asset.AssetUri;
+import org.terasology.assets.AssetType;
+import org.terasology.assets.ResourceUrn;
 import org.terasology.entitySystem.Component;
 import org.terasology.entitySystem.prefab.Prefab;
 import org.terasology.entitySystem.prefab.PrefabData;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 /**
- * @author Immortius <immortius@gmail.com>
  */
 public class PojoPrefab extends Prefab {
 
@@ -37,9 +38,9 @@ public class PojoPrefab extends Prefab {
     private boolean persisted;
     private boolean alwaysRelevant = true;
 
-    public PojoPrefab(AssetUri uri, PrefabData data) {
-        super(uri);
-        onReload(data);
+    public PojoPrefab(ResourceUrn urn, AssetType<?, PrefabData> assetType, PrefabData data) {
+        super(urn, assetType);
+        reload(data);
     }
 
     @Override
@@ -73,6 +74,16 @@ public class PojoPrefab extends Prefab {
     }
 
     @Override
+    public boolean hasAnyComponents(List<Class<? extends Component>> filterComponents) {
+        return !Collections.disjoint(componentMap.keySet(), filterComponents);
+    }
+
+    @Override
+    public boolean hasAllComponents(List<Class<? extends Component>> filterComponents) {
+        return componentMap.keySet().containsAll(filterComponents);
+    }
+
+    @Override
     public <T extends Component> T getComponent(Class<T> componentClass) {
         return componentClass.cast(componentMap.get(componentClass));
     }
@@ -83,11 +94,7 @@ public class PojoPrefab extends Prefab {
     }
 
     @Override
-    protected void onDispose() {
-    }
-
-    @Override
-    protected void onReload(PrefabData data) {
+    protected void doReload(PrefabData data) {
         this.componentMap = ImmutableMap.copyOf(data.getComponents());
         this.persisted = data.isPersisted();
         this.alwaysRelevant = data.isAlwaysRelevant();

@@ -15,11 +15,12 @@
  */
 package org.terasology.persistence.typeHandling;
 
+import org.terasology.persistence.typeHandling.inMemory.PersistedMap;
+
 import java.util.Map;
 import java.util.Set;
 
 /**
- * @author Immortius
  */
 public interface PersistedDataMap extends PersistedData {
 
@@ -45,4 +46,7 @@ public interface PersistedDataMap extends PersistedData {
 
     Set<Map.Entry<String, PersistedData>> entrySet();
 
+    static PersistedDataMap of(Map<String, PersistedData> map) {
+        return new PersistedMap(map);
+    }
 }

@@ -16,7 +16,7 @@
 
 package org.terasology.world.chunks.internal;
 
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.world.chunks.Chunk;
 import org.terasology.world.chunks.ChunkProvider;
 
@@ -24,7 +24,6 @@ import org.terasology.world.chunks.ChunkProvider;
  * Internal interface used within the chunk generation system, allows a chunk provider to manage "generation" (including
  * reloading) of a chunk. These methods may be called off of the main thread.
  *
- * @author Immortius
  */
 public interface GeneratingChunkProvider extends ChunkProvider {
 

@@ -17,17 +17,19 @@
 package org.terasology.world.generator;
 
 import org.junit.Assert;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Matchers;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.terasology.config.Config;
+import org.terasology.context.internal.ContextImpl;
+import org.terasology.context.internal.MockContext;
 import org.terasology.core.world.generator.trees.TreeGenerator;
 import org.terasology.core.world.generator.trees.Trees;
-import org.terasology.math.Rect2i;
-import org.terasology.math.Vector2i;
+import org.terasology.math.geom.BaseVector2i;
+import org.terasology.math.geom.Rect2i;
 import org.terasology.math.geom.Vector3i;
 import org.terasology.registry.CoreRegistry;
 import org.terasology.utilities.random.MersenneRandom;
@@ -37,28 +39,36 @@ import org.terasology.world.block.BlockManager;
 import org.terasology.world.block.BlockUri;
 import org.terasology.world.chunks.Chunk;
 import org.terasology.world.chunks.ChunkConstants;
+import org.terasology.world.chunks.blockdata.ExtraBlockDataManager;
 import org.terasology.world.chunks.internal.ChunkImpl;
 
 /**
  * TODO: more flexibility for estimated extents
- * @author Martin Steiger
  */
 public class TreeTests {
 
     private static final Logger logger = LoggerFactory.getLogger(TreeTests.class);
 
-    @BeforeClass
-    public static void setup() {
-        // Needed only as long as #1536 is unresolved
-        CoreRegistry.putPermanently(Config.class, new Config());
+    private BlockManager blockManager;
+    private ExtraBlockDataManager extraDataManager;
 
-        BlockManager blockManager = Mockito.mock(BlockManager.class);
-        Block air = BlockManager.getAir();
+    @Before
+    public void setup() {
+        ContextImpl context = new ContextImpl();
+        CoreRegistry.setContext(context);
+
+        // Needed only as long as #1536 is unresolved
+        context.put(Config.class, new Config(new MockContext()));
+
+        blockManager = Mockito.mock(BlockManager.class);
+        Block air = blockManager.getBlock(BlockManager.AIR_ID);
+        
+        extraDataManager = new ExtraBlockDataManager();
 
         Mockito.when(blockManager.getBlock(Matchers.<BlockUri>any())).thenReturn(air);
         Mockito.when(blockManager.getBlock(Matchers.<String>any())).thenReturn(air);
 
-        CoreRegistry.putPermanently(BlockManager.class, blockManager);
+        context.put(BlockManager.class, blockManager);
     }
 
     @Test
@@ -104,8 +114,8 @@ public class TreeTests {
         final Vector3i max = new Vector3i(pos);
 
         Rect2i chunks = Rect2i.createFromMinAndMax(-1, -1, 1, 1);
-        for (Vector2i chunkPos : chunks) {
-            Chunk chunk = new ChunkImpl(chunkPos.getX(), 0, chunkPos.getY()) {
+        for (BaseVector2i chunkPos : chunks.contents()) {
+            Chunk chunk = new ChunkImpl(chunkPos.getX(), 0, chunkPos.getY(), blockManager, extraDataManager) {
                 @Override
                 public Block setBlock(int x, int y, int z, Block block) {
                     Vector3i world = chunkToWorldPosition(x, y, z);
@@ -117,9 +127,9 @@ public class TreeTests {
             };
 
             Random random = new MersenneRandom(seed);
-            BlockManager blockManager = CoreRegistry.get(BlockManager.class);
+            BlockManager blockManagerLocal = CoreRegistry.get(BlockManager.class);
             Vector3i relPos = chunk.chunkToWorldPosition(0, 0, 0).sub(pos).invert();
-            treeGen.generate(blockManager, chunk, random, relPos.x, relPos.y, relPos.z);
+            treeGen.generate(blockManagerLocal, chunk, random, relPos.x, relPos.y, relPos.z);
         }
 
         Vector3i ext = new Vector3i(max).sub(min);

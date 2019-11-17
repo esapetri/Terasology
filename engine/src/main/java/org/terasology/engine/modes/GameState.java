@@ -16,10 +16,12 @@
 
 package org.terasology.engine.modes;
 
+import org.terasology.context.Context;
 import org.terasology.engine.GameEngine;
+import org.terasology.entitySystem.entity.EntityRef;
+import org.terasology.world.chunks.event.OnChunkLoaded;
 
 /**
- * @author Anton Kireev <adeon.k87@gmail.com>
  * @version 0.1
  *
  * A GameState encapsulates a different set of systems and managers being initialized
@@ -32,7 +34,11 @@ public interface GameState {
 
     void init(GameEngine engine);
 
-    void dispose();
+    void dispose(boolean shuttingDown);
+
+    default void dispose() {
+        dispose(false);
+    }
 
     void handleInput(float delta);
 
@@ -44,4 +50,15 @@ public interface GameState {
      * @return Whether the game should hibernate when it loses focus
      */
     boolean isHibernationAllowed();
+
+    /**
+     * @return identifies the target for logging events
+     */
+    String getLoggingPhase();
+
+    Context getContext();
+
+    default void onChunkLoaded(OnChunkLoaded chunkAvailable, EntityRef worldEntity) {
+        
+    }
 }

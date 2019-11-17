@@ -16,11 +16,10 @@
 package org.terasology.rendering.nui;
 
 import com.google.common.base.Preconditions;
-
-import org.terasology.module.sandbox.API;
-import org.terasology.math.Vector3i;
 import org.terasology.math.geom.Vector3f;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.math.geom.Vector4f;
+import org.terasology.module.sandbox.API;
 
 import java.nio.ByteBuffer;
 import java.util.Locale;
@@ -29,7 +28,7 @@ import java.util.Objects;
 /**
  * Color is a representation of a RGBA color. Color components can be set and accessed via floats ranging from 0-1, or ints ranging from 0-255.
  * Color is immutable and thread safe.
- * <p/>
+ * <br><br>
  * There are a plethora of Color classes, but none that are quite suitable IMO:
  * <ul>
  * <li>vecmaths - doesn't access with r/g/b/a, separation by representation is awkward, feature bland.</li>
@@ -40,7 +39,6 @@ import java.util.Objects;
  * <li>awt - tempting, certainly feature-rich. Has some strange awt-specific functionality though (createContext) and native links</li>
  * </ul>
  *
- * @author Immortius
  */
 @API
 public class Color {
@@ -173,22 +171,22 @@ public class Color {
     }
 
     public Color alterRed(int value) {
-        Preconditions.checkArgument(value >= 0 || value <= MAX, "Color values must be in range 0-255");
+        Preconditions.checkArgument(value >= 0 && value <= MAX, "Color values must be in range 0-255");
         return new Color(value << RED_OFFSET | (representation & RED_FILTER));
     }
 
     public Color alterBlue(int value) {
-        Preconditions.checkArgument(value >= 0 || value <= MAX, "Color values must be in range 0-255");
+        Preconditions.checkArgument(value >= 0 && value <= MAX, "Color values must be in range 0-255");
         return new Color(value << BLUE_OFFSET | (representation & BLUE_FILTER));
     }
 
     public Color alterGreen(int value) {
-        Preconditions.checkArgument(value >= 0 || value <= MAX, "Color values must be in range 0-255");
+        Preconditions.checkArgument(value >= 0 && value <= MAX, "Color values must be in range 0-255");
         return new Color(value << GREEN_OFFSET | (representation & GREEN_FILTER));
     }
 
     public Color alterAlpha(int value) {
-        Preconditions.checkArgument(value >= 0 || value <= MAX, "Color values must be in range 0-255");
+        Preconditions.checkArgument(value >= 0 && value <= MAX, "Color values must be in range 0-255");
         return new Color(value | (representation & ALPHA_FILTER));
     }
 

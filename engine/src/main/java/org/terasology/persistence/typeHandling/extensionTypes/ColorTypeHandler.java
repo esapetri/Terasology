@@ -16,33 +16,39 @@
 package org.terasology.persistence.typeHandling.extensionTypes;
 
 import gnu.trove.list.TIntList;
-
-import org.terasology.persistence.typeHandling.DeserializationContext;
+import org.terasology.persistence.typeHandling.DeserializationException;
 import org.terasology.persistence.typeHandling.PersistedData;
 import org.terasology.persistence.typeHandling.PersistedDataArray;
-import org.terasology.persistence.typeHandling.SerializationContext;
-import org.terasology.persistence.typeHandling.SimpleTypeHandler;
+import org.terasology.persistence.typeHandling.PersistedDataSerializer;
 import org.terasology.rendering.nui.Color;
 
+import java.util.Optional;
+
 /**
- * @author Immortius
+ * Serializes {@link Color} instances to an int array <code>[r, g, b, a]</code>.
+ * De-serializing also supports hexadecimal strings such as <code>"AAAAAAFF"</code>.
  */
-public class ColorTypeHandler extends SimpleTypeHandler<Color> {
+public class ColorTypeHandler extends org.terasology.persistence.typeHandling.TypeHandler<Color> {
 
     @Override
-    public PersistedData serialize(Color value, SerializationContext context) {
-        return context.create(value.r(), value.g(), value.b(), value.a());
+    public PersistedData serializeNonNull(Color value, PersistedDataSerializer serializer) {
+        return serializer.serialize(value.r(), value.g(), value.b(), value.a());
     }
 
     @Override
-    public Color deserialize(PersistedData data, DeserializationContext context) {
+    public Optional<Color> deserialize(PersistedData data) {
         if (data.isArray()) {
             PersistedDataArray dataArray = data.getAsArray();
             if (dataArray.isNumberArray() && dataArray.size() > 3) {
                 TIntList vals = dataArray.getAsIntegerArray();
-                return new Color(vals.get(0), vals.get(1), vals.get(2), vals.get(3));
+                return Optional.of(new Color(vals.get(0), vals.get(1), vals.get(2), vals.get(3)));
             }
         }
-        return null;
+        if (data.isString()) {
+            String value = data.getAsString();
+            return Optional.of(new Color((int) Long.parseLong(value, 16)));
+        }
+
+        return Optional.empty();
     }
 }

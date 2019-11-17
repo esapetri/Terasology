@@ -28,13 +28,11 @@ import org.terasology.entitySystem.metadata.ComponentLibrary;
 import org.terasology.entitySystem.metadata.ComponentMetadata;
 import org.terasology.entitySystem.metadata.ReplicatedFieldMetadata;
 import org.terasology.module.Module;
-import org.terasology.persistence.typeHandling.DeserializationContext;
 import org.terasology.persistence.typeHandling.PersistedData;
 import org.terasology.persistence.typeHandling.Serializer;
-import org.terasology.persistence.typeHandling.TypeSerializationLibrary;
-import org.terasology.persistence.typeHandling.protobuf.ProtobufDeserializationContext;
+import org.terasology.persistence.typeHandling.TypeHandlerLibrary;
 import org.terasology.persistence.typeHandling.protobuf.ProtobufPersistedData;
-import org.terasology.persistence.typeHandling.protobuf.ProtobufSerializationContext;
+import org.terasology.persistence.typeHandling.protobuf.ProtobufPersistedDataSerializer;
 import org.terasology.protobuf.EntityData;
 import org.terasology.reflection.metadata.FieldMetadata;
 
@@ -43,13 +41,12 @@ import java.util.Map;
 /**
  * ComponentSerializer provides the ability to serialize and deserialize between Components and the protobuf
  * EntityData.Component
- * <p/>
+ * <br><br>
  * If provided with a idTable, then the components will be serialized and deserialized using those ids rather
  * than the names of each component, saving some space.
- * <p/>
+ * <br><br>
  * When serializing, a FieldSerializeCheck can be provided to determine whether each field should be serialized or not
  *
- * @author Immortius
  */
 public class ComponentSerializer {
 
@@ -58,20 +55,18 @@ public class ComponentSerializer {
     private ComponentLibrary componentLibrary;
     private BiMap<Class<? extends Component>, Integer> idTable = ImmutableBiMap.<Class<? extends Component>, Integer>builder().build();
     private boolean usingFieldIds;
-    private TypeSerializationLibrary typeSerializationLibrary;
-    private ProtobufSerializationContext serializationContext;
-    private ProtobufDeserializationContext deserializationContext;
+    private TypeHandlerLibrary typeHandlerLibrary;
+    private ProtobufPersistedDataSerializer serializationContext;
 
     /**
      * Creates the component serializer.
      *
      * @param componentLibrary The component library used to provide information on each component and its fields.
      */
-    public ComponentSerializer(ComponentLibrary componentLibrary, TypeSerializationLibrary typeSerializationLibrary) {
+    public ComponentSerializer(ComponentLibrary componentLibrary, TypeHandlerLibrary typeHandlerLibrary) {
         this.componentLibrary = componentLibrary;
-        this.typeSerializationLibrary = typeSerializationLibrary;
-        this.serializationContext = new ProtobufSerializationContext(typeSerializationLibrary);
-        this.deserializationContext = new ProtobufDeserializationContext(typeSerializationLibrary);
+        this.typeHandlerLibrary = typeHandlerLibrary;
+        this.serializationContext = new ProtobufPersistedDataSerializer();
     }
 
     public void setUsingFieldIds(boolean usingFieldIds) {
@@ -184,8 +179,7 @@ public class ComponentSerializer {
 
     private <T extends Component> Component deserializeOnto(Component targetComponent, EntityData.Component componentData,
                                                             ComponentMetadata<T> componentMetadata, FieldSerializeCheck<Component> fieldCheck) {
-        Serializer serializer = typeSerializationLibrary.getSerializerFor(componentMetadata);
-        DeserializationContext context = new ProtobufDeserializationContext(typeSerializationLibrary);
+        Serializer serializer = typeHandlerLibrary.getSerializerFor(componentMetadata);
         Map<FieldMetadata<?, ?>, PersistedData> dataMap = Maps.newHashMapWithExpectedSize(componentData.getFieldCount());
         for (EntityData.NameValue field : componentData.getFieldList()) {
             FieldMetadata<?, ?> fieldInfo = null;
@@ -196,11 +190,11 @@ public class ComponentSerializer {
             }
             if (fieldInfo != null) {
                 dataMap.put(fieldInfo, new ProtobufPersistedData(field.getValue()));
-            } else if (field.hasNameIndex()) {
+            } else if (field.hasName()) {
                 logger.warn("Cannot deserialize unknown field '{}' onto '{}'", field.getName(), componentMetadata.getUri());
             }
         }
-        serializer.deserializeOnto(targetComponent, dataMap, context, fieldCheck);
+        serializer.deserializeOnto(targetComponent, dataMap, fieldCheck);
         return targetComponent;
     }
 
@@ -231,8 +225,8 @@ public class ComponentSerializer {
         EntityData.Component.Builder componentMessage = EntityData.Component.newBuilder();
         serializeComponentType(componentMetadata, componentMessage);
 
-        Serializer serializer = typeSerializationLibrary.getSerializerFor(componentMetadata);
-        for (ReplicatedFieldMetadata field : componentMetadata.getFields()) {
+        Serializer serializer = typeHandlerLibrary.getSerializerFor(componentMetadata);
+        for (ReplicatedFieldMetadata<?, ?> field : componentMetadata.getFields()) {
             if (check.shouldSerializeField(field, component)) {
                 PersistedData result = serializer.serialize(field, component, serializationContext);
                 if (!result.isNull()) {
@@ -287,10 +281,10 @@ public class ComponentSerializer {
         EntityData.Component.Builder componentMessage = EntityData.Component.newBuilder();
         serializeComponentType(componentMetadata, componentMessage);
 
-        Serializer serializer = typeSerializationLibrary.getSerializerFor(componentMetadata);
+        Serializer serializer = typeHandlerLibrary.getSerializerFor(componentMetadata);
         boolean changed = false;
         for (ReplicatedFieldMetadata field : componentMetadata.getFields()) {
-            if (check.shouldSerializeField(field, delta)) {
+            if (check.shouldSerializeField(field, delta) && serializer.getHandlerFor(field) != null) {
                 Object origValue = field.getValue(base);
                 Object deltaValue = field.getValue(delta);
 

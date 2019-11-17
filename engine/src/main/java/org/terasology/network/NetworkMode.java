@@ -19,7 +19,6 @@ package org.terasology.network;
 /**
  * The current multiplayer mode of the game.
  *
- * @author Immortius
  */
 public enum NetworkMode {
     /**
@@ -46,7 +45,7 @@ public enum NetworkMode {
     private boolean isServer;
     private boolean hasLocalClient;
 
-    private NetworkMode(boolean authority, boolean isServer, boolean hasLocalClient) {
+    NetworkMode(boolean authority, boolean isServer, boolean hasLocalClient) {
         this.authority = authority;
         this.isServer = isServer;
         this.hasLocalClient = hasLocalClient;

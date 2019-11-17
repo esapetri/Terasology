@@ -25,7 +25,6 @@ import java.util.List;
  * BenchmarkResult records the results and the errors of the execution of one particular benchmark.
  * It also maintains a list of columns which are very useful for pretty printing the results.
  *
- * @author Manuel Brotz <manu.brotz@gmx.ch>
  */
 public abstract class BenchmarkResult {
 
@@ -39,7 +38,7 @@ public abstract class BenchmarkResult {
     private boolean aborted;
     private final List<BenchmarkError> errors = Lists.newLinkedList();
 
-    public static enum Alignment {
+    public enum Alignment {
         LEFT {
             @Override
             public String pad(String value, int size) {

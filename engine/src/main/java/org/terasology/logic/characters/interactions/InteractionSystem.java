@@ -17,15 +17,12 @@ package org.terasology.logic.characters.interactions;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.terasology.asset.AssetUri;
+import org.terasology.assets.ResourceUrn;
 import org.terasology.entitySystem.entity.EntityRef;
-import org.terasology.entitySystem.event.EventPriority;
 import org.terasology.entitySystem.event.ReceiveEvent;
 import org.terasology.entitySystem.systems.BaseComponentSystem;
 import org.terasology.entitySystem.systems.RegisterMode;
 import org.terasology.entitySystem.systems.RegisterSystem;
-import org.terasology.input.ButtonState;
-import org.terasology.input.binds.inventory.InventoryButton;
 import org.terasology.logic.characters.CharacterComponent;
 import org.terasology.logic.characters.events.ActivationPredicted;
 import org.terasology.logic.characters.events.ActivationRequestDenied;
@@ -36,10 +33,6 @@ import org.terasology.rendering.nui.NUIManager;
 import org.terasology.rendering.nui.ScreenLayerClosedEvent;
 
 /**
- *
- * @author Immortius <immortius@gmail.com>
- * @author Florian <florian@fkoeberle.de>
- *
  */
 @RegisterSystem(RegisterMode.ALWAYS)
 public class InteractionSystem extends BaseComponentSystem {
@@ -112,7 +105,7 @@ public class InteractionSystem extends BaseComponentSystem {
 
     @ReceiveEvent(components = {InteractionScreenComponent.class})
     public void onInteractionStartPredicted(InteractionStartPredicted event, EntityRef container,
-                                   InteractionScreenComponent interactionScreenComponent) {
+                                            InteractionScreenComponent interactionScreenComponent) {
         EntityRef investigator = event.getInstigator();
         CharacterComponent characterComponent = investigator.getComponent(CharacterComponent.class);
         if (characterComponent == null) {
@@ -121,44 +114,23 @@ public class InteractionSystem extends BaseComponentSystem {
         }
         ClientComponent controller = characterComponent.controller.getComponent(ClientComponent.class);
         if (controller != null && controller.local) {
+            nuiManager.closeAllScreens();
             nuiManager.pushScreen(interactionScreenComponent.screen);
         }
     }
 
     /**
      * The method listens for the event that the user closes the screen of the current interaction target.
-     *
+     * <p>
      * When it happens then it cancels the interaction.
      */
     @ReceiveEvent(components = {ClientComponent.class})
     public void onScreenLayerClosed(ScreenLayerClosedEvent event, EntityRef container, ClientComponent clientComponent) {
         EntityRef character = clientComponent.character;
-        AssetUri activeInteractionScreenUri = InteractionUtil.getActiveInteractionScreenUri(character);
+        ResourceUrn activeInteractionScreenUri = InteractionUtil.getActiveInteractionScreenUri(character);
 
         if ((activeInteractionScreenUri != null) && (activeInteractionScreenUri.equals(event.getClosedScreenUri()))) {
             InteractionUtil.cancelInteractionAsClient(clientComponent.character);
         }
     }
-
-
-    /*
-     * At the activation of the inventory the current dialog needs to be closed instantly.
-     *
-     * The close of the dialog triggers {@link #onScreenLayerClosed} which resets the
-     * interactionTarget.
-     */
-    @ReceiveEvent(components = ClientComponent.class, priority = EventPriority.PRIORITY_HIGH)
-    public void onToggleInventory(InventoryButton event, EntityRef entity, ClientComponent clientComponent) {
-        if (event.getState() != ButtonState.DOWN) {
-            return;
-        }
-
-        EntityRef character = clientComponent.character;
-        AssetUri activeInteractionScreenUri = InteractionUtil.getActiveInteractionScreenUri(character);
-        if (activeInteractionScreenUri != null) {
-            InteractionUtil.cancelInteractionAsClient(character);
-            // do not consume the event, so that the inventory will still open
-        }
-    }
-
 }

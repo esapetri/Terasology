@@ -11,6 +11,9 @@
                     "text-color": "AAAAAAFF"
                 }
             }
+        },
+        "UIButtonWebBrowser": {
+            "text-color": "8B85FFFF"
         }
     },
     "families": {
@@ -19,7 +22,6 @@
                 "UIButton": {
                     "min-width": 192,
                     "min-height": 32
-
                 }
             }
         },
@@ -32,17 +34,30 @@
             }
         },
         "title": {
-            "font": "title"
+            "font": "NotoSans-Regular-Large",
+            "text-color": "F0F0F0FF"
+        },
+        "subtitle": {
+            "font": "NotoSans-Regular-Medium",
+            "text-color": "F0F0F0FF"
         },
         "error": {
             "text-color": "FF4444FF"
         },
-        "highlight": {
-            "text-color": "FFFF00FF"
+        "warning": {
+            "text-color": "FF4500FF"
         },
-        "heading-input": {
-            "font": "title",
-            "text-align-horizontal": "left"
+        "highlight": {
+            "text-color": "FFFF00FF",
+            "font": "NotoSans-Bold"
+        },
+        "subheading": {
+            "font": "NotoSans-Regular-Medium",
+            "text-align-horizontal": "left",
+            "margin": {
+                "bottom": 4,
+                "left": 4
+            }
         },
         "left-label": {
             "elements": {
@@ -59,7 +74,7 @@
                         "item": {
                             "modes": {
                                 "gameplay": {
-                                    "text-color": "2B65ECFF"
+                                    "text-color": "8B85FFFF"
                                 },
                                 "enabled": {
                                     "text-color": "00FF00FF"
@@ -67,11 +82,38 @@
                                 "dependency": {
                                     "text-color": "FFFF00FF"
                                 },
+                                "available": {
+                                    "text-color": "FFFFFFFF"
+                                },
                                 "disabled": {
                                     "text-color": "AAAAAAFF"
                                 },
                                 "invalid": {
                                     "text-color": "FF0000FF"
+                                },
+                                "latest": {
+                                    "text-color": "FFFF00FF"
+                                },
+                                "strict": {
+                                    "text-color": "FFFFFFFF"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "biome-list": {
+            "elements": {
+                "UIList": {
+                    "parts": {
+                        "item": {
+                            "modes": {
+                                "internal": {
+                                    "text-color": "FFFFFFFF"
+                                },
+                                "external": {
+                                    "text-color": "8B85FFFF"
                                 }
                             }
                         }

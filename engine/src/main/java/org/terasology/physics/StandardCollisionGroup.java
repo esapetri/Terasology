@@ -19,9 +19,9 @@ package org.terasology.physics;
 import java.util.Locale;
 
 /**
- * @author Immortius
  */
 public enum StandardCollisionGroup implements CollisionGroup {
+    NONE((short) 0b00000000),
     DEFAULT((short) 0b00000001),
     STATIC((short) 0b00000010),
     KINEMATIC((short) 0b00000100),
@@ -34,7 +34,7 @@ public enum StandardCollisionGroup implements CollisionGroup {
 
     private short flag;
 
-    private StandardCollisionGroup(short flag) {
+     StandardCollisionGroup(short flag) {
         this.flag = flag;
     }
 

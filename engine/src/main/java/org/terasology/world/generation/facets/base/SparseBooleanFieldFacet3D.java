@@ -16,20 +16,19 @@
 
 package org.terasology.world.generation.facets.base;
 
+import com.google.common.collect.Maps;
+import org.terasology.math.Region3i;
+import org.terasology.math.geom.Vector3i;
+import org.terasology.world.generation.Border3D;
+
 import java.util.Collections;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.terasology.math.Region3i;
-import org.terasology.math.Vector3i;
-import org.terasology.world.generation.Border3D;
-
-import com.google.common.collect.Maps;
-
 /**
  * A sparse (map-based) implementation
  * of {@link ObjectFacet3D}.
- * @author Martin Steiger
+ *
  */
 public abstract class SparseBooleanFieldFacet3D extends SparseFacet3D implements BooleanFieldFacet3D {
 
@@ -56,7 +55,7 @@ public abstract class SparseBooleanFieldFacet3D extends SparseFacet3D implements
         checkRelativeCoords(pos.x, pos.y, pos.z);
 
         Boolean boxed = relData.get(pos);
-        return (boxed != null) ? boxed.booleanValue() : defValue;
+        return (boxed != null) ? boxed : defValue;
     }
 
     @Override
@@ -69,7 +68,7 @@ public abstract class SparseBooleanFieldFacet3D extends SparseFacet3D implements
         checkRelativeCoords(pos.x, pos.y, pos.z);
 
         if (value != defValue) {
-            relData.put(pos, Boolean.valueOf(value));
+            relData.put(pos, value);
         }
     }
 
@@ -84,7 +83,7 @@ public abstract class SparseBooleanFieldFacet3D extends SparseFacet3D implements
 
         Vector3i rel = worldToRelative(x, y, z);
         Boolean boxed = relData.get(rel);
-        return (boxed != null) ? boxed.booleanValue() : defValue;
+        return (boxed != null) ? boxed : defValue;
     }
 
     @Override
@@ -98,7 +97,7 @@ public abstract class SparseBooleanFieldFacet3D extends SparseFacet3D implements
 
         Vector3i rel = worldToRelative(x, y, z);
         if (value != defValue) {
-            relData.put(rel, Boolean.valueOf(value));
+            relData.put(rel, value);
         }
     }
 

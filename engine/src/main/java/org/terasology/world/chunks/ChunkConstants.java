@@ -16,15 +16,12 @@
 
 package org.terasology.world.chunks;
 
-import org.terasology.config.Config;
-import org.terasology.module.sandbox.API;
-import org.terasology.registry.CoreRegistry;
 import org.terasology.math.Region3i;
 import org.terasology.math.TeraMath;
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
+import org.terasology.module.sandbox.API;
 
 /**
- * @author Immortius
  */
 @API
 public final class ChunkConstants {

@@ -18,11 +18,11 @@ package org.terasology.entitySystem.metadata;
 import com.google.common.collect.Iterables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.terasology.context.Context;
 import org.terasology.engine.SimpleUri;
 import org.terasology.entitySystem.Component;
 import org.terasology.module.Module;
 import org.terasology.naming.Name;
-import org.terasology.persistence.internal.ReadWriteStorageManager;
 import org.terasology.reflection.copy.CopyStrategy;
 import org.terasology.reflection.copy.CopyStrategyLibrary;
 import org.terasology.reflection.metadata.AbstractClassLibrary;
@@ -31,15 +31,13 @@ import org.terasology.reflection.reflect.ReflectFactory;
 
 /**
  * The library for metadata about components (and their fields).
- *
- * @author Immortius <immortius@gmail.com>
  */
 public class ComponentLibrary extends AbstractClassLibrary<Component> {
 
     private static final Logger logger = LoggerFactory.getLogger(ComponentLibrary.class);
 
-    public ComponentLibrary(ReflectFactory factory, CopyStrategyLibrary copyStrategies) {
-        super(factory, copyStrategies);
+    public ComponentLibrary(Context context) {
+        super(context);
     }
 
     private ComponentLibrary(ComponentLibrary componentLibrary, CopyStrategyLibrary newCopyStrategies) {
@@ -62,6 +60,10 @@ public class ComponentLibrary extends AbstractClassLibrary<Component> {
         } catch (NoSuchMethodException e) {
             logger.error("Unable to register class {}: Default Constructor Required", type.getSimpleName(), e);
             return null;
+        } catch (NoClassDefFoundError e) {
+            // log what class was not found so that diagnosis is easier
+            logger.error("Class not found, {}", type.getSimpleName(), e);
+            throw e;
         }
         return info;
     }
@@ -104,8 +106,8 @@ public class ComponentLibrary extends AbstractClassLibrary<Component> {
 
 
     /**
-     * Should not be called during the game, as the {@link ReadWriteStorageManager} creates a copy of the data
-     * and uses the same instance in multiple threads.
+     * Should not be called during the game, as the {@link org.terasology.persistence.internal.ReadWriteStorageManager}
+     * creates a copy of the data and uses the same instance in multiple threads.
      */
     @Override
     public void register(SimpleUri uri, Class<? extends Component> clazz) {

@@ -17,11 +17,11 @@
 package org.terasology.rendering;
 
 import org.lwjgl.opengl.GL11;
-import org.terasology.registry.CoreRegistry;
+import org.terasology.logic.players.LocalPlayer;
 import org.terasology.math.AABB;
 import org.terasology.math.geom.Vector3f;
 import org.terasology.math.geom.Vector4f;
-import org.terasology.rendering.world.WorldRenderer;
+import org.terasology.registry.CoreRegistry;
 
 import static org.lwjgl.opengl.GL11.GL_BLEND;
 import static org.lwjgl.opengl.GL11.GL_LINE_LOOP;
@@ -35,7 +35,6 @@ import static org.lwjgl.opengl.GL11.glEnable;
 import static org.lwjgl.opengl.GL11.glEnd;
 import static org.lwjgl.opengl.GL11.glEndList;
 import static org.lwjgl.opengl.GL11.glGenLists;
-import static org.lwjgl.opengl.GL11.glLineWidth;
 import static org.lwjgl.opengl.GL11.glNewList;
 import static org.lwjgl.opengl.GL11.glPopMatrix;
 import static org.lwjgl.opengl.GL11.glPushMatrix;
@@ -45,8 +44,6 @@ import static org.lwjgl.opengl.GL11.glVertex3f;
 
 /**
  * Renderer for an AABB.
- *
- * @author Immortius
  */
 public class AABBRenderer implements BlockOverlayRenderer {
     private int displayListWire = -1;
@@ -59,6 +56,7 @@ public class AABBRenderer implements BlockOverlayRenderer {
         this.aabb = aabb;
     }
 
+    @Override
     public void setAABB(AABB from) {
         if (from != null && !from.equals(this.aabb)) {
             this.aabb = from;
@@ -83,18 +81,17 @@ public class AABBRenderer implements BlockOverlayRenderer {
 
     /**
      * Renders this AABB.
-     * <p/>
-     *
-     * @param lineThickness The thickness of the line
+     * <br><br>
      */
-    public void render(float lineThickness) {
+    @Override
+    public void render() {
         CoreRegistry.get(ShaderManager.class).enableDefault();
 
         glPushMatrix();
-        Vector3f cameraPosition = CoreRegistry.get(WorldRenderer.class).getActiveCamera().getPosition();
+        Vector3f cameraPosition = CoreRegistry.get(LocalPlayer.class).getViewPosition();
         glTranslated(aabb.getCenter().x - cameraPosition.x, -cameraPosition.y, aabb.getCenter().z - cameraPosition.z);
 
-        renderLocally(lineThickness);
+        renderLocally();
 
         glPopMatrix();
     }
@@ -103,7 +100,7 @@ public class AABBRenderer implements BlockOverlayRenderer {
         CoreRegistry.get(ShaderManager.class).enableDefault();
 
         glPushMatrix();
-        Vector3f cameraPosition = CoreRegistry.get(WorldRenderer.class).getActiveCamera().getPosition();
+        Vector3f cameraPosition = CoreRegistry.get(LocalPlayer.class).getViewPosition();
         glTranslated(aabb.getCenter().x - cameraPosition.x, -cameraPosition.y, aabb.getCenter().z - cameraPosition.z);
 
         renderSolidLocally();
@@ -111,7 +108,14 @@ public class AABBRenderer implements BlockOverlayRenderer {
         glPopMatrix();
     }
 
-    public void renderLocally(float lineThickness) {
+    /**
+     * Maintained for API compatibility.
+     */
+    public void renderLocally(float ignored) {
+        renderLocally();
+    }
+
+    public void renderLocally() {
         CoreRegistry.get(ShaderManager.class).enableDefault();
 
         if (displayListWire == -1) {
@@ -121,7 +125,6 @@ public class AABBRenderer implements BlockOverlayRenderer {
         glPushMatrix();
         glTranslated(0f, aabb.getCenter().y, 0f);
 
-        glLineWidth(lineThickness);
         glCallList(displayListWire);
 
         glPopMatrix();

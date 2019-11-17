@@ -15,30 +15,49 @@
  */
 package org.terasology.core.world.generator.facetProviders;
 
+import org.terasology.entitySystem.Component;
 import org.terasology.math.TeraMath;
 import org.terasology.math.geom.Vector2f;
-import org.terasology.utilities.procedural.BrownianNoise3D;
-import org.terasology.utilities.procedural.Noise3DTo2DAdapter;
+import org.terasology.rendering.nui.properties.Range;
+import org.terasology.utilities.procedural.BrownianNoise;
 import org.terasology.utilities.procedural.PerlinNoise;
-import org.terasology.utilities.procedural.SubSampledNoise2D;
+import org.terasology.utilities.procedural.SubSampledNoise;
 import org.terasology.world.generation.Border3D;
-import org.terasology.world.generation.FacetProvider;
+import org.terasology.world.generation.ConfigurableFacetProvider;
 import org.terasology.world.generation.GeneratingRegion;
 import org.terasology.world.generation.Produces;
 import org.terasology.world.generation.facets.SurfaceHumidityFacet;
 
 /**
- * @author Immortius
+ * Defines surface humidity in the range [0..1] based on random noise.
+ * @deprecated Prefer using {@link SimplexHumidityProvider}.
  */
+@Deprecated
 @Produces(SurfaceHumidityFacet.class)
-public class PerlinHumidityProvider implements FacetProvider {
+public class PerlinHumidityProvider implements ConfigurableFacetProvider {
     private static final int SAMPLE_RATE = 4;
 
-    private SubSampledNoise2D humidityNoise;
+    private SubSampledNoise humidityNoise;
+
+    private Configuration config = new Configuration();
+
+    private long seed;
+
+    public PerlinHumidityProvider() {
+        // use default values
+    }
+
+    /**
+     * @param config the config to use
+     */
+    public PerlinHumidityProvider(Configuration config) {
+        this.config = config;
+    }
 
     @Override
     public void setSeed(long seed) {
-        humidityNoise = new SubSampledNoise2D(new Noise3DTo2DAdapter(new BrownianNoise3D(new PerlinNoise(seed + 6), 8)), new Vector2f(0.0005f, 0.0005f), SAMPLE_RATE);
+        this.seed = seed;
+        reload();
     }
 
     @Override
@@ -48,9 +67,40 @@ public class PerlinHumidityProvider implements FacetProvider {
 
         float[] noise = humidityNoise.noise(facet.getWorldRegion());
         for (int i = 0; i < noise.length; ++i) {
-            noise[i] = TeraMath.clamp((noise[i] + 1f) * 0.5f);
+            noise[i] = TeraMath.clamp((noise[i] * 2.11f + 1f) * 0.5f);
         }
         facet.set(noise);
         region.setRegionFacet(SurfaceHumidityFacet.class, facet);
+    }
+
+    @Override
+    public String getConfigurationName() {
+        return "Humidity";
+    }
+
+    @Override
+    public Component getConfiguration() {
+        return config;
+    }
+
+    @Override
+    public void setConfiguration(Component configuration) {
+        this.config = (Configuration) configuration;
+        reload();
+    }
+
+    private void reload() {
+        float realScale = config.scale * 0.01f;
+        Vector2f scale = new Vector2f(realScale, realScale);
+        BrownianNoise brown = new BrownianNoise(new PerlinNoise(seed + 6), config.octaves);
+        humidityNoise = new SubSampledNoise(brown, scale, SAMPLE_RATE);
+    }
+
+    public static class Configuration implements Component {
+        @Range(min = 0, max = 10.0f, increment = 1f, precision = 0, description = "The number of noise octaves")
+        public int octaves = 8;
+
+        @Range(min = 0.01f, max = 5f, increment = 0.01f, precision = 2, description = "The noise scale")
+        public float scale = 0.05f;
     }
 }

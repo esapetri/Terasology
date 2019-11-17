@@ -25,7 +25,6 @@ import java.util.Map;
 /**
  * TODO Type description
  *
- * @author Martin Steiger
  */
 public interface ServerInfoMessage {
 
@@ -33,6 +32,8 @@ public interface ServerInfoMessage {
      * @return
      */
     String getGameName();
+
+    String getMOTD();
 
     List<WorldInfo> getWorldInfoList();
 
@@ -45,8 +46,6 @@ public interface ServerInfoMessage {
      * @return
      */
     Map<Integer, String> getBlockIds();
-
-    Map<Short, String> getBiomeIds();
 
     /**
      * @return
@@ -63,4 +62,8 @@ public interface ServerInfoMessage {
      */
     float getReflectionHeight();
 
+    /**
+     * Get amount of online players from server
+     */
+    int getOnlinePlayersAmount();
 }

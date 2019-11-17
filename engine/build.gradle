@@ -1,19 +1,12 @@
 // The engine build is the primary Java project and has the primary list of dependencies
 
-// Get the gradle versioneye plugin from the plugins.gradle.org repo
-plugins {
-    id "org.standardout.versioneye" version "1.0.0"
-}
-
 // Grab all the common stuff like plugins to use, artifact repositories, code analysis config, etc
 apply from: "$rootDir/config/gradle/artifactory.gradle"
 
 import groovy.json.JsonSlurper
-import org.apache.tools.ant.filters.FixCrLfFilter
 import org.reflections.Reflections;
 import org.reflections.scanners.SubTypesScanner;
 import org.reflections.scanners.TypeAnnotationsScanner;
-import org.reflections.util.ConfigurationBuilder;
 
 import java.text.SimpleDateFormat;
 
@@ -90,52 +83,90 @@ configurations.all {
 // Primary dependencies definition
 dependencies {
 
+
+
+
     // Storage and networking
-    compile group: 'com.google.guava', name: 'guava', version: '18.0'
-    compile group: 'com.google.code.gson', name: 'gson', version: '2.3.1'
+    compile group: 'com.google.guava', name: 'guava', version: '23.0'
+    compile group: 'com.google.code.gson', name: 'gson', version: '2.6.2'
     compile group: 'com.google.protobuf', name: 'protobuf-java', version: '2.6.1'
     compile group: 'net.sf.trove4j', name: 'trove4j', version: '3.0.3'
-    compile group: 'io.netty', name: 'netty', version: '3.10.0.Final'
+    compile group: 'io.netty', name: 'netty', version: '3.10.5.Final'
 
     // Java magic
-    compile group: 'net.java.dev.jna', name: 'jna', version: '3.5.2'
-    compile group: 'net.java.dev.jna', name: 'platform', version: '3.5.2'
-    compile group: 'org.reflections', name: 'reflections', version: '0.9.9-RC1'
-    compile group: 'com.esotericsoftware.reflectasm', name: 'reflectasm', version: '1.09'
+    compile group: 'net.java.dev.jna', name: 'jna-platform', version: '4.2.2'
+    compile group: 'org.reflections', name: 'reflections', version: '0.9.10'
+    compile group: 'org.javassist', name: 'javassist', version: '3.20.0-GA'
+    compile group: 'com.esotericsoftware', name: 'reflectasm', version: '1.11.1'
 
     // Graphics, 3D, UI, etc
     compile group: 'org.lwjgl.lwjgl', name: 'lwjgl', version: LwjglVersion
     compile group: 'org.lwjgl.lwjgl', name: 'lwjgl_util', version: LwjglVersion
     compile group: 'java3d', name: 'vecmath', version: '1.3.1' // Note: Downgraded to this release until TeraMath ready
-    compile group: 'org.abego.treelayout', name: 'org.abego.treelayout.core', version: '1.0.1'
+    compile "org.joml:joml:1.8.1"
+    compile group: 'org.abego.treelayout', name: 'org.abego.treelayout.core', version: '1.0.3'
     compile group: 'com.miglayout', name: 'miglayout-core', version: '5.0'
-    compile group: 'org.newdawn.slick', name: 'slick', version: '237'
+    compile group: 'de.matthiasmann.twl', name: 'PNGDecoder', version: '1111'
+
+    // Assembly & Bytecode
+    compile group: 'org.ow2.asm', name: 'asm', version: '5.0.3'
+    compile group: 'org.ow2.asm', name: 'asm-tree', version: '5.0.4'
+    compile group: 'org.ow2.asm', name: 'asm-util', version: '5.0.4'
+    compile group: 'org.ow2.asm', name: 'asm-commons', version: '5.0.4'
+
 
     // Logging and audio
-    compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.9'
+    compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.21'
     compile group: 'com.projectdarkstar.ext.jorbis', name: 'jorbis', version: '0.0.17'
 
     // Small-time 3rd party libs we've stored in our Artifactory for access
     compile group: 'ec.util', name: 'MersenneTwister', version: '20'
     compile group: 'org.eaxy', name: 'eaxy', version: '0.1'
 
+    // telemetry
+    compile (group: 'com.snowplowanalytics', name: 'snowplow-java-tracker', version :'0.8.0'){
+        exclude group:'org.slf4j',module:'slf4j-simple'
+    }
+    compile group: 'net.logstash.logback', name: 'logstash-logback-encoder', version: '4.10'
+
+    // Discord RPC
+    compile 'com.jagrosh:DiscordIPC:0.4'
+
     // Our developed libs
-    compile group: 'org.terasology', name: 'gestalt-module', version: '2.2.3'
-    compile group: 'org.terasology', name: 'TeraMath', version: '+', changing: true
-    compile group: 'org.terasology.bullet', name: 'tera-bullet', version: '1.0.3'
+    compile group: 'org.terasology', name: 'gestalt-module', version: '5.1.4'
+    compile group: 'org.terasology', name: 'gestalt-asset-core', version: '5.1.4'
+    compile group: 'org.terasology', name: 'TeraMath', version: '1.4.0'
+    compile group: 'org.terasology.bullet', name: 'tera-bullet', version: '1.3.1'
+    compile group: 'org.terasology', name: 'splash-screen', version: '1.0.2'
+    compile group: 'org.terasology.jnlua', name: 'JNLua', version: '0.1.0-SNAPSHOT'
 
     // Wildcard dependency to catch any libs provided with the project (remote repo preferred instead)
     compile fileTree(dir: 'libs', include: '*.jar')
 
-    // TODO: These could be moved into facade
-    compile group: 'org.terasology', name: 'CrashReporter', version: '+', changing: true
-    runtime group: 'org.slf4j', name: 'jul-to-slf4j', version: '1.7.9'
-    runtime group: 'ch.qos.logback', name: 'logback-classic', version: '1.1.2'
-    // And here is Groovy just to read the config file
-    runtime group: 'org.codehaus.groovy', name: 'groovy', version: '2.3.9'
+    compile group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.3'
+    runtime group: 'org.slf4j', name: 'jul-to-slf4j', version: '1.7.21'
 
     // In addition to all the above the dev source set also needs to depend on what gets compiled in main
     devCompile sourceSets.main.output
+
+    // Dependency on CrashReporter, conditionally either from source or via binary
+    // TODO: Consider moving this back to the PC Facade instead of having the engine rely on it?
+    File wouldBeSrcPath = new File(rootDir, 'libs/CrashReporter')
+    println "ENGINE Scanning for source CrashReporter at: " + wouldBeSrcPath.getAbsolutePath()
+
+    if (wouldBeSrcPath.exists()) {
+        println "*** Identified CrashReporter source, using that"
+        //compile ':libs:CrashReporter:cr-terasology'
+
+        def targetProject = findProject(':libs:CrashReporter:cr-terasology')
+        println "Found the project? " + targetProject
+        //compile targetProject
+
+        compile project(':libs:CrashReporter:cr-terasology')
+    } else {
+        println "*** Setting a CrashReporter binary dependency, not present as source"
+        compile group: 'org.terasology.crashreporter', name: 'cr-terasology', version: '4.1.0'
+    }
 }
 
 // Instructions for packaging a jar file for the engine
@@ -152,18 +183,17 @@ jar {
 task cacheReflections {
     description = 'Caches reflection output to make regular startup faster. May go stale and need cleanup at times.'
     inputs.files project.classes.outputs.files
-    outputs.file file(sourceSets.main.output.classesDir.toString() + "/reflections.cache")
     dependsOn classes
-    
-    doFirst {
+
+    doLast {
         // Without the .mkdirs() we might hit a scenario where the classes dir doesn't exist yet
         file(sourceSets.main.output.classesDir.toString()).mkdirs()
-        Reflections reflections = new ConfigurationBuilder()
-                .addUrls(configurations.runtime.collect { it.toURI().toURL()} + sourceSets.main.output.classesDir.toURI().toURL())
-                .setScanners(new TypeAnnotationsScanner(), new SubTypesScanner())
-                .build()
+        Reflections reflections = new org.reflections.Reflections(new org.reflections.util.ConfigurationBuilder()
+            .addUrls(configurations.compile.collect { it.toURI().toURL()} + sourceSets.main.output.classesDir.toURI().toURL())
+            .setScanners(new TypeAnnotationsScanner(), new SubTypesScanner()))
         reflections.save(sourceSets.main.output.classesDir.toString() + "/reflections.cache")
     }
+
 }
 
 task cleanReflections(type: Delete) {
@@ -193,14 +223,7 @@ version = moduleConfig.version
 // Jenkins-Artifactory integration catches on to this as part of the Maven-type descriptor
 group = 'org.terasology.engine'
 
-// Everything is considered a snapshot unless built by a Jenkins release job. Might as well just attach -SNAPSHOT here
-if (env.ReleaseScope == null) {
-    version += '-SNAPSHOT'
-    println "Sticking with default snapshot for $project.name: $version"
-} else {
-    // Do version stuff
-    println "Expecting running as Jenkins release job, need to increment version $version by scope: " + env.ReleaseScope
-}
+println "Version for $project.name loaded as $version for group $group"
 
 // This version info file actually goes inside the built jar and can be used at runtime
 task createVersionInfoFile {
@@ -243,3 +266,8 @@ idea {
         downloadSources = true
     }
 }
+
+// Make sure our config file for code analytics get extracted (vulnerability: non-IDE execution of single analytic)
+ideaModule.dependsOn rootProject.extractConfig
+tasks.eclipse.dependsOn rootProject.extractConfig
+check.dependsOn rootProject.extractConfig

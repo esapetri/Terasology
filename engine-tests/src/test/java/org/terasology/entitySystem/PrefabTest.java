@@ -19,23 +19,29 @@ import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.terasology.asset.AssetFactory;
-import org.terasology.asset.AssetManager;
-import org.terasology.asset.AssetType;
-import org.terasology.asset.AssetUri;
-import org.terasology.engine.bootstrap.EntitySystemBuilder;
+import org.terasology.assets.AssetFactory;
+import org.terasology.assets.management.AssetManager;
+import org.terasology.assets.module.ModuleAwareAssetTypeManager;
+import org.terasology.context.internal.ContextImpl;
+import org.terasology.engine.bootstrap.EntitySystemSetupUtil;
 import org.terasology.engine.module.ModuleManager;
-import org.terasology.entitySystem.entity.EntityManager;
+import org.terasology.entitySystem.metadata.ComponentLibrary;
 import org.terasology.entitySystem.prefab.Prefab;
 import org.terasology.entitySystem.prefab.PrefabData;
 import org.terasology.entitySystem.prefab.PrefabManager;
 import org.terasology.entitySystem.prefab.internal.PojoPrefab;
 import org.terasology.entitySystem.prefab.internal.PojoPrefabManager;
+import org.terasology.entitySystem.prefab.internal.PrefabFormat;
+import org.terasology.entitySystem.stubs.ListOfEnumsComponent;
+import org.terasology.entitySystem.stubs.ListOfObjectComponent;
+import org.terasology.entitySystem.stubs.MappedContainerComponent;
 import org.terasology.entitySystem.stubs.OrderedMapTestComponent;
 import org.terasology.entitySystem.stubs.StringComponent;
+import org.terasology.math.Side;
 import org.terasology.network.NetworkMode;
 import org.terasology.network.NetworkSystem;
-import org.terasology.reflection.reflect.ReflectionReflectFactory;
+import org.terasology.persistence.typeHandling.TypeHandlerLibrary;
+import org.terasology.recording.RecordAndReplayCurrentStatus;
 import org.terasology.registry.CoreRegistry;
 import org.terasology.testUtil.ModuleManagerFactory;
 
@@ -51,7 +57,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * @author Immortius
  */
 public class PrefabTest {
 
@@ -61,46 +66,54 @@ public class PrefabTest {
 
     @Before
     public void setup() throws Exception {
+        ContextImpl context = new ContextImpl();
+        context.put(RecordAndReplayCurrentStatus.class, new RecordAndReplayCurrentStatus());
+        CoreRegistry.setContext(context);
         ModuleManager moduleManager = ModuleManagerFactory.create();
+        context.put(ModuleManager.class, moduleManager);
 
-        AssetManager assetManager = new AssetManager(moduleManager.getEnvironment());
-        CoreRegistry.put(ModuleManager.class, moduleManager);
-        CoreRegistry.put(AssetManager.class, assetManager);
-        AssetType.registerAssetTypes(assetManager);
-        assetManager.setAssetFactory(AssetType.PREFAB, new AssetFactory<PrefabData, Prefab>() {
-            @Override
-            public Prefab buildAsset(AssetUri uri, PrefabData data) {
-                return new PojoPrefab(uri, data);
-            }
-        });
+        EntitySystemSetupUtil.addReflectionBasedLibraries(context);
+
+        ModuleAwareAssetTypeManager assetTypeManager = new ModuleAwareAssetTypeManager();
+        assetTypeManager.registerCoreAssetType(Prefab.class,
+                (AssetFactory<Prefab, PrefabData>) PojoPrefab::new, "prefabs");
+        ComponentLibrary componentLibrary = context.get(ComponentLibrary.class);
+        TypeHandlerLibrary typeHandlerLibrary = context.get(TypeHandlerLibrary.class);
+        PrefabFormat prefabFormat = new PrefabFormat(componentLibrary, typeHandlerLibrary);
+        assetTypeManager.registerCoreFormat(Prefab.class, prefabFormat);
+        assetTypeManager.switchEnvironment(moduleManager.getEnvironment());
+        context.put(AssetManager.class, assetTypeManager.getAssetManager());
+
         NetworkSystem networkSystem = mock(NetworkSystem.class);
         when(networkSystem.getMode()).thenReturn(NetworkMode.NONE);
-        EntityManager em = new EntitySystemBuilder().build(moduleManager.getEnvironment(), networkSystem, new ReflectionReflectFactory());
-        prefabManager = new PojoPrefabManager();
+        context.put(NetworkSystem.class, networkSystem);
+        EntitySystemSetupUtil.addEntityManagementRelatedClasses(context);
+
+        prefabManager = new PojoPrefabManager(context);
     }
 
     @Test
-    public void getSimplePrefab() {
+    public void testGetSimplePrefab() {
         Prefab prefab = prefabManager.getPrefab("unittest:simple");
         assertNotNull(prefab);
         assertEquals("unittest:simple", prefab.getName());
     }
 
     @Test
-    public void prefabHasDefinedComponents() {
+    public void testPrefabHasDefinedComponents() {
         Prefab prefab = prefabManager.getPrefab("unittest:withComponent");
         assertTrue(prefab.hasComponent(StringComponent.class));
     }
 
     @Test
-    public void prefabHasDefinedComponentsWithOrderedMap() {
+    public void testPrefabHasDefinedComponentsWithOrderedMap() {
         Prefab prefab = prefabManager.getPrefab("unittest:withComponentContainingOrderedMap");
         assertTrue(prefab.hasComponent(OrderedMapTestComponent.class));
         OrderedMapTestComponent component = prefab.getComponent(OrderedMapTestComponent.class);
         assertNotNull(component);
         Map<String, Long> orderedMap = component.orderedMap;
         Set<String> keySet = orderedMap.keySet();
-        List<String> keyList = new ArrayList<String>(keySet);
+        List<String> keyList = new ArrayList<>(keySet);
         assertEquals(4, keyList.size());
         assertEquals("one", keyList.get(0));
         assertEquals("two", keyList.get(1));
@@ -113,14 +126,48 @@ public class PrefabTest {
     }
 
     @Test
-    public void prefabInheritsFromParent() {
+    public void testPrefabInheritsFromParent() {
         Prefab prefab = prefabManager.getPrefab("unittest:inheritsComponent");
         assertTrue(prefab.hasComponent(StringComponent.class));
     }
 
     @Test
-    public void prefabTransitiveInheritance() {
+    public void testPrefabTransitiveInheritance() {
         Prefab prefab = prefabManager.getPrefab("unittest:multilevelInheritance");
         assertTrue(prefab.hasComponent(StringComponent.class));
+    }
+
+    @Test
+    public void testPrefabWithCollectionOfMappedContainers() {
+        Prefab prefab = prefabManager.getPrefab("unittest:withCollectionOfMappedContainers");
+        MappedContainerComponent mappedContainer = prefab.getComponent(MappedContainerComponent.class);
+        assertNotNull(mappedContainer);
+        assertNotNull(mappedContainer.containers);
+        assertEquals(1, mappedContainer.containers.size());
+        MappedContainerComponent.Cont cont = mappedContainer.containers.iterator().next();
+        assertNotNull(cont);
+        assertEquals("a", cont.value);
+    }
+
+    @Test
+    public void testPrefabWithListOfMappedContainers() {
+        Prefab prefab = prefabManager.getPrefab("unittest:withListContainer");
+        ListOfObjectComponent mappedContainer = prefab.getComponent(ListOfObjectComponent.class);
+        assertEquals(2, mappedContainer.elements.size());
+        assertEquals("returnHome", mappedContainer.elements.get(1).id);
+    }
+
+    @Test
+    public void testPrefabWithListOfEnums() {
+        Prefab prefab = prefabManager.getPrefab("unittest:withListEnumContainer");
+        ListOfEnumsComponent mappedContainer = prefab.getComponent(ListOfEnumsComponent.class);
+        assertEquals(6, mappedContainer.elements.size());
+        assertEquals(Side.TOP, mappedContainer.elements.get(0));
+        assertEquals(Side.LEFT, mappedContainer.elements.get(1));
+        assertEquals(Side.RIGHT, mappedContainer.elements.get(2));
+        assertEquals(Side.FRONT, mappedContainer.elements.get(3));
+        assertEquals(Side.BACK, mappedContainer.elements.get(4));
+        assertEquals(Side.BOTTOM, mappedContainer.elements.get(5));
+
     }
 }

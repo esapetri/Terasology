@@ -3,6 +3,8 @@
 // Dependencies needed for what our Gradle scripts themselves use. It cannot be included via an external Gradle file :-(
 buildscript {
     repositories {
+        // External libs - jcenter is Bintray and is supposed to be a superset of Maven Central, but do both just in case
+        jcenter()
         mavenCentral()
     }
 
@@ -321,7 +323,7 @@ tasks.addRule("Pattern: createFacade<ID>") { String taskName ->
 }
 
 // Dynamic task for fetching project-related libs
-// Sample command: gradlew fetchLibJitter
+// Sample command: gradlew fetchLibCrashReporter
 tasks.addRule("Pattern: fetchLib<ID>") { String taskName ->
     if (taskName.startsWith("fetchLib")) {
 

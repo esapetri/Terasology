@@ -16,29 +16,32 @@
 
 package org.terasology.persistence.internal;
 
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.Collection;
-
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.entity.internal.EngineEntityManager;
 import org.terasology.module.ModuleEnvironment;
 import org.terasology.network.Client;
 import org.terasology.network.ClientComponent;
+import org.terasology.world.block.BlockManager;
 import org.terasology.world.chunks.Chunk;
+import org.terasology.world.chunks.blockdata.ExtraBlockDataManager;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Collection;
 
 /**
  * A {@link org.terasology.persistence.StorageManager} that performs reading only.
- * @author Martin Steiger
  */
 public final class ReadOnlyStorageManager extends AbstractStorageManager {
 
-    public ReadOnlyStorageManager(Path savePath, ModuleEnvironment environment, EngineEntityManager entityManager) {
-        this(savePath, environment, entityManager, true);
+    public ReadOnlyStorageManager(Path savePath, ModuleEnvironment environment, EngineEntityManager entityManager,
+                                  BlockManager blockManager, ExtraBlockDataManager extraDataManager) {
+        this(savePath, environment, entityManager, blockManager, extraDataManager, true);
     }
 
-    public ReadOnlyStorageManager(Path savePath, ModuleEnvironment environment, EngineEntityManager entityManager, boolean storeChunksInZips) {
-        super(savePath, environment, entityManager, storeChunksInZips);
+    public ReadOnlyStorageManager(Path savePath, ModuleEnvironment environment, EngineEntityManager entityManager,
+                                  BlockManager blockManager, ExtraBlockDataManager extraDataManager, boolean storeChunksInZips) {
+        super(savePath, environment, entityManager, blockManager, extraDataManager, storeChunksInZips);
     }
 
     @Override
@@ -60,9 +63,7 @@ public final class ReadOnlyStorageManager extends AbstractStorageManager {
     public void deactivateChunk(Chunk chunk) {
         Collection<EntityRef> entitiesOfChunk = getEntitiesOfChunk(chunk);
 
-        for (EntityRef entity : entitiesOfChunk) {
-            deactivateOrDestroyEntityRecursive(entity);
-        }
+        entitiesOfChunk.forEach(this::deactivateOrDestroyEntityRecursive);
     }
 
     @Override

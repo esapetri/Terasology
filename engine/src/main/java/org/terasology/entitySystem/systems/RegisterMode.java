@@ -22,7 +22,6 @@ import org.terasology.network.NetworkMode;
  * Enumeration of registration modes for ComponentSystems.
  * The registration mode dictates if a component system should be run locally or not.
  *
- * @author Immortius
  */
 public enum RegisterMode {
     /**
@@ -47,7 +46,7 @@ public enum RegisterMode {
     private boolean validWhenRemote;
     private boolean validWhenHeadless;
 
-    private RegisterMode(boolean validWhenAuthority, boolean validWhenRemote, boolean validWhenHeadless) {
+     RegisterMode(boolean validWhenAuthority, boolean validWhenRemote, boolean validWhenHeadless) {
         this.validWhenAuthority = validWhenAuthority;
         this.validWhenRemote = validWhenRemote;
         this.validWhenHeadless = validWhenHeadless;

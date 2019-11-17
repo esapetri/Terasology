@@ -20,7 +20,8 @@ import org.terasology.audio.StaticSound;
 import org.terasology.network.OwnerEvent;
 
 /**
- * @author Immortius
+ * This event is sent whenever a sound is played.
+ * It will also be sent to the client that owns the entity sending the event.
  */
 @OwnerEvent
 public class PlaySoundForOwnerEvent extends AbstractPlaySoundEvent {

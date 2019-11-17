@@ -23,11 +23,9 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Queues;
 import com.google.common.collect.SetMultimap;
-
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
-
 import org.jboss.netty.channel.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,8 +36,7 @@ import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.entity.internal.EngineEntityManager;
 import org.terasology.entitySystem.event.Event;
 import org.terasology.math.ChunkMath;
-import org.terasology.math.TeraMath;
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.network.NetMetricSource;
 import org.terasology.network.NetworkComponent;
 import org.terasology.network.Server;
@@ -54,17 +51,19 @@ import org.terasology.protobuf.NetData;
 import org.terasology.registry.CoreRegistry;
 import org.terasology.world.BlockEntityRegistry;
 import org.terasology.world.WorldProvider;
-import org.terasology.world.biomes.Biome;
-import org.terasology.world.biomes.BiomeManager;
 import org.terasology.world.block.Block;
 import org.terasology.world.block.BlockComponent;
 import org.terasology.world.block.BlockManager;
 import org.terasology.world.block.BlockUri;
+import org.terasology.world.block.BlockUriParseException;
 import org.terasology.world.block.internal.BlockManagerImpl;
 import org.terasology.world.chunks.Chunk;
+import org.terasology.world.chunks.blockdata.ExtraBlockDataManager;
 import org.terasology.world.chunks.internal.ChunkSerializer;
 import org.terasology.world.chunks.remoteChunkProvider.RemoteChunkProvider;
 
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -74,7 +73,6 @@ import java.util.concurrent.BlockingQueue;
 /**
  * Used to interact with a remote server (from client end)
  *
- * @author Immortius
  */
 public class ServerImpl implements Server {
     private static final Logger logger = LoggerFactory.getLogger(ServerImpl.class);
@@ -92,7 +90,7 @@ public class ServerImpl implements Server {
     private NetworkEntitySerializer entitySerializer;
     private EventSerializer eventSerializer;
     private BlockManagerImpl blockManager;
-    private BiomeManager biomeManager;
+    private ExtraBlockDataManager extraDataManager;
 
     private BlockEntityRegistry blockEntityRegistry;
     private RemoteChunkProvider remoteWorldProvider;
@@ -100,7 +98,7 @@ public class ServerImpl implements Server {
     private TIntSet netDirty = new TIntHashSet();
     private SetMultimap<Integer, Class<? extends Component>> changedComponents = HashMultimap.create();
     private ListMultimap<Vector3i, NetData.BlockChangeMessage> awaitingChunkReadyBlockUpdates = ArrayListMultimap.create();
-    private ListMultimap<Vector3i, NetData.BiomeChangeMessage> awaitingChunkReadyBiomeUpdates = ArrayListMultimap.create();
+    private ListMultimap<Vector3i, NetData.ExtraDataChangeMessage> awaitingChunkReadyExtraDataUpdates = ArrayListMultimap.create();
 
     private EngineTime time;
 
@@ -119,7 +117,7 @@ public class ServerImpl implements Server {
         this.entitySerializer = newEntitySerializer;
         this.blockEntityRegistry = newBlockEntityRegistry;
         blockManager = (BlockManagerImpl) CoreRegistry.get(BlockManager.class);
-        biomeManager = CoreRegistry.get(BiomeManager.class);
+        extraDataManager = CoreRegistry.get(ExtraBlockDataManager.class);
     }
 
     void setServerInfo(NetData.ServerInfoMessage serverInfo) {
@@ -133,6 +131,16 @@ public class ServerImpl implements Server {
     @Override
     public EntityRef getClientEntity() {
         return networkSystem.getEntity(clientEntityNetId);
+    }
+
+    @Override
+    public String getRemoteAddress() {
+        SocketAddress socketAddress = channel.getRemoteAddress();
+
+        // Cast to InetSocketAddress to retrieve remote address
+        InetSocketAddress inetSocketAddress = (InetSocketAddress) socketAddress;
+
+        return inetSocketAddress.getHostName() + "-" + inetSocketAddress.getAddress().getHostAddress() + "-" + inetSocketAddress.getPort();
     }
 
     @Override
@@ -180,9 +188,7 @@ public class ServerImpl implements Server {
     }
 
     private void sendEvents(NetData.NetMessage.Builder message) {
-        for (NetData.EventMessage event : queuedOutgoingEvents) {
-            message.addEvent(event);
-        }
+        queuedOutgoingEvents.forEach(message::addEvent);
         queuedOutgoingEvents.clear();
     }
 
@@ -260,14 +266,10 @@ public class ServerImpl implements Server {
             processReceivedChunks(message);
             processInvalidatedChunks(message);
             processBlockChanges(message);
-            processBiomeChanges(message);
+            processExtraDataChanges(message);
             processRemoveEntities(message);
-            for (NetData.CreateEntityMessage createEntity : message.getCreateEntityList()) {
-                createEntityMessage(createEntity);
-            }
-            for (NetData.UpdateEntityMessage updateEntity : message.getUpdateEntityList()) {
-                updateEntity(updateEntity);
-            }
+            message.getCreateEntityList().forEach(this::createEntityMessage);
+            message.getUpdateEntityList().forEach(this::updateEntity);
             for (NetData.EventMessage event : message.getEventList()) {
                 try {
                     processEvent(event);
@@ -289,7 +291,10 @@ public class ServerImpl implements Server {
             }
         }
     }
-
+    
+    /**
+     * Apply the block changes from the message to the local world.
+     */
     private void processBlockChanges(NetData.NetMessage message) {
         for (NetData.BlockChangeMessage blockChange : message.getBlockChangeList()) {
             Block newBlock = blockManager.getBlock((short) blockChange.getNewBlock());
@@ -305,17 +310,17 @@ public class ServerImpl implements Server {
         }
     }
 
-    private void processBiomeChanges(NetData.NetMessage message) {
-        for (NetData.BiomeChangeMessage biomeChange : message.getBiomeChangeList()) {
-            logger.debug("Received block change to {}", blockManager.getBlock((short) biomeChange.getNewBiome()));
-            // TODO: Store changes to blocks that aren't ready to be modified (the surrounding chunks aren't available)
+    /**
+     * Apply the extra-data changes from the message to the local world.
+     */
+    private void processExtraDataChanges(NetData.NetMessage message) {
+        for (NetData.ExtraDataChangeMessage extraDataChange : message.getExtraDataChangeList()) {
             WorldProvider worldProvider = CoreRegistry.get(WorldProvider.class);
-            Vector3i pos = NetMessageUtil.convert(biomeChange.getPos());
+            Vector3i pos = NetMessageUtil.convert(extraDataChange.getPos());
             if (worldProvider.isBlockRelevant(pos)) {
-                Biome newBiome = biomeManager.getBiomeByShortId((short) biomeChange.getNewBiome());
-                worldProvider.setBiome(pos, newBiome);
+                worldProvider.setExtraData(extraDataChange.getIndex(), pos, extraDataChange.getNewData());
             } else {
-                awaitingChunkReadyBiomeUpdates.put(ChunkMath.calcChunkPos(pos), biomeChange);
+                awaitingChunkReadyExtraDataUpdates.put(ChunkMath.calcChunkPos(pos), extraDataChange);
             }
         }
     }
@@ -325,13 +330,13 @@ public class ServerImpl implements Server {
             Vector3i chunkPos = NetMessageUtil.convert(chunk.getPos());
             remoteWorldProvider.invalidateChunks(chunkPos);
             awaitingChunkReadyBlockUpdates.removeAll(chunkPos);
-            awaitingChunkReadyBiomeUpdates.removeAll(chunkPos);
+            awaitingChunkReadyExtraDataUpdates.removeAll(chunkPos);
         }
     }
 
     private void processReceivedChunks(NetData.NetMessage message) {
         for (EntityData.ChunkStore chunkInfo : message.getChunkInfoList()) {
-            Chunk chunk = ChunkSerializer.decode(chunkInfo);
+            Chunk chunk = ChunkSerializer.decode(chunkInfo, blockManager, extraDataManager);
             chunkQueue.offer(chunk);
         }
     }
@@ -343,12 +348,16 @@ public class ServerImpl implements Server {
             } else if (blockFamily.getBlockUriCount() == 0) {
                 logger.error("Received empty block registration");
             } else {
-                BlockUri family = new BlockUri(blockFamily.getBlockUri(0)).getFamilyUri();
-                Map<String, Integer> registrationMap = Maps.newHashMap();
-                for (int i = 0; i < blockFamily.getBlockIdCount(); ++i) {
-                    registrationMap.put(blockFamily.getBlockUri(i), blockFamily.getBlockId(i));
+                try {
+                    BlockUri family = new BlockUri(blockFamily.getBlockUri(0)).getFamilyUri();
+                    Map<String, Integer> registrationMap = Maps.newHashMap();
+                    for (int i = 0; i < blockFamily.getBlockIdCount(); ++i) {
+                        registrationMap.put(blockFamily.getBlockUri(i), blockFamily.getBlockId(i));
+                    }
+                    blockManager.receiveFamilyRegistration(family, registrationMap);
+                } catch (BlockUriParseException e) {
+                    logger.error("Received invalid block uri {}", blockFamily.getBlockUri(0));
                 }
-                blockManager.receiveFamilyRegistration(family, registrationMap);
             }
         }
     }
@@ -368,7 +377,7 @@ public class ServerImpl implements Server {
             entitySerializer.deserializeOnto(currentEntity, updateEntity.getEntity());
             BlockComponent blockComponent = currentEntity.getComponent(BlockComponent.class);
             if (blockComponent != null && !blockEntityBefore) {
-                if (!blockEntityRegistry.getExistingBlockEntityAt(blockComponent.getPosition()).equals(currentEntity)) {
+                if (!blockEntityRegistry.getExistingBlockEntityAt(blockComponent.position).equals(currentEntity)) {
                     logger.error("Failed to associated new block entity");
                 }
             }
@@ -411,11 +420,12 @@ public class ServerImpl implements Server {
             worldProvider.setBlock(pos, newBlock);
         }
 
-        List<NetData.BiomeChangeMessage> updateBiomeMessages = awaitingChunkReadyBiomeUpdates.removeAll(chunkPos);
-        for (NetData.BiomeChangeMessage message : updateBiomeMessages) {
+        List<NetData.ExtraDataChangeMessage> updateExtraDataMessages = awaitingChunkReadyExtraDataUpdates.removeAll(chunkPos);
+        for (NetData.ExtraDataChangeMessage message : updateExtraDataMessages) {
             Vector3i pos = NetMessageUtil.convert(message.getPos());
-            Biome newBiome = biomeManager.getBiomeByShortId((short) message.getNewBiome());
-            worldProvider.setBiome(pos, newBiome);
+            int newValue = message.getNewData();
+            int i = message.getIndex();
+            worldProvider.setExtraData(i, pos, newValue);
         }
     }
 }

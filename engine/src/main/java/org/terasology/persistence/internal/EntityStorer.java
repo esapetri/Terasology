@@ -32,8 +32,6 @@ import java.util.Set;
 /**
  * Utility class for the construction of a EntityData.EntityStore structure for storing the entities on disk..
  *
- * @author Immortius
- * @author Florian <florian@fkoeberle.de>
  */
 final class EntityStorer {
 
@@ -42,7 +40,7 @@ final class EntityStorer {
     private final OwnershipHelper helper;
     private Set<EntityRef> storedEntities = Sets.newHashSet();
 
-    public EntityStorer(EngineEntityManager entityManager) {
+    EntityStorer(EngineEntityManager entityManager) {
         this.entityStoreBuilder = EntityData.EntityStore.newBuilder();
         this.serializer = new EntitySerializer(entityManager);
         this.helper = new OwnershipHelper(entityManager.getComponentLibrary());
@@ -62,10 +60,8 @@ final class EntityStorer {
     public void store(EntityRef entity, String name) {
         if (entity.isActive()) {
             for (EntityRef ownedEntity : helper.listOwnedEntities(entity)) {
-                if (!ownedEntity.isAlwaysRelevant()) {
-                    if (ownedEntity.isPersistent()) {
-                        store(ownedEntity);
-                    }
+                if (!ownedEntity.isAlwaysRelevant() && ownedEntity.isPersistent()) {
+                    store(ownedEntity);
                 }
             }
             EntityData.Entity entityData = serializer.serialize(entity, true, FieldSerializeCheck.NullCheck.<Component>newInstance());

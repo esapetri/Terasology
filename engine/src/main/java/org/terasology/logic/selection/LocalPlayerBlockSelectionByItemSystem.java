@@ -15,16 +15,19 @@
  */
 package org.terasology.logic.selection;
 
-import org.terasology.entitySystem.entity.EntityManager;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.event.ReceiveEvent;
 import org.terasology.entitySystem.systems.BaseComponentSystem;
 import org.terasology.entitySystem.systems.RegisterMode;
 import org.terasology.entitySystem.systems.RegisterSystem;
 import org.terasology.input.cameraTarget.CameraTargetChangedEvent;
+import org.terasology.input.events.LeftMouseDownButtonEvent;
 import org.terasology.logic.common.ActivateEvent;
 import org.terasology.logic.location.LocationComponent;
 import org.terasology.logic.players.LocalPlayer;
+import org.terasology.math.Region3i;
+import org.terasology.math.geom.Vector3f;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.registry.In;
 import org.terasology.world.selection.BlockSelectionComponent;
 import org.terasology.world.selection.event.SetBlockSelectionEndingPointEvent;
@@ -35,12 +38,9 @@ import org.terasology.world.selection.event.SetBlockSelectionStartingPointEvent;
  * will see selections done by one player.  This system uses an item's activate event to both start and end a selection,
  * then triggers a ApplyBlockSelectionEvent event.
  *
- * @author synopia
  */
 @RegisterSystem(RegisterMode.CLIENT)
 public class LocalPlayerBlockSelectionByItemSystem extends BaseComponentSystem {
-    @In
-    private EntityManager entityManager;
     @In
     private LocalPlayer localPlayer;
 
@@ -81,11 +81,63 @@ public class LocalPlayerBlockSelectionByItemSystem extends BaseComponentSystem {
         }
 
         BlockSelectionComponent blockSelectionComponent = blockSelectionComponentEntity.getComponent(BlockSelectionComponent.class);
+
+        if (blockSelectionComponent == null) {
+            return;
+        }
+
+        EntityRef target = event.getNewTarget();
+        LocationComponent locationComponent = target.getComponent(LocationComponent.class);
+
+        if (locationComponent == null) {
+            return;
+        }
+
+        Vector3f targetLocation = locationComponent.getWorldPosition();
+
+        if (blockSelectionComponent.isMovable) {
+            Region3i region = blockSelectionComponent.currentSelection;
+
+            blockSelectionComponent.currentSelection = Region3i.createFromCenterExtents(new Vector3i(targetLocation.x, targetLocation.y, targetLocation.z),
+                    new Vector3i(region.sizeX()/2, 0, region.sizeZ()/2));
+            blockSelectionComponentEntity.saveComponent(blockSelectionComponent);
+
+            return;
+        }
+
         if (blockSelectionComponent.startPosition == null) {
             return;
         }
-        EntityRef target = event.getNewTarget();
+
         target.send(new SetBlockSelectionEndingPointEvent(blockSelectionComponentEntity));
+    }
+
+    /**
+     * This event is sent after the size of a region is finalized and the location is to yet to be decided by the player.
+     * This event marks the start of the camera position binding with the region.
+     * @param event The event sent
+     * @param blockSelectionComponentEntity The entity sending the event. This entity must have the {@link BlockSelectionComponent}
+     */
+    @ReceiveEvent(components = {BlockSelectionComponent.class})
+    public void onMovableBlockSelectionStart(MovableSelectionStartEvent event, EntityRef blockSelectionComponentEntity) {
+        this.blockSelectionComponentEntity = blockSelectionComponentEntity;
+    }
+
+    /**
+     * This marks the end of the camera position binding with the region position.
+     * @param event LeftMouseButtonDownEvent
+     * @param entity Entity sending the event
+     */
+    @ReceiveEvent
+    public void onLeftMouseButtonDown(LeftMouseDownButtonEvent event, EntityRef entity) {
+        if (this.blockSelectionComponentEntity != null && this.blockSelectionComponentEntity != EntityRef.NULL) {
+            BlockSelectionComponent blockSelectionComponent = blockSelectionComponentEntity.getComponent(BlockSelectionComponent.class);
+            if (blockSelectionComponent != null && blockSelectionComponent.isMovable) {
+                blockSelectionComponentEntity.send(new MovableSelectionEndEvent(blockSelectionComponent.currentSelection));
+
+                blockSelectionComponentEntity.destroy();
+            }
+        }
     }
 
 }

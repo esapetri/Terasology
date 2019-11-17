@@ -19,9 +19,13 @@ import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL15;
-import org.terasology.asset.AbstractAsset;
-import org.terasology.asset.AssetUri;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.terasology.assets.AssetType;
+import org.terasology.assets.ResourceUrn;
+import org.terasology.engine.GameThread;
 import org.terasology.engine.subsystem.lwjgl.GLBufferPool;
+import org.terasology.math.AABB;
 import org.terasology.math.geom.Quat4f;
 import org.terasology.math.geom.Vector2f;
 import org.terasology.math.geom.Vector3f;
@@ -47,30 +51,28 @@ import static org.lwjgl.opengl.GL11.glTexCoordPointer;
 import static org.lwjgl.opengl.GL11.glVertexPointer;
 
 /**
- * @author Immortius
  */
-public class OpenGLSkeletalMesh extends AbstractAsset<SkeletalMeshData> implements SkeletalMesh {
+public class OpenGLSkeletalMesh extends SkeletalMesh {
 
     private static final int TEX_COORD_SIZE = 2;
     private static final int VECTOR3_SIZE = 3;
     private static final int STRIDE = 24;
     private static final int NORMAL_OFFSET = VECTOR3_SIZE * 4;
 
+    private static final Logger logger = LoggerFactory.getLogger(OpenGLSkeletalMesh.class);
+
     private SkeletalMeshData data;
-
-    private int vboPosNormBuffer;
-    private int vboUVBuffer;
-    private int vboIndexBuffer;
-
-    private GLBufferPool bufferPool;
 
     private Vector3f scale;
     private Vector3f translate;
 
-    public OpenGLSkeletalMesh(AssetUri uri, SkeletalMeshData data, GLBufferPool bufferPool) {
-        super(uri);
-        this.bufferPool = bufferPool;
-        onReload(data);
+    private DisposalAction disposalAction;
+
+    public OpenGLSkeletalMesh(ResourceUrn urn, AssetType<?, SkeletalMeshData> assetType, SkeletalMeshData data, GLBufferPool bufferPool) {
+        super(urn, assetType);
+        disposalAction = new DisposalAction(urn, bufferPool);
+        getDisposalHook().setDisposeAction(disposalAction);
+        reload(data);
     }
 
     public void setScaleTranslate(Vector3f newScale, Vector3f newTranslate) {
@@ -79,47 +81,37 @@ public class OpenGLSkeletalMesh extends AbstractAsset<SkeletalMeshData> implemen
     }
 
     @Override
-    protected void onReload(SkeletalMeshData newData) {
-        this.data = newData;
+    protected void doReload(SkeletalMeshData newData) {
+        try {
+            GameThread.synch(() -> {
+                this.data = newData;
 
-        if (vboPosNormBuffer == 0) {
-            vboPosNormBuffer = bufferPool.get(getURI().toSimpleString());
-        }
+                if (disposalAction.vboPosNormBuffer == 0) {
+                    disposalAction.vboPosNormBuffer = disposalAction.bufferPool.get(getUrn().toString());
+                }
 
-        IntBuffer indexBuffer = BufferUtils.createIntBuffer(newData.getIndices().size());
-        indexBuffer.put(newData.getIndices().toArray());
-        indexBuffer.flip();
-        if (vboIndexBuffer == 0) {
-            vboIndexBuffer = bufferPool.get(getURI().toSimpleString());
-        }
-        VertexBufferObjectUtil.bufferVboElementData(vboIndexBuffer, indexBuffer, GL15.GL_STATIC_DRAW);
+                IntBuffer indexBuffer = BufferUtils.createIntBuffer(newData.getIndices().size());
+                indexBuffer.put(newData.getIndices().toArray());
+                indexBuffer.flip();
+                if (disposalAction.vboIndexBuffer == 0) {
+                    disposalAction.vboIndexBuffer = disposalAction.bufferPool.get(getUrn().toString());
+                }
+                VertexBufferObjectUtil.bufferVboElementData(disposalAction.vboIndexBuffer, indexBuffer, GL15.GL_STATIC_DRAW);
 
-        FloatBuffer uvBuffer = BufferUtils.createFloatBuffer(newData.getUVs().size() * 2);
-        for (Vector2f uv : newData.getUVs()) {
-            uvBuffer.put(uv.x);
-            uvBuffer.put(uv.y);
-        }
-        uvBuffer.flip();
+                FloatBuffer uvBuffer = BufferUtils.createFloatBuffer(newData.getUVs().size() * 2);
+                for (Vector2f uv : newData.getUVs()) {
+                    uvBuffer.put(uv.x);
+                    uvBuffer.put(uv.y);
+                }
+                uvBuffer.flip();
 
-        if (vboUVBuffer == 0) {
-            vboUVBuffer = bufferPool.get(getURI().toSimpleString());
-        }
-        VertexBufferObjectUtil.bufferVboData(vboUVBuffer, uvBuffer, GL15.GL_STATIC_DRAW);
-    }
-
-    @Override
-    protected void onDispose() {
-        if (vboIndexBuffer != 0) {
-            bufferPool.dispose(vboIndexBuffer);
-            vboIndexBuffer = 0;
-        }
-        if (vboPosNormBuffer != 0) {
-            bufferPool.dispose(vboPosNormBuffer);
-            vboPosNormBuffer = 0;
-        }
-        if (vboUVBuffer != 0) {
-            bufferPool.dispose(vboUVBuffer);
-            vboUVBuffer = 0;
+                if (disposalAction.vboUVBuffer == 0) {
+                    disposalAction.vboUVBuffer = disposalAction.bufferPool.get(getUrn().toString());
+                }
+                VertexBufferObjectUtil.bufferVboData(disposalAction.vboUVBuffer, uvBuffer, GL15.GL_STATIC_DRAW);
+            });
+        } catch (InterruptedException e) {
+            logger.error("Failed to reload {}", getUrn(), e);
         }
     }
 
@@ -128,11 +120,11 @@ public class OpenGLSkeletalMesh extends AbstractAsset<SkeletalMeshData> implemen
         glEnableClientState(GL_TEXTURE_COORD_ARRAY);
         glEnableClientState(GL_NORMAL_ARRAY);
 
-        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, vboUVBuffer);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, disposalAction.vboUVBuffer);
         GL13.glClientActiveTexture(GL13.GL_TEXTURE0);
         glTexCoordPointer(2, GL11.GL_FLOAT, TEX_COORD_SIZE * 4, 0);
 
-        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, vboIndexBuffer);
+        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, disposalAction.vboIndexBuffer);
     }
 
     public void postRender() {
@@ -157,9 +149,9 @@ public class OpenGLSkeletalMesh extends AbstractAsset<SkeletalMeshData> implemen
             vertBuffer.put(norm.z);
         }
         vertBuffer.flip();
-        VertexBufferObjectUtil.bufferVboData(vboPosNormBuffer, vertBuffer, GL15.GL_DYNAMIC_DRAW);
+        VertexBufferObjectUtil.bufferVboData(disposalAction.vboPosNormBuffer, vertBuffer, GL15.GL_DYNAMIC_DRAW);
 
-        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, vboPosNormBuffer);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, disposalAction.vboPosNormBuffer);
         glVertexPointer(VECTOR3_SIZE, GL_FLOAT, STRIDE, 0);
         glNormalPointer(GL_FLOAT, STRIDE, NORMAL_OFFSET);
 
@@ -193,5 +185,47 @@ public class OpenGLSkeletalMesh extends AbstractAsset<SkeletalMeshData> implemen
     @Override
     public Bone getBone(String boneName) {
         return data.getBone(boneName);
+    }
+
+    @Override
+    public AABB getStaticAabb() {
+        return data.getStaticAABB();
+    }
+
+    private static class DisposalAction implements Runnable {
+
+        private final ResourceUrn urn;
+        private GLBufferPool bufferPool;
+
+        private int vboPosNormBuffer;
+        private int vboUVBuffer;
+        private int vboIndexBuffer;
+
+         DisposalAction(ResourceUrn urn, GLBufferPool bufferPool) {
+            this.urn = urn;
+            this.bufferPool = bufferPool;
+        }
+
+        @Override
+        public void run() {
+            try {
+                GameThread.synch(() -> {
+                    if (vboIndexBuffer != 0) {
+                        bufferPool.dispose(vboIndexBuffer);
+                        vboIndexBuffer = 0;
+                    }
+                    if (vboPosNormBuffer != 0) {
+                        bufferPool.dispose(vboPosNormBuffer);
+                        vboPosNormBuffer = 0;
+                    }
+                    if (vboUVBuffer != 0) {
+                        bufferPool.dispose(vboUVBuffer);
+                        vboUVBuffer = 0;
+                    }
+                });
+            } catch (InterruptedException e) {
+                logger.error("Failed to dispose {}", urn, e);
+            }
+        }
     }
 }

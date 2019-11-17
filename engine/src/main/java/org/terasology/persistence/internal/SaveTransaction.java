@@ -18,29 +18,30 @@ package org.terasology.persistence.internal;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-
-import gnu.trove.procedure.TLongObjectProcedure;
-import gnu.trove.procedure.TLongProcedure;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.terasology.engine.paths.PathManager;
 import org.terasology.entitySystem.Component;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.entity.internal.EngineEntityManager;
 import org.terasology.game.GameManifest;
 import org.terasology.logic.location.LocationComponent;
 import org.terasology.math.ChunkMath;
-import org.terasology.math.TeraMath;
-import org.terasology.math.Vector3i;
 import org.terasology.math.geom.Vector3f;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.network.ClientComponent;
 import org.terasology.protobuf.EntityData;
+import org.terasology.recording.RecordAndReplayCurrentStatus;
+import org.terasology.recording.RecordAndReplaySerializer;
+import org.terasology.recording.RecordAndReplayStatus;
+import org.terasology.recording.RecordAndReplayUtils;
 import org.terasology.utilities.concurrency.AbstractTask;
 import org.terasology.world.chunks.internal.ChunkImpl;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.URI;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileSystem;
@@ -51,7 +52,6 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.file.spi.FileSystemProvider;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -62,10 +62,9 @@ import java.util.concurrent.locks.Lock;
 
 /**
  * Task that writes a previously created memory snapshot of the game to the disk.
- * <p/>
+ * <br><br>
  * The result of this task can be obtained via {@link #getResult()}.
  *
- * @author Florian <florian@fkoeberle.de>
  */
 public class SaveTransaction extends AbstractTask {
     private static final Logger logger = LoggerFactory.getLogger(SaveTransaction.class);
@@ -97,13 +96,21 @@ public class SaveTransaction extends AbstractTask {
     private final StoragePathProvider storagePathProvider;
     private final SaveTransactionHelper saveTransactionHelper;
 
+    //Record and Replay
+    private RecordAndReplaySerializer recordAndReplaySerializer;
+    private RecordAndReplayUtils recordAndReplayUtils;
+    private RecordAndReplayCurrentStatus recordAndReplayCurrentStatus;
+
 
     public SaveTransaction(EngineEntityManager privateEntityManager, EntitySetDeltaRecorder deltaToSave,
                            Map<String, EntityData.PlayerStore> unloadedPlayers,
                            Map<String, PlayerStoreBuilder> loadedPlayers, GlobalStoreBuilder globalStoreBuilder,
                            Map<Vector3i, CompressedChunkBuilder> unloadedChunks, Map<Vector3i, ChunkImpl> loadedChunks,
                            GameManifest gameManifest, boolean storeChunksInZips,
-                           StoragePathProvider storagePathProvider, Lock worldDirectoryWriteLock) {
+                           StoragePathProvider storagePathProvider, Lock worldDirectoryWriteLock,
+                           RecordAndReplaySerializer recordAndReplaySerializer,
+                           RecordAndReplayUtils recordAndReplayUtils,
+                           RecordAndReplayCurrentStatus recordAndReplayCurrentStatus) {
         this.privateEntityManager = privateEntityManager;
         this.deltaToSave = deltaToSave;
         this.unloadedPlayers = unloadedPlayers;
@@ -116,6 +123,9 @@ public class SaveTransaction extends AbstractTask {
         this.storagePathProvider = storagePathProvider;
         this.saveTransactionHelper = new SaveTransactionHelper(storagePathProvider);
         this.worldDirectoryWriteLock = worldDirectoryWriteLock;
+        this.recordAndReplaySerializer = recordAndReplaySerializer;
+        this.recordAndReplayUtils = recordAndReplayUtils;
+        this.recordAndReplayCurrentStatus = recordAndReplayCurrentStatus;
     }
 
 
@@ -124,7 +134,11 @@ public class SaveTransaction extends AbstractTask {
         return "Saving";
     }
 
+    @Override
     public void run() {
+        if (isReplay()) {
+            return;
+        }
         try {
             if (Files.exists(storagePathProvider.getUnmergedChangesPath())) {
                 // should not happen, as initialization should clean it up
@@ -133,6 +147,7 @@ public class SaveTransaction extends AbstractTask {
             saveTransactionHelper.cleanupSaveTransactionDirectory();
             applyDeltaToPrivateEntityManager();
             prepareChunksPlayersAndGlobalStore();
+            createPreviewImagesFolder();
             createSaveTransactionDirectory();
             writePlayerStores();
             writeGlobalStore();
@@ -142,18 +157,52 @@ public class SaveTransaction extends AbstractTask {
             mergeChanges();
             result = SaveTransactionResult.createSuccessResult();
             logger.info("Save game finished");
-        } catch (Throwable t) {
+            saveRecordingData();
+        } catch (IOException | RuntimeException t) {
             logger.error("Save game creation failed", t);
             result = SaveTransactionResult.createFailureResult(t);
         }
     }
 
+    private void createPreviewImagesFolder() throws IOException {
+        Files.createDirectories(storagePathProvider.getPreviewsPath());
+    }
+
+    private void saveRecordingData() {
+        if (recordAndReplayCurrentStatus.getStatus() == RecordAndReplayStatus.RECORDING) {
+            if (recordAndReplayUtils.isShutdownRequested()) {
+                recordAndReplaySerializer.serializeRecordAndReplayData();
+
+                recordAndReplayCurrentStatus.setStatus(RecordAndReplayStatus.NOT_ACTIVATED);
+                recordAndReplayUtils.reset();
+            } else {
+                String recordingPath = PathManager.getInstance().getRecordingPath(recordAndReplayUtils.getGameTitle()).toString();
+                recordAndReplaySerializer.serializeRecordedEvents(recordingPath);
+            }
+        }
+    }
+
+    private boolean isReplay() {
+        boolean isReplay = false;
+        if (recordAndReplayCurrentStatus.getStatus() == RecordAndReplayStatus.REPLAY_FINISHED
+                || recordAndReplayCurrentStatus.getStatus() == RecordAndReplayStatus.REPLAYING) {
+
+            isReplay = true;
+            if (recordAndReplayUtils.isShutdownRequested()) {
+                recordAndReplayCurrentStatus.setStatus(RecordAndReplayStatus.NOT_ACTIVATED);
+                recordAndReplayUtils.reset();
+            }
+
+        }
+        return isReplay;
+    }
+
     private void prepareChunksPlayersAndGlobalStore() {
-        /**
+        /*
          * Currently loaded persistent entities without owner that have not been saved yet.
          */
         Set<EntityRef> unsavedEntities = new HashSet<>();
-        for (EntityRef entity: privateEntityManager.getAllEntities()) {
+        for (EntityRef entity : privateEntityManager.getAllEntities()) {
             if (entity.isPersistent()) {
                 unsavedEntities.add(entity);
             }
@@ -165,7 +214,6 @@ public class SaveTransaction extends AbstractTask {
 
 
     /**
-     *
      * @param unsavedEntities currently loaded persistent entities without owner that have not been saved yet.
      *                        This method removes entities it saves.
      */
@@ -174,7 +222,7 @@ public class SaveTransaction extends AbstractTask {
 
         allChunks = Maps.newHashMap();
         allChunks.putAll(unloadedChunks);
-        for (Map.Entry<Vector3i,ChunkImpl> chunkEntry: loadedChunks.entrySet()) {
+        for (Map.Entry<Vector3i, ChunkImpl> chunkEntry : loadedChunks.entrySet()) {
             Collection<EntityRef> entitiesToStore = chunkPosToEntitiesMap.get(chunkEntry.getKey());
             if (entitiesToStore == null) {
                 entitiesToStore = Collections.emptySet();
@@ -189,14 +237,13 @@ public class SaveTransaction extends AbstractTask {
     }
 
     /**
-     *
      * @param unsavedEntities currently loaded persistent entities without owner that have not been saved yet.
      *                        This method removes entities it saves.
      */
     private void preparePlayerStores(Set<EntityRef> unsavedEntities) {
         allPlayers = Maps.newHashMap();
         allPlayers.putAll(unloadedPlayers);
-        for (Map.Entry<String,PlayerStoreBuilder> playerEntry: loadedPlayers.entrySet()) {
+        for (Map.Entry<String, PlayerStoreBuilder> playerEntry : loadedPlayers.entrySet()) {
             PlayerStoreBuilder playerStoreBuilder = playerEntry.getValue();
             EntityData.PlayerStore playerStore = playerStoreBuilder.build(privateEntityManager);
             unsavedEntities.removeAll(playerStoreBuilder.getStoredEntities());
@@ -236,64 +283,50 @@ public class SaveTransaction extends AbstractTask {
 
 
     private void applyDeltaToPrivateEntityManager() {
-        deltaToSave.getEntityDeltas().forEachEntry(new TLongObjectProcedure<EntityDelta>() {
-            @Override
-            public boolean execute(long entityId, EntityDelta delta) {
-                if (entityId >= privateEntityManager.getNextId()) {
-                    privateEntityManager.setNextId(entityId + 1);
-                }
-                return true;
+        deltaToSave.getEntityDeltas().forEachEntry((entityId, delta) -> {
+            if (entityId >= privateEntityManager.getNextId()) {
+                privateEntityManager.setNextId(entityId + 1);
             }
+            return true;
         });
-        deltaToSave.getDestroyedEntities().forEach(new TLongProcedure() {
-            @Override
-            public boolean execute(long entityId) {
-                if (entityId >= privateEntityManager.getNextId()) {
-                    privateEntityManager.setNextId(entityId + 1);
-                }
-                return true;
+        deltaToSave.getDestroyedEntities().forEach(entityId -> {
+            if (entityId >= privateEntityManager.getNextId()) {
+                privateEntityManager.setNextId(entityId + 1);
             }
+            return true;
         });
-        deltaToSave.getEntityDeltas().forEachEntry(new TLongObjectProcedure<EntityDelta>() {
-            @Override
-            public boolean execute(long entityId, EntityDelta delta) {
-                if (privateEntityManager.isActiveEntity(entityId)) {
-                    EntityRef entity = privateEntityManager.getEntity(entityId);
-                    for (Component changedComponent: delta.getChangedComponents().values()) {
-                        entity.removeComponent(changedComponent.getClass());
-                        entity.addComponent(changedComponent);
-                    }
-                    for (Class<? extends Component> c: delta.getRemovedComponents()) {
-                        entity.removeComponent(c);
-                    }
-                } else {
-                    privateEntityManager.createEntityWithId(entityId, delta.getChangedComponents().values());
+        deltaToSave.getEntityDeltas().forEachEntry((entityId, delta) -> {
+            if (privateEntityManager.isActiveEntity(entityId)) {
+                EntityRef entity = privateEntityManager.getEntity(entityId);
+                for (Component changedComponent : delta.getChangedComponents().values()) {
+                    entity.removeComponent(changedComponent.getClass());
+                    entity.addComponent(changedComponent);
                 }
+                delta.getRemovedComponents().forEach(entity::removeComponent);
+            } else {
+                privateEntityManager.createEntityWithId(entityId, delta.getChangedComponents().values());
+            }
 
-                return true;
-            }
+            return true;
         });
         final List<EntityRef> entitiesToDestroy = Lists.newArrayList();
-        deltaToSave.getDestroyedEntities().forEach(new TLongProcedure() {
-            @Override
-            public boolean execute(long entityId) {
-                EntityRef entityToDestroy;
-                if (privateEntityManager.isActiveEntity(entityId)) {
-                    entityToDestroy = privateEntityManager.getEntity(entityId);
-                } else {
-                    /**
-                     * Create the entity as theere could be a component that references a {@link DelayedEntityRef}
-                     * with the specified id. It is important that the {@link DelayedEntityRef} will reference
-                     * a destroyed {@link EntityRef} instance. That is why a entity will be created, potentially
-                     * bound to one or more {@link DelayedEntityRef}s and then destroyed.
-                     *
-                     */
-                    entityToDestroy = privateEntityManager.createEntityWithId(entityId,
-                            Collections.<Component>emptyList());
-                }
-                entitiesToDestroy.add(entityToDestroy);
-                return true;
+        deltaToSave.getDestroyedEntities().forEach(entityId -> {
+            EntityRef entityToDestroy;
+            if (privateEntityManager.isActiveEntity(entityId)) {
+                entityToDestroy = privateEntityManager.getEntity(entityId);
+            } else {
+                /*
+                 * Create the entity as theere could be a component that references a {@link DelayedEntityRef}
+                 * with the specified id. It is important that the {@link DelayedEntityRef} will reference
+                 * a destroyed {@link EntityRef} instance. That is why a entity will be created, potentially
+                 * bound to one or more {@link DelayedEntityRef}s and then destroyed.
+                 *
+                 */
+                entityToDestroy = privateEntityManager.createEntityWithId(entityId,
+                        Collections.<Component>emptyList());
             }
+            entitiesToDestroy.add(entityToDestroy);
+            return true;
         });
 
         /*
@@ -304,17 +337,12 @@ public class SaveTransaction extends AbstractTask {
          */
         deltaToSave.bindAllDelayedEntityRefsTo(privateEntityManager);
 
-        for (EntityRef entityRef: entitiesToDestroy) {
-            entityRef.destroy();
-        }
+        entitiesToDestroy.forEach(EntityRef::destroy);
 
-        deltaToSave.getDeactivatedEntities().forEach(new TLongProcedure() {
-            @Override
-            public boolean execute(long entityId) {
-                EntityRef entityRef = privateEntityManager.getEntity(entityId);
-                privateEntityManager.deactivateForStorage(entityRef);
-                return true;
-            }
+        deltaToSave.getDeactivatedEntities().forEach(entityId -> {
+            EntityRef entityRef = privateEntityManager.getEntity(entityId);
+            privateEntityManager.deactivateForStorage(entityRef);
+            return true;
         });
     }
 
@@ -372,8 +400,6 @@ public class SaveTransaction extends AbstractTask {
     }
 
     private void writeChunkStores() throws IOException {
-        FileSystemProvider zipProvider = getZipFileSystemProvider();
-
         Path chunksPath = storagePathProvider.getWorldTempPath();
         Files.createDirectories(chunksPath);
         if (storeChunksInZips) {
@@ -385,7 +411,7 @@ public class SaveTransaction extends AbstractTask {
                 if (zip == null) {
                     Path targetPath = storagePathProvider.getChunkZipTempPath(chunkZipPos);
                     Files.deleteIfExists(targetPath);
-                    zip = zipProvider.newFileSystem(targetPath, CREATE_ZIP_OPTIONS);
+                    zip = FileSystems.newFileSystem(URI.create("jar:" + targetPath.toUri()), CREATE_ZIP_OPTIONS);
                     newChunkZips.put(chunkZipPos, zip);
                 }
                 Path chunkPath = zip.getPath(storagePathProvider.getChunkFilename(chunkPos));
@@ -430,22 +456,6 @@ public class SaveTransaction extends AbstractTask {
             }
         }
     }
-
-    private FileSystemProvider getZipFileSystemProvider() throws IOException {
-        // This is a little bit of a hack to get around a JAVA 7 bug (hopefully fixed in JAVA 8
-        FileSystemProvider zipProvider = null;
-        for (FileSystemProvider provider : FileSystemProvider.installedProviders()) {
-            if ("jar".equalsIgnoreCase(provider.getScheme())) {
-                zipProvider = provider;
-            }
-        }
-
-        if (zipProvider == null) {
-            throw new IOException("Zip archive support missing! Unable to save chunks.");
-        }
-        return zipProvider;
-    }
-
 
     /**
      * @return the result if there is one yet or null. This method returns the value of a volatile variable and

@@ -17,15 +17,14 @@
 package org.terasology.math;
 
 import com.google.common.collect.Maps;
-
 import org.terasology.math.geom.Vector3f;
+import org.terasology.math.geom.Vector3i;
 
 import java.util.EnumMap;
 
 /**
  * An enumeration of the axis of the world from the player perspective. There is also
  *
- * @author Immortius
  */
 public enum Direction {
     UP(Vector3i.up(), new Vector3f(0, 1, 0)),
@@ -35,11 +34,11 @@ public enum Direction {
     FORWARD(new Vector3i(0, 0, 1), new Vector3f(0, 0, 1)),
     DOWN(Vector3i.down(), new Vector3f(0, -1, 0));
 
-    private static EnumMap<Direction, Direction> reverseMap;
-    private static EnumMap<Direction, Side> conversionMap;
+    private static final EnumMap<Direction, Direction> reverseMap;
+    private static final EnumMap<Direction, Side> conversionMap;
 
-    private Vector3i vector3iDir;
-    private Vector3f vector3fDir;
+    private final Vector3i vector3iDir;
+    private final Vector3f vector3fDir;
 
     static {
         reverseMap = new EnumMap<>(Direction.class);
@@ -58,7 +57,7 @@ public enum Direction {
         conversionMap.put(RIGHT, Side.LEFT);
     }
 
-    private Direction(Vector3i vector3i, Vector3f vector3f) {
+    Direction(Vector3i vector3i, Vector3f vector3f) {
         this.vector3iDir = vector3i;
         this.vector3fDir = vector3f;
     }

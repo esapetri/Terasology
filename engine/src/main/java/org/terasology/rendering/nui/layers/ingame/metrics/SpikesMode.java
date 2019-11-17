@@ -20,12 +20,11 @@ import gnu.trove.map.TObjectDoubleMap;
 import org.terasology.monitoring.PerformanceMonitor;
 
 /**
- * @author Immortius
  */
 final class SpikesMode extends TimeMetricsMode {
 
-    public SpikesMode() {
-        super("Spikes", 10);
+     SpikesMode() {
+        super("\n- Spikes -", 10);
     }
 
     @Override

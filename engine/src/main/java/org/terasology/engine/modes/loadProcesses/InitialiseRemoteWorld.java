@@ -16,14 +16,15 @@
 
 package org.terasology.engine.modes.loadProcesses;
 
+import org.terasology.context.Context;
 import org.terasology.engine.ComponentSystemManager;
 import org.terasology.engine.TerasologyConstants;
 import org.terasology.engine.subsystem.RenderingSubsystemFactory;
 import org.terasology.game.GameManifest;
 import org.terasology.logic.players.LocalPlayer;
-import org.terasology.logic.players.LocalPlayerSystem;
 import org.terasology.network.NetworkSystem;
-import org.terasology.registry.CoreRegistry;
+import org.terasology.recording.DirectionAndOriginPosRecorderList;
+import org.terasology.recording.RecordAndReplayCurrentStatus;
 import org.terasology.rendering.backdrop.BackdropProvider;
 import org.terasology.rendering.backdrop.BackdropRenderer;
 import org.terasology.rendering.backdrop.Skysphere;
@@ -31,7 +32,9 @@ import org.terasology.rendering.cameras.Camera;
 import org.terasology.rendering.world.WorldRenderer;
 import org.terasology.world.BlockEntityRegistry;
 import org.terasology.world.WorldProvider;
+import org.terasology.world.block.BlockManager;
 import org.terasology.world.chunks.remoteChunkProvider.RemoteChunkProvider;
+import org.terasology.world.chunks.blockdata.ExtraBlockDataManager;
 import org.terasology.world.internal.EntityAwareWorldProvider;
 import org.terasology.world.internal.WorldProviderCoreImpl;
 import org.terasology.world.internal.WorldProviderWrapper;
@@ -39,13 +42,13 @@ import org.terasology.world.sun.BasicCelestialModel;
 import org.terasology.world.sun.CelestialSystem;
 import org.terasology.world.sun.DefaultCelestialSystem;
 
-/**
- * @author Immortius
- */
 public class InitialiseRemoteWorld extends SingleStepLoadProcess {
-    private GameManifest gameManifest;
+    private final Context context;
+    private final GameManifest gameManifest;
 
-    public InitialiseRemoteWorld(GameManifest gameManifest) {
+
+    public InitialiseRemoteWorld(Context context, GameManifest gameManifest) {
+        this.context = context;
         this.gameManifest = gameManifest;
     }
 
@@ -58,37 +61,41 @@ public class InitialiseRemoteWorld extends SingleStepLoadProcess {
     public boolean step() {
 
         // TODO: These shouldn't be done here, nor so strongly tied to the world renderer
-        CoreRegistry.put(LocalPlayer.class, new LocalPlayer());
+        LocalPlayer localPlayer = new LocalPlayer();
+        localPlayer.setRecordAndReplayClasses(context.get(DirectionAndOriginPosRecorderList.class), context.get(RecordAndReplayCurrentStatus.class));
+        context.put(LocalPlayer.class, localPlayer);
+        BlockManager blockManager = context.get(BlockManager.class);
+        ExtraBlockDataManager extraDataManager = context.get(ExtraBlockDataManager.class);
 
-        RemoteChunkProvider chunkProvider = new RemoteChunkProvider();
+        RemoteChunkProvider chunkProvider = new RemoteChunkProvider(blockManager, localPlayer);
 
-        WorldProviderCoreImpl worldProviderCore = new WorldProviderCoreImpl(gameManifest.getWorldInfo(TerasologyConstants.MAIN_WORLD), chunkProvider);
-        EntityAwareWorldProvider entityWorldProvider = new EntityAwareWorldProvider(worldProviderCore);
-        WorldProvider worldProvider = new WorldProviderWrapper(entityWorldProvider);
-        CoreRegistry.put(WorldProvider.class, worldProvider);
-        CoreRegistry.put(BlockEntityRegistry.class, entityWorldProvider);
-        CoreRegistry.get(ComponentSystemManager.class).register(entityWorldProvider, "engine:BlockEntityRegistry");
+        WorldProviderCoreImpl worldProviderCore = new WorldProviderCoreImpl(gameManifest.getWorldInfo(TerasologyConstants.MAIN_WORLD), chunkProvider,
+                blockManager.getBlock(BlockManager.UNLOADED_ID), context);
+        EntityAwareWorldProvider entityWorldProvider = new EntityAwareWorldProvider(worldProviderCore, context);
+        WorldProvider worldProvider = new WorldProviderWrapper(entityWorldProvider, extraDataManager);
+        context.put(WorldProvider.class, worldProvider);
+        context.put(BlockEntityRegistry.class, entityWorldProvider);
+        context.get(ComponentSystemManager.class).register(entityWorldProvider, "engine:BlockEntityRegistry");
 
-        DefaultCelestialSystem celestialSystem = new DefaultCelestialSystem(new BasicCelestialModel());
-        CoreRegistry.put(CelestialSystem.class, celestialSystem);
-        CoreRegistry.get(ComponentSystemManager.class).register(celestialSystem);
+        DefaultCelestialSystem celestialSystem = new DefaultCelestialSystem(new BasicCelestialModel(), context);
+        context.put(CelestialSystem.class, celestialSystem);
+        context.get(ComponentSystemManager.class).register(celestialSystem);
 
         // Init. a new world
-        Skysphere skysphere = new Skysphere();
+        Skysphere skysphere = new Skysphere(context);
         BackdropProvider backdropProvider = skysphere;
         BackdropRenderer backdropRenderer = skysphere;
-        CoreRegistry.put(BackdropProvider.class, backdropProvider);
-        CoreRegistry.put(BackdropRenderer.class, backdropRenderer);
+        context.put(BackdropProvider.class, backdropProvider);
+        context.put(BackdropRenderer.class, backdropRenderer);
 
-        RenderingSubsystemFactory engineSubsystemFactory = CoreRegistry.get(RenderingSubsystemFactory.class);
-        WorldRenderer worldRenderer = engineSubsystemFactory.createWorldRenderer(backdropProvider, backdropRenderer,
-                                                                                 worldProvider, chunkProvider, CoreRegistry.get(LocalPlayerSystem.class));
-        float reflectionHeight = CoreRegistry.get(NetworkSystem.class).getServer().getInfo().getReflectionHeight();
+        RenderingSubsystemFactory engineSubsystemFactory = context.get(RenderingSubsystemFactory.class);
+        WorldRenderer worldRenderer = engineSubsystemFactory.createWorldRenderer(context);
+        float reflectionHeight = context.get(NetworkSystem.class).getServer().getInfo().getReflectionHeight();
         worldRenderer.getActiveCamera().setReflectionHeight(reflectionHeight);
-        CoreRegistry.put(WorldRenderer.class, worldRenderer);
+        context.put(WorldRenderer.class, worldRenderer);
         // TODO: These shouldn't be done here, nor so strongly tied to the world renderer
-        CoreRegistry.put(Camera.class, worldRenderer.getActiveCamera());
-        CoreRegistry.get(NetworkSystem.class).setRemoteWorldProvider(chunkProvider);
+        context.put(Camera.class, worldRenderer.getActiveCamera());
+        context.get(NetworkSystem.class).setRemoteWorldProvider(chunkProvider);
 
         return true;
     }

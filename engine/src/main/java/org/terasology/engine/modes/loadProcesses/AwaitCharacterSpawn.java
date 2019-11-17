@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MovingBlocks
+ * Copyright 2016 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,47 +16,49 @@
 
 package org.terasology.engine.modes.loadProcesses;
 
+import org.terasology.context.Context;
 import org.terasology.engine.ComponentSystemManager;
-import org.terasology.registry.CoreRegistry;
 import org.terasology.engine.modes.LoadProcess;
 import org.terasology.entitySystem.systems.UpdateSubscriberSystem;
 import org.terasology.logic.players.LocalPlayer;
 import org.terasology.network.ClientComponent;
-import org.terasology.rendering.world.WorldRenderer;
+import org.terasology.world.chunks.ChunkProvider;
 
-/**
- * @author Immortius
- */
 public class AwaitCharacterSpawn implements LoadProcess {
 
-    private WorldRenderer worldRenderer;
+    private final Context context;
+    private ChunkProvider chunkProvider;
+
+    public AwaitCharacterSpawn(Context context) {
+        this.context = context;
+    }
 
     @Override
     public String getMessage() {
-        return "Awaiting Character Spawn...";
+        return  "${engine:menu#awaiting-character-spawn}";
     }
 
     @Override
     public boolean step() {
-        ComponentSystemManager componentSystemManager = CoreRegistry.get(ComponentSystemManager.class);
+        ComponentSystemManager componentSystemManager = context.get(ComponentSystemManager.class);
         for (UpdateSubscriberSystem updater : componentSystemManager.iterateUpdateSubscribers()) {
             updater.update(0.0f);
         }
-        LocalPlayer localPlayer = CoreRegistry.get(LocalPlayer.class);
+        LocalPlayer localPlayer = context.get(LocalPlayer.class);
         ClientComponent client = localPlayer.getClientEntity().getComponent(ClientComponent.class);
         if (client != null && client.character.exists()) {
-            worldRenderer.setPlayer(CoreRegistry.get(LocalPlayer.class));
+            client.character.send(new AwaitedLocalCharacterSpawnEvent());
             return true;
         } else {
-            worldRenderer.getChunkProvider().completeUpdate();
-            worldRenderer.getChunkProvider().beginUpdate();
+            chunkProvider.completeUpdate();
+            chunkProvider.beginUpdate();
         }
         return false;
     }
 
     @Override
     public void begin() {
-        worldRenderer = CoreRegistry.get(WorldRenderer.class);
+        chunkProvider = context.get(ChunkProvider.class);
     }
 
     @Override

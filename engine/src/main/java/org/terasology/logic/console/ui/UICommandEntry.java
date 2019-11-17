@@ -17,38 +17,33 @@ package org.terasology.logic.console.ui;
 
 import com.google.common.collect.Lists;
 import org.terasology.input.Keyboard;
-import org.terasology.input.events.KeyEvent;
 import org.terasology.rendering.nui.databinding.Binding;
 import org.terasology.rendering.nui.databinding.DefaultBinding;
-import org.terasology.rendering.nui.widgets.CursorUpdateEventListener;
+import org.terasology.rendering.nui.events.NUIKeyEvent;
 import org.terasology.rendering.nui.widgets.UIText;
 
 import java.util.List;
 
 /**
- * @author Immortius
  */
 public class UICommandEntry extends UIText {
 
-    private Binding<List<String>> commandHistory = new DefaultBinding<List<String>>(Lists.<String>newArrayList());
+    private Binding<List<String>> commandHistory = new DefaultBinding<>(Lists.<String>newArrayList());
     private int index;
     private TabCompletionEngine tabCompletionEngine;
 
     public UICommandEntry() {
-        subscribe(new CursorUpdateEventListener() {
-            @Override
-            public void onCursorUpdated(int oldPosition, int newPosition) {
-                if (tabCompletionEngine == null) {
-                    return;
-                }
-
-                tabCompletionEngine.reset();
+        subscribe((int oldPosition, int newPosition) -> {
+            if (tabCompletionEngine == null) {
+                return;
             }
+
+            tabCompletionEngine.reset();
         });
     }
 
     @Override
-    public void onKeyEvent(KeyEvent event) {
+    public boolean onKeyEvent(NUIKeyEvent event) {
         if (event.isDown()) {
             int id = event.getKey().getId();
             
@@ -65,8 +60,7 @@ public class UICommandEntry extends UIText {
                         }
                         setCursorPosition(getText().length());
                     }
-                    event.consume();
-                    break;
+                    return true;
                 case Keyboard.KeyId.DOWN:
                     if (index < getCommandHistory().size()) {
                         index++;
@@ -77,24 +71,24 @@ public class UICommandEntry extends UIText {
                             setCursorPosition(getText().length());
                         }
                     }
-                    event.consume();
-                    break;
+                    return true;
                 case Keyboard.KeyId.TAB:
                     if (tabCompletionEngine != null) {
                         setText(tabCompletionEngine.complete(getText()));
                         setCursorPosition(getText().length(), true, false);
-                        event.consume();
+                        return true;
                     }
                     break;
                 case Keyboard.KeyId.ENTER:
-                    super.onKeyEvent(event);
+                    boolean consumed = super.onKeyEvent(event);
                     setText("");
                     index = getCommandHistory().size();
-                    break;
+                    return consumed;
                 default:
-                    super.onKeyEvent(event);
+                    return super.onKeyEvent(event);
             }
         }
+        return false;
     }
 
     public void bindCommandHistory(Binding<List<String>> binding) {

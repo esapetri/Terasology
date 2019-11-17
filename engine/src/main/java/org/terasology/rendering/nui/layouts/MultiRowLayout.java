@@ -17,23 +17,23 @@ package org.terasology.rendering.nui.layouts;
 
 import com.google.common.collect.Lists;
 import com.google.gson.annotations.SerializedName;
-import org.terasology.input.events.KeyEvent;
 import org.terasology.input.events.MouseButtonEvent;
 import org.terasology.input.events.MouseWheelEvent;
-import org.terasology.math.Rect2i;
+import org.terasology.math.geom.Rect2i;
 import org.terasology.math.TeraMath;
-import org.terasology.math.Vector2i;
+import org.terasology.math.geom.Vector2i;
 import org.terasology.rendering.nui.Canvas;
 import org.terasology.rendering.nui.CoreLayout;
 import org.terasology.rendering.nui.LayoutConfig;
 import org.terasology.rendering.nui.LayoutHint;
 import org.terasology.rendering.nui.UIWidget;
+import org.terasology.rendering.nui.events.NUIKeyEvent;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
- * @author Immortius
  */
 public class MultiRowLayout extends CoreLayout<LayoutHint> {
 
@@ -63,6 +63,16 @@ public class MultiRowLayout extends CoreLayout<LayoutHint> {
         widgetList.add(widget);
     }
 
+    @Override
+    public void removeWidget(UIWidget widget) {
+        widgetList.remove(widget);
+    }
+
+    @Override
+    public void removeAllWidgets() {
+        widgetList.clear();
+    }
+
     public int getRows() {
         return rows;
     }
@@ -76,7 +86,7 @@ public class MultiRowLayout extends CoreLayout<LayoutHint> {
         }
     }
 
-    public void setRowHeights(float ... heights) {
+    public void setRowHeights(float... heights) {
         if (heights.length > rows) {
             throw new IllegalArgumentException("More heights than rows");
         }
@@ -116,9 +126,7 @@ public class MultiRowLayout extends CoreLayout<LayoutHint> {
 
             List<List<UIWidget>> columns = Lists.newArrayList(getColumnIterator());
             List<ColumnInfo> columnInfos = Lists.newArrayList();
-            for (List<UIWidget> column : columns) {
-                columnInfos.add(calculateColumnSize(column, canvas, availableSize));
-            }
+            columnInfos.addAll(columns.stream().map(column -> calculateColumnSize(column, canvas, availableSize)).collect(Collectors.toList()));
 
             int[] minHeights = new int[rows];
             int minColumnHeight = 0;
@@ -140,7 +148,7 @@ public class MultiRowLayout extends CoreLayout<LayoutHint> {
             } else {
                 minColumnHeight = canvas.size().y;
                 for (int i = 0; i < rows; ++i) {
-                    minHeights[i] = TeraMath.floorToInt((minColumnHeight - (rows - 1) * verticalSpacing) * rowHeights[i]);
+                    minHeights[i] = TeraMath.floorToInt((minColumnHeight - (rows - 1) * (float) verticalSpacing) * rowHeights[i]);
                 }
             }
 
@@ -178,7 +186,7 @@ public class MultiRowLayout extends CoreLayout<LayoutHint> {
             UIWidget widget = column.get(i);
             Vector2i cellSize = new Vector2i(areaHint.x, availableHeight);
             if (!autoSizeRows) {
-                cellSize.y *= rowHeights[i];
+                cellSize.y = (int) (cellSize.y * rowHeights[i]);
             }
             if (widget != null) {
                 Vector2i contentSize = canvas.calculateRestrictedSize(widget, cellSize);
@@ -261,7 +269,7 @@ public class MultiRowLayout extends CoreLayout<LayoutHint> {
             }
         }
 
-        height += verticalSpacing * (rows - 1);
+        height += (long) verticalSpacing * (rows - 1);
 
         size.y = (int) Math.min(Integer.MAX_VALUE, height);
         return size;
@@ -283,7 +291,8 @@ public class MultiRowLayout extends CoreLayout<LayoutHint> {
     }
 
     @Override
-    public void onKeyEvent(KeyEvent event) {
+    public boolean onKeyEvent(NUIKeyEvent event) {
+        return false;
     }
 
     @Override

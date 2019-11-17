@@ -30,7 +30,6 @@ import java.util.zip.GZIPOutputStream;
  * Provides an easy to get a compressed version of a chunk. Either the chunk most have a snapshot of it's state
  * or it must be an unloaded chunk which no longer changes.
  *
- * @author Florian <florian@fkoeberle.de>
  */
 public class CompressedChunkBuilder {
     private EntityData.EntityStore entityStore;
@@ -50,11 +49,7 @@ public class CompressedChunkBuilder {
                                   Collection<EntityRef> entitiesToSave,
                                   boolean chunkUnloaded) {
         EntityStorer storer = new EntityStorer(entityManager);
-        for (EntityRef entityRef : entitiesToSave) {
-            if (entityRef.isPersistent()) {
-                storer.store(entityRef);
-            }
-        }
+        entitiesToSave.stream().filter(EntityRef::isPersistent).forEach(storer::store);
         storedEntities = storer.getStoredEntities();
         this.entityStore = storer.finaliseStore();
 

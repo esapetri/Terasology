@@ -15,38 +15,27 @@
  */
 package org.terasology.persistence.typeHandling.coreTypes;
 
-import com.google.common.collect.Lists;
-import org.terasology.persistence.typeHandling.DeserializationContext;
 import org.terasology.persistence.typeHandling.PersistedData;
-import org.terasology.persistence.typeHandling.SerializationContext;
+import org.terasology.persistence.typeHandling.PersistedDataSerializer;
 import org.terasology.persistence.typeHandling.TypeHandler;
 
-import java.util.Collection;
-import java.util.List;
+import java.util.Optional;
 
 /**
- * @author Immortius
  */
-public class StringTypeHandler implements TypeHandler<String> {
+public class StringTypeHandler extends TypeHandler<String> {
 
     @Override
-    public PersistedData serialize(String value, SerializationContext context) {
-        return context.create(value);
+    public PersistedData serializeNonNull(String value, PersistedDataSerializer serializer) {
+        return serializer.serialize(value);
     }
 
     @Override
-    public String deserialize(PersistedData data, DeserializationContext context) {
-        return data.getAsString();
+    public Optional<String> deserialize(PersistedData data) {
+        if (data.isString()) {
+            return Optional.ofNullable(data.getAsString());
+        }
+        return Optional.empty();
     }
 
-    @Override
-    public PersistedData serializeCollection(Collection<String> value, SerializationContext context) {
-        return context.createStrings(value);
-
-    }
-
-    @Override
-    public List<String> deserializeCollection(PersistedData data, DeserializationContext context) {
-        return Lists.newArrayList(data.getAsArray().getAsStringArray());
-    }
 }

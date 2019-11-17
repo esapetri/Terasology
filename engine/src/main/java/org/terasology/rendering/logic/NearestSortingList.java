@@ -33,17 +33,16 @@ import java.util.TimerTask;
 /**
  * This data structure takes Entities with a location in the world and sorts
  * them based on their distance to an other entity.
- * <p/>
+ * <br><br>
  * The sorting is done in a background thread.
- * <p/>
+ * <br><br>
  * When retrieving Entities from this container, no guarantees are given on the
  * sorting of the entities. This class only tries to keep the elements sorted,
  * but does not guarantee it.
- * <p/>
- * It it therefor use full for graphics purposes, to keep track of the nearest
+ * <br><br>
+ * It it therefore use full for graphics purposes, to keep track of the nearest
  * entities to draw.
  *
- * @author XanHou
  */
 public class NearestSortingList implements Iterable<EntityRef> {
     private static final Logger logger = LoggerFactory.getLogger(NearestSortingList.class);
@@ -100,11 +99,12 @@ public class NearestSortingList implements Iterable<EntityRef> {
      * from this container.
      *
      * @param e The entity to add. Must have a LocationComponent or an
-     *          IlligalArgumentException is thrown.
+     *          IllegalArgumentException is thrown.
      */
     public synchronized void add(EntityRef e) {
         if (e.getComponent(LocationComponent.class) == null) {
             logger.warn("Adding entity without LocationComponent to container that sorts on location. Entity: {}", e);
+            throw new IllegalArgumentException("Entity has no LocationComponent");
         }
         //new entities are inserted to make sure that new entities are drawn first.
         //Since it is likely the players wants to see new entities over existing ones
@@ -184,7 +184,7 @@ public class NearestSortingList implements Iterable<EntityRef> {
      * Fills the given array with Entities from this container. Attempts are
      * made to put the Entities nearest to the player in this array and nearer
      * entities are expected, but not guaranteed to be at a lower index.
-     * <p/>
+     * <br><br>
      * This is the most memory friendly way to obtain elements from this
      * container.
      *
@@ -240,9 +240,9 @@ public class NearestSortingList implements Iterable<EntityRef> {
     public synchronized void initialiseAndPause(Camera origin) {
         if (sortingTask != null || timer != null) {
             logger.error("Mis-usages of initialise detected! Initialising again"
-                    + " before stopping the sorting process. Sorting is "
-                    + "stopped now, but it should be done by the user of "
-                    + "this class.");
+                         + " before stopping the sorting process. Sorting is "
+                         + "stopped now, but it should be done by the user of "
+                         + "this class.");
             stop();
         }
         sortingTask = new SortTask(origin);
@@ -260,9 +260,9 @@ public class NearestSortingList implements Iterable<EntityRef> {
     public synchronized void initialise(Camera origin, long period, long initialDelay) {
         if (sortingTask != null || timer != null) {
             logger.error("Mis-usages of initialise detected! Initialising again"
-                    + " before stopping the sorting process. Sorting is "
-                    + "stopped now, but it should be done by the user of "
-                    + "this class.");
+                         + " before stopping the sorting process. Sorting is "
+                         + "stopped now, but it should be done by the user of "
+                         + "this class.");
             stop();
         }
         sortPeriod = period;
@@ -281,12 +281,12 @@ public class NearestSortingList implements Iterable<EntityRef> {
     /**
      * Stops the background sorting without deleting clearing this container.
      * This is required for proper clean-up.
-     * <p/>
+     * <br><br>
      * Note that if a sorting process is running while this method is called,
      * the sorting process finishes sorting this method will wait for it to
      * finish. Afterwards the sorting is not scheduled again until the
      * initialize method is called again.
-     * <p/>
+     * <br><br>
      * Note that calling stop() and clear() can be done in any order and the
      * specified behaviour will be exactly the same. If there is a difference it
      * is an insignificant performance loss or win if.
@@ -367,7 +367,7 @@ public class NearestSortingList implements Iterable<EntityRef> {
     private static class AddCommand implements Command {
         private EntityRef toAdd;
 
-        public AddCommand(EntityRef toAdd) {
+        AddCommand(EntityRef toAdd) {
             this.toAdd = toAdd;
         }
 
@@ -380,7 +380,7 @@ public class NearestSortingList implements Iterable<EntityRef> {
     private static class RemoveCommand implements Command {
         private EntityRef toRem;
 
-        public RemoveCommand(EntityRef toRemove) {
+        RemoveCommand(EntityRef toRemove) {
             toRem = toRemove;
         }
 
@@ -408,7 +408,7 @@ public class NearestSortingList implements Iterable<EntityRef> {
          * @param origin The entities of a NearestSortingCollection will be
          *               sorted based on their distance to this entity.
          */
-        public SortTask(Camera origin) {
+        SortTask(Camera origin) {
             originCamera = origin;
         }
 
@@ -423,7 +423,8 @@ public class NearestSortingList implements Iterable<EntityRef> {
                  * game to crash. Instead we shall output an error to the logger
                  * and continue.
                  */
-                logger.error("Uncaught exception in sorting thread: " + ex.toString());
+                //for ArrayIndexOutOfBoundsException see issue #2742
+                logger.error("Uncaught exception in sorting thread", ex);
             }
         }
 
@@ -450,6 +451,14 @@ public class NearestSortingList implements Iterable<EntityRef> {
                 Collections.sort(newEnts, comparator);
             } catch (IllegalArgumentException ex) {
                 logger.warn("Entities destroyed during sorting process. Sorting is skipped this round.");
+                clearQueue();
+                return;
+            } catch (ArrayIndexOutOfBoundsException e) {
+                // see https://github.com/MovingBlocks/Terasology/issues/2742
+                // This happens when the component lookup used for sorting is async with the game thread, 
+                // e.g. when a large amount of entities is destroyed or created in a short timespan.
+                // as long as this occurs rarely, it can be ignored.
+                logger.warn("Something went wrong during sorting process. Sorting is skipped this round.");
                 clearQueue();
                 return;
             }

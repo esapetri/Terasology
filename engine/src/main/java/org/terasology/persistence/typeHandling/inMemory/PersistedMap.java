@@ -23,13 +23,22 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * @author Immortius
  */
 public class PersistedMap extends AbstractPersistedData implements PersistedDataMap {
     private Map<String, PersistedData> map;
 
     public PersistedMap(Map<String, PersistedData> map) {
         this.map = map;
+    }
+
+    @Override
+    public PersistedDataMap getAsValueMap() {
+        return this;
+    }
+
+    @Override
+    public boolean isValueMap() {
+        return true;
     }
 
     @Override

@@ -23,7 +23,6 @@ import org.terasology.entitySystem.metadata.ReplicatedFieldMetadata;
 /**
  * Interface for providing serializers with a method to check whether a given field should be serialized.
  *
- * @author Immortius
  */
 public interface FieldSerializeCheck<T> extends DeserializeFieldCheck {
 
@@ -32,7 +31,7 @@ public interface FieldSerializeCheck<T> extends DeserializeFieldCheck {
      * @param object The object it belongs to
      * @return Whether the field should be serialized
      */
-    boolean shouldSerializeField(ReplicatedFieldMetadata field, T object);
+    boolean shouldSerializeField(ReplicatedFieldMetadata<?, ?> field, T object);
 
     /**
      * @param field            The field to check
@@ -40,35 +39,35 @@ public interface FieldSerializeCheck<T> extends DeserializeFieldCheck {
      * @param componentInitial In a network situation, whether the component is newly added or not
      * @return Whether the field should be serialized
      */
-    boolean shouldSerializeField(ReplicatedFieldMetadata field, T object, boolean componentInitial);
+    boolean shouldSerializeField(ReplicatedFieldMetadata<?, ?> field, T object, boolean componentInitial);
 
     /**
      * Null implementation, returns true for all fields
      */
-    public static final class NullCheck<T> implements FieldSerializeCheck<T> {
+     final class NullCheck<T> implements FieldSerializeCheck<T> {
 
-        private static final NullCheck INSTANCE = new NullCheck();
+        private static final FieldSerializeCheck.NullCheck INSTANCE = new FieldSerializeCheck.NullCheck();
 
         private NullCheck() {
         }
 
         @SuppressWarnings("unchecked")
-        public static <T> NullCheck<T> newInstance() {
+        public static <T> FieldSerializeCheck.NullCheck<T> newInstance() {
             return INSTANCE;
         }
 
         @Override
-        public boolean shouldSerializeField(ReplicatedFieldMetadata field, T object) {
+        public boolean shouldSerializeField(ReplicatedFieldMetadata<?, ?> field, T object) {
             return true;
         }
 
         @Override
-        public boolean shouldSerializeField(ReplicatedFieldMetadata field, T object, boolean componentInitial) {
+        public boolean shouldSerializeField(ReplicatedFieldMetadata<?, ?> field, T object, boolean componentInitial) {
             return true;
         }
 
         @Override
-        public boolean shouldDeserialize(ClassMetadata classMetadata, FieldMetadata fieldMetadata) {
+        public boolean shouldDeserialize(ClassMetadata<?, ?> classMetadata, FieldMetadata<?, ?> fieldMetadata) {
             return true;
         }
     }

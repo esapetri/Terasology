@@ -15,52 +15,67 @@
  */
 package org.terasology.rendering.nui.layers.mainMenu;
 
-import com.google.common.base.Function;
 import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.terasology.asset.AssetType;
-import org.terasology.asset.AssetUri;
-import org.terasology.asset.Assets;
+import org.terasology.assets.ResourceUrn;
+import org.terasology.assets.module.ModuleAwareAssetTypeManager;
 import org.terasology.config.Config;
+import org.terasology.context.Context;
+import org.terasology.context.internal.ContextImpl;
+import org.terasology.engine.SimpleUri;
+import org.terasology.engine.bootstrap.EnvironmentSwitchHandler;
 import org.terasology.engine.module.ModuleManager;
-import org.terasology.math.Rect2i;
+import org.terasology.entitySystem.Component;
+import org.terasology.entitySystem.metadata.ComponentLibrary;
 import org.terasology.math.TeraMath;
+import org.terasology.module.DependencyResolver;
+import org.terasology.module.ModuleEnvironment;
+import org.terasology.module.ResolutionResult;
+import org.terasology.module.exceptions.UnresolvedDependencyException;
+import org.terasology.reflection.metadata.FieldMetadata;
 import org.terasology.registry.CoreRegistry;
 import org.terasology.registry.In;
 import org.terasology.rendering.assets.texture.Texture;
 import org.terasology.rendering.assets.texture.TextureData;
-import org.terasology.rendering.nui.Color;
 import org.terasology.rendering.nui.CoreScreenLayer;
 import org.terasology.rendering.nui.NUIManager;
-import org.terasology.rendering.nui.UIWidget;
 import org.terasology.rendering.nui.WidgetUtil;
+import org.terasology.rendering.nui.animation.MenuAnimationSystems;
 import org.terasology.rendering.nui.databinding.Binding;
-import org.terasology.rendering.nui.databinding.DefaultBinding;
-import org.terasology.rendering.nui.databinding.ReadOnlyBinding;
-import org.terasology.rendering.nui.widgets.ActivateEventListener;
+import org.terasology.rendering.nui.layers.mainMenu.preview.FacetLayerPreview;
+import org.terasology.rendering.nui.layers.mainMenu.preview.PreviewGenerator;
+import org.terasology.rendering.nui.layouts.PropertyLayout;
+import org.terasology.rendering.nui.properties.Property;
+import org.terasology.rendering.nui.properties.PropertyOrdering;
+import org.terasology.rendering.nui.properties.PropertyProvider;
 import org.terasology.rendering.nui.widgets.UIButton;
 import org.terasology.rendering.nui.widgets.UIDropdown;
 import org.terasology.rendering.nui.widgets.UIImage;
-import org.terasology.rendering.nui.widgets.UILabel;
 import org.terasology.rendering.nui.widgets.UISlider;
 import org.terasology.rendering.nui.widgets.UIText;
+import org.terasology.utilities.Assets;
+import org.terasology.world.generator.WorldConfigurator;
 import org.terasology.world.generator.WorldGenerator;
-import org.terasology.world.generator.WorldGenerator2DPreview;
-import org.terasology.world.generator.internal.WorldGeneratorInfo;
 import org.terasology.world.generator.internal.WorldGeneratorManager;
 import org.terasology.world.generator.plugin.TempWorldGeneratorPluginLibrary;
 import org.terasology.world.generator.plugin.WorldGeneratorPluginLibrary;
+import org.terasology.world.zones.Zone;
 
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
 
 /**
- * @author Immortius
+ * Shows a preview of the generated world and provides some
+ * configuration options to tweak the generation process.
  */
 public class PreviewWorldScreen extends CoreScreenLayer {
+
+    public static final ResourceUrn ASSET_URI = new ResourceUrn("engine:previewWorldScreen");
 
     private static final Logger logger = LoggerFactory.getLogger(PreviewWorldScreen.class);
 
@@ -68,135 +83,184 @@ public class PreviewWorldScreen extends CoreScreenLayer {
     private ModuleManager moduleManager;
 
     @In
+    private ModuleAwareAssetTypeManager assetTypeManager;
+
+    @In
     private WorldGeneratorManager worldGeneratorManager;
 
     @In
     private Config config;
 
-    private int imageSize = 128;
+    @In
+    private Context context;
 
-    private WorldGenerator2DPreview previewGenerator;
+    private WorldGenerator worldGenerator;
 
-    private SeedBinding seedBinding = new SeedBinding();
-
-    private UILabel errorLabel;
     private UIImage previewImage;
     private UISlider zoomSlider;
+    private UIDropdown<Zone> zoneSelector;
     private UIButton applyButton;
-    private UIDropdown<String> layerDropdown;
-    private PreviewSettings currentSettings;
 
-    @Override
-    public void onOpened() {
-        super.onOpened();
+    private UIText seed;
 
-        CoreRegistry.put(WorldGeneratorPluginLibrary.class, new TempWorldGeneratorPluginLibrary());
-        WorldGeneratorInfo info = worldGeneratorManager.getWorldGeneratorInfo(config.getWorldGeneration().getDefaultGenerator());
+    private PreviewGenerator previewGen;
 
-        try {
-            WorldGenerator worldGenerator = worldGeneratorManager.createGenerator(info.getUri());
-            seedBinding.setWorldGenerator(worldGenerator);
 
-            if (worldGenerator instanceof WorldGenerator2DPreview) {
-                previewGenerator = (WorldGenerator2DPreview) worldGenerator;
+    private Context subContext;
+    private ModuleEnvironment environment;
+
+    private Texture texture;
+
+    private boolean triggerUpdate;
+    private String targetZone = "Surface";
+
+    public PreviewWorldScreen() {
+    }
+
+    public void setEnvironment() throws Exception {
+
+        // TODO: pass world gen and module list directly rather than using the config
+        SimpleUri worldGenUri = config.getWorldGeneration().getDefaultGenerator();
+
+        DependencyResolver resolver = new DependencyResolver(moduleManager.getRegistry());
+        ResolutionResult result = resolver.resolve(config.getDefaultModSelection().listModules());
+        if (result.isSuccess()) {
+            subContext = new ContextImpl(context);
+            CoreRegistry.setContext(subContext);
+            environment = moduleManager.loadEnvironment(result.getModules(), false);
+            subContext.put(WorldGeneratorPluginLibrary.class, new TempWorldGeneratorPluginLibrary(environment, subContext));
+            EnvironmentSwitchHandler environmentSwitchHandler = context.get(EnvironmentSwitchHandler.class);
+            environmentSwitchHandler.handleSwitchToPreviewEnvironment(subContext, environment);
+            genTexture();
+
+            worldGenerator = WorldGeneratorManager.createWorldGenerator(worldGenUri, subContext, environment);
+            worldGenerator.setWorldSeed(seed.getText());
+
+            List<Zone> previewZones = Lists.newArrayList(worldGenerator.getZones())
+                    .stream()
+                    .filter(z -> !z.getPreviewLayers().isEmpty())
+                    .collect(Collectors.toList());
+            if (previewZones.isEmpty()) {
+                zoneSelector.setVisible(false);
+                previewGen = new FacetLayerPreview(environment, worldGenerator);
             } else {
-                logger.info(info.getUri().toString() + " does not support a 2d preview");
+                zoneSelector.setVisible(true);
+                zoneSelector.setOptions(previewZones);
+                zoneSelector.setSelection(previewZones.get(0));
             }
-        } catch (Exception e) {
-            // if errors happen, don't enable this feature
-            seedBinding = new SeedBinding();
-            previewGenerator = null;
-            logger.error("Unable to load world generator: " + info.getUri().toString() + " for a 2d preview");
+
+            configureProperties();
+        } else {
+            throw new UnresolvedDependencyException("Unable to resolve depencencies for " + worldGenUri);
         }
     }
 
-    @Override
-    public void initialise() {
-        zoomSlider = find("zoomSlider", UISlider.class);
-        if (zoomSlider != null) {
-            zoomSlider.setMinimum(1.0f);
-            zoomSlider.setRange(99.f);
-            zoomSlider.setIncrement(1.0f);
-            zoomSlider.setValue(10f);
-            zoomSlider.setPrecision(0);
-        }
-
-        applyButton = find("apply", UIButton.class);
-        if (applyButton != null) {
-            applyButton.setEnabled(false);
-            applyButton.subscribe(new ActivateEventListener() {
-                @Override
-                public void onActivated(UIWidget widget) {
-                    updatePreview();
-                }
-            });
-        }
-
-        errorLabel = find("error", UILabel.class);
-        if (errorLabel != null) {
-            errorLabel.setVisible(false);
-        }
+    private void genTexture() {
+        int imgWidth = 384;
+        int imgHeight = 384;
+        ByteBuffer buffer = ByteBuffer.allocateDirect(imgWidth * imgHeight * Integer.BYTES);
+        ByteBuffer[] data = new ByteBuffer[]{buffer};
+        ResourceUrn uri = new ResourceUrn("engine:terrainPreview");
+        TextureData texData = new TextureData(imgWidth, imgHeight, data, Texture.WrapMode.CLAMP, Texture.FilterMode.LINEAR);
+        texture = Assets.generateAsset(uri, texData, Texture.class);
 
         previewImage = find("preview", UIImage.class);
-
-        UIText seed = find("seed", UIText.class);
-        if (seed != null) {
-            seed.bindText(seedBinding);
-        }
-
-        layerDropdown = find("display", UIDropdown.class);
-        layerDropdown.bindOptions(new ReadOnlyBinding<List<String>>() {
-            @Override
-            public List<String> get() {
-                if (previewGenerator != null) {
-                    return Lists.newArrayList(previewGenerator.getLayers());
-                } else {
-                    return Lists.newArrayList();
-                }
-            }
-        });
-        layerDropdown.bindSelection(new Binding<String>() {
-            String selection;
-
-            @Override
-            public String get() {
-                if (selection == null && layerDropdown.getOptions().size() > 0) {
-                    // select the first one in the list
-                    selection = layerDropdown.getOptions().get(0);
-                }
-                return selection;
-            }
-
-            @Override
-            public void set(String value) {
-                selection = value;
-            }
-        });
-
-
-        WidgetUtil.trySubscribe(this, "close", new ActivateEventListener() {
-            @Override
-            public void onActivated(UIWidget button) {
-                getManager().popScreen();
-            }
-        });
+        previewImage.setImage(texture);
     }
 
     @Override
     public void update(float delta) {
         super.update(delta);
-        if (previewGenerator != null) {
-            PreviewSettings newSettings = new PreviewSettings(layerDropdown.getSelection(), TeraMath.floorToInt(zoomSlider.getValue()), seedBinding.get());
-            if (currentSettings == null || !currentSettings.equals(newSettings)) {
-                boolean firstTime = currentSettings == null;
-                currentSettings = newSettings;
-                if (applyButton != null && !firstTime) {
-                    applyButton.setEnabled(true);
-                } else {
-                    updatePreview();
-                }
+
+        if (triggerUpdate) {
+            updatePreview();
+            triggerUpdate = false;
+        }
+    }
+
+    private void configureProperties() {
+
+        PropertyLayout propLayout = find("properties", PropertyLayout.class);
+        propLayout.setOrdering(PropertyOrdering.byLabel());
+        propLayout.clear();
+
+        WorldConfigurator worldConfig = worldGenerator.getConfigurator();
+
+        Map<String, Component> params = worldConfig.getProperties();
+
+        for (String key : params.keySet()) {
+            Class<? extends Component> clazz = params.get(key).getClass();
+            Component comp = config.getModuleConfig(worldGenerator.getUri(), key, clazz);
+            if (comp != null) {
+                worldConfig.setProperty(key, comp);       // use the data from the config instead of defaults
             }
         }
+
+        ComponentLibrary compLib = subContext.get(ComponentLibrary.class);
+
+        for (String label : params.keySet()) {
+
+            PropertyProvider provider = new PropertyProvider() {
+                @Override
+                protected <T> Binding<T> createTextBinding(Object target, FieldMetadata<Object, T> fieldMetadata) {
+                    return new WorldConfigBinding<>(worldConfig, label, compLib, fieldMetadata);
+                }
+
+                @Override
+                protected Binding<Float> createFloatBinding(Object target, FieldMetadata<Object, ?> fieldMetadata) {
+                    return new WorldConfigNumberBinding(worldConfig, label, compLib, fieldMetadata);
+                }
+            };
+
+            Component target = params.get(label);
+            List<Property<?, ?>> properties = provider.createProperties(target);
+            propLayout.addProperties(label, properties);
+        }
+    }
+
+    private void resetEnvironment() {
+
+        CoreRegistry.setContext(context);
+
+        if (environment != null) {
+            EnvironmentSwitchHandler environmentSwitchHandler = context.get(EnvironmentSwitchHandler.class);
+            environmentSwitchHandler.handleSwitchBackFromPreviewEnvironment(subContext);
+            environment.close();
+            environment = null;
+        }
+
+        previewGen.close();
+
+        WorldConfigurator worldConfig = worldGenerator.getConfigurator();
+
+        Map<String, Component> params = worldConfig.getProperties();
+        if (params != null) {
+            config.setModuleConfigs(worldGenerator.getUri(), params);
+        }
+    }
+
+    @Override
+    public void initialise() {
+        setAnimationSystem(MenuAnimationSystems.createDefaultSwipeAnimation());
+
+        zoomSlider = find("zoomSlider", UISlider.class);
+        if (zoomSlider != null) {
+            zoomSlider.setValue(2f);
+        }
+
+        seed = find("seed", UIText.class);
+
+        zoneSelector = find("zoneSelector", UIDropdown.class);
+
+        applyButton = find("apply", UIButton.class);
+        if (applyButton != null) {
+            applyButton.subscribe(widget -> updatePreview());
+        }
+
+        WidgetUtil.trySubscribe(this, "close", w -> {
+            resetEnvironment();
+            triggerBackAnimation();
+        });
     }
 
     @Override
@@ -205,177 +269,119 @@ public class PreviewWorldScreen extends CoreScreenLayer {
     }
 
     public void bindSeed(Binding<String> binding) {
-        seedBinding.setExternalBinding(binding);
-    }
-
-    public String getSeed() {
-        return seedBinding.get();
-    }
-
-    public void setSeed(String val) {
-        seedBinding.set(val);
+        if (seed == null) {
+            // TODO: call initialize through NUIManager instead of onOpened()
+            seed = find("seed", UIText.class);
+        }
+        seed.bindText(binding);
     }
 
     private void updatePreview() {
-        previewImage.setVisible(false);
-        errorLabel.setVisible(false);
 
-        final NUIManager manager = CoreRegistry.get(NUIManager.class);
-        final WaitPopup<ByteBufferResult> popup = manager.pushScreen(WaitPopup.ASSET_URI, WaitPopup.class);
+        final NUIManager manager = context.get(NUIManager.class);
+        final WaitPopup<TextureData> popup = manager.pushScreen(WaitPopup.ASSET_URI, WaitPopup.class);
         popup.setMessage("Updating Preview", "Please wait ...");
 
-        final ByteBufferProgressListener progressListener = new ByteBufferProgressListener() {
-            @Override
-            public void onProgress(float progress) {
+        ProgressListener progressListener = progress ->
                 popup.setMessage("Updating Preview", String.format("Please wait ... %d%%", (int) (progress * 100f)));
+
+        Callable<TextureData> operation = () -> {
+            if (seed != null) {
+                worldGenerator.setWorldSeed(seed.getText());
             }
+            int zoom = TeraMath.floorToInt(zoomSlider.getValue());
+            TextureData data = texture.getData();
+
+            if (zoneSelector.isVisible()) {
+                previewGen = zoneSelector.getSelection().preview(worldGenerator);
+            }
+            previewGen.render(data, zoom, progressListener);
+
+            return data;
         };
 
-        Callable<ByteBufferResult> operation = new Callable<ByteBufferResult>() {
-            @Override
-            public ByteBufferResult call() throws InterruptedException {
-                try {
-                    ByteBuffer buf = createByteBuffer(imageSize, imageSize, currentSettings.zoom, currentSettings.layer, progressListener);
-                    return new ByteBufferResult(true, buf, null);
-                } catch (InterruptedException e) {
-                    throw e;
-                } catch (Exception ex) {
-                    return new ByteBufferResult(false, null, ex);
-                }
-            }
-        };
-
-        popup.onSuccess(new Function<ByteBufferResult, Void>() {
-            @Override
-            public Void apply(ByteBufferResult byteBufferResult) {
-                if (byteBufferResult.success) {
-                    previewImage.setImage(createTexture(imageSize, imageSize, byteBufferResult.buf));
-                    previewImage.setVisible(true);
-                    if (applyButton != null) {
-                        applyButton.setEnabled(false);
-                    }
-                } else {
-                    errorLabel.setText("Sorry: could not generate 2d preview :-(");
-                    errorLabel.setVisible(true);
-                    logger.error("Error generating a 2d preview for " + layerDropdown.getSelection(), byteBufferResult.exception);
-                }
-                return null;
-            }
-        });
-
+        popup.onSuccess(texture::reload);
         popup.startOperation(operation, true);
     }
 
-    private Texture createTexture(int width, int height, ByteBuffer buf) {
-        ByteBuffer[] data = new ByteBuffer[]{buf};
-        AssetUri uri = new AssetUri(AssetType.TEXTURE, "engine:terrainPreview");
-        TextureData texData = new TextureData(width, height, data, Texture.WrapMode.CLAMP, Texture.FilterMode.LINEAR);
+    /**
+     * Updates a world configurator through setProperty() whenever Binding#set() is called.
+     */
+    private static class WorldConfigBinding<T> implements Binding<T> {
+        private final String label;
+        private final WorldConfigurator worldConfig;
+        private final FieldMetadata<Object, T> fieldMetadata;
+        private final ComponentLibrary compLib;
 
-        return Assets.generateAsset(uri, texData, Texture.class);
-    }
-
-    private ByteBuffer createByteBuffer(int width, int height, int scale, String layerName, ByteBufferProgressListener progressListener) throws InterruptedException {
-        int size = 4 * width * height;
-        final int offX = -width / 2;
-        final int offY = -height / 2;
-        ByteBuffer buf = ByteBuffer.allocateDirect(size);
-        for (int y = 0; y < height; ++y) {
-            for (int x = 0; x < width; ++x) {
-                int px = (x + offX) * scale;
-                int py = (y + offY) * scale;
-                Rect2i area = Rect2i.createFromMinAndSize(px, py, scale, scale);
-                Color c = previewGenerator.get(layerName, area);
-                c.addToBuffer(buf);
-            }
-            if (Thread.currentThread().isInterrupted()) {
-                throw new InterruptedException();
-            }
-            if (progressListener != null) {
-                progressListener.onProgress((float) y / height);
-            }
-        }
-        buf.flip();
-        return buf;
-    }
-
-    private static class SeedBinding implements Binding<String> {
-
-        private Binding<String> externalBinding = new DefaultBinding<>("");
-        private WorldGenerator worldGenerator;
-
-        @Override
-        public String get() {
-            return externalBinding.get();
+        protected WorldConfigBinding(WorldConfigurator config, String label, ComponentLibrary compLib, FieldMetadata<Object, T> fieldMetadata) {
+            this.worldConfig = config;
+            this.label = label;
+            this.compLib = compLib;
+            this.fieldMetadata = fieldMetadata;
         }
 
         @Override
-        public void set(String value) {
-            externalBinding.set(value);
-            if (worldGenerator != null) {
-                worldGenerator.setWorldSeed(value);
-            }
-        }
-
-        public Binding<String> getExternalBinding() {
-            return externalBinding;
-        }
-
-        public void setExternalBinding(Binding<String> externalBinding) {
-            this.externalBinding = externalBinding;
-            if (worldGenerator != null) {
-                worldGenerator.setWorldSeed(get());
-            }
-        }
-
-        public void setWorldGenerator(WorldGenerator worldGenerator) {
-            this.worldGenerator = worldGenerator;
-            worldGenerator.setWorldSeed(get());
-        }
-    }
-
-    private static class PreviewSettings {
-        private String layer;
-        private int zoom;
-        private String seed;
-
-        public PreviewSettings(String layer, int zoom, String seed) {
-            this.layer = layer;
-            this.zoom = zoom;
-            this.seed = seed;
+        public T get() {
+            Component comp = worldConfig.getProperties().get(label);
+            return fieldMetadata.getValue(comp);
         }
 
         @Override
-        public boolean equals(Object obj) {
-            if (obj == this) {
-                return true;
+        public void set(T value) {
+            T old = get();
+
+            if (!Objects.equals(old, value)) {
+                cloneAndSet(label, value);
             }
-            if (obj instanceof PreviewSettings) {
-                PreviewSettings other = (PreviewSettings) obj;
-                return Objects.equals(other.layer, layer) && other.zoom == zoom && Objects.equals(other.seed, seed);
+        }
+
+        private void cloneAndSet(String group, Object value) {
+            Component comp = worldConfig.getProperties().get(group);
+            Component clone = compLib.copy(comp);
+            fieldMetadata.setValue(clone, value);
+
+            // notify the world generator about the new component
+            worldConfig.setProperty(label, clone);
+        }
+    }
+
+    private static class WorldConfigNumberBinding implements Binding<Float> {
+
+        private WorldConfigBinding<? extends Number> binding;
+
+        @SuppressWarnings("unchecked")
+        protected WorldConfigNumberBinding(WorldConfigurator config, String label, ComponentLibrary compLib, FieldMetadata<Object, ?> field) {
+            Class<?> type = field.getType();
+            if (type == Integer.TYPE || type == Integer.class) {
+                this.binding = new WorldConfigBinding<>(config, label, compLib,
+                        (FieldMetadata<Object, Integer>) field);
+            } else if (type == Float.TYPE || type == Float.class) {
+                this.binding = new WorldConfigBinding<>(config, label, compLib,
+                        (FieldMetadata<Object, Float>) field);
             }
-            return false;
         }
 
         @Override
-        public int hashCode() {
-            return Objects.hash(layer, zoom, seed);
+        public Float get() {
+            Number val = binding.get();
+            if (val instanceof Float) {
+                // use boxed instance directly
+                return (Float) val;
+            }
+            // create a boxed instance otherwise
+            return val.floatValue();
         }
-    }
 
-    private static final class ByteBufferResult {
-        public boolean success;
-        public ByteBuffer buf;
-        public Exception exception;
-
-        private ByteBufferResult(boolean success, ByteBuffer buf, Exception exception) {
-            this.success = success;
-            this.buf = buf;
-            this.exception = exception;
+        @Override
+        @SuppressWarnings("unchecked")
+        public void set(Float value) {
+            Class<? extends Number> type = binding.fieldMetadata.getType();
+            if (type == Integer.TYPE || type == Integer.class) {
+                ((Binding<Integer>) binding).set(value.intValue());
+            } else if (type == Float.TYPE || type == Float.class) {
+                ((Binding<Float>) binding).set(value);
+            }
         }
-    }
-
-    private interface ByteBufferProgressListener {
-        void onProgress(float percent);
     }
 }
 

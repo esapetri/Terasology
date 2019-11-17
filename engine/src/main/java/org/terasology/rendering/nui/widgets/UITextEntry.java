@@ -24,12 +24,11 @@ import org.terasology.rendering.nui.databinding.DefaultBinding;
 import java.util.Objects;
 
 /**
- * @author Immortius
- * @author synopia
+ * A widget allowing for simple text entry
  */
 public class UITextEntry<T> extends UIText {
     private static final Logger logger = LoggerFactory.getLogger(UITextEntry.class);
-    
+
     private Binding<T> value = new DefaultBinding<>();
     private Binding<String> stringValue = new DefaultBinding<>("");
     private Parser<T> parser;
@@ -47,11 +46,12 @@ public class UITextEntry<T> extends UIText {
     @Override
     public void onDraw(Canvas canvas) {
         if (!isFocused()) {
-            stringValue.set(formatter.toString(value.get()));
+            resetValue();
         }
         super.onDraw(canvas);
     }
 
+    @Override
     public void onLoseFocus() {
         super.onLoseFocus();
         try {
@@ -65,23 +65,39 @@ public class UITextEntry<T> extends UIText {
         }
     }
 
+    public void resetValue() {
+        stringValue.set(formatter.toString(value.get()));
+    }
+
     public void bindValue(Binding<T> binding) {
         value = binding;
         stringValue.set(formatter.toString(value.get()));
     }
 
+    /**
+     * @return The current value of the widget
+     */
     public T getValue() {
         return value.get();
     }
 
+    /**
+     * @param val The new text to display
+     */
     public void setValue(T val) {
         value.set(val);
     }
 
+    /**
+     * @param parser The parser to use on the input
+     */
     public void setParser(Parser<T> parser) {
         this.parser = parser;
     }
 
+    /**
+     * @param formatter The formatter to use
+     */
     public void setFormatter(Formatter<T> formatter) {
         this.formatter = formatter;
     }

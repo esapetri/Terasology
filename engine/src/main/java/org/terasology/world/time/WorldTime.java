@@ -18,7 +18,6 @@ package org.terasology.world.time;
 import org.terasology.entitySystem.systems.ComponentSystem;
 
 /**
- * @author Immortius
  */
 public interface WorldTime extends ComponentSystem {
 
@@ -34,6 +33,11 @@ public interface WorldTime extends ComponentSystem {
     long TICK_EVENTS_PER_DAY = 100;
 
     long TICK_EVENT_RATE = DAY_LENGTH / TICK_EVENTS_PER_DAY;
+
+    /**
+     * The offset used by the game to start at 12 noon.
+     */
+    float NOON_OFFSET = 0.50f;
 
 
     /**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MovingBlocks
+ * Copyright 2017 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,58 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.terasology.config;
 
-import java.beans.PropertyChangeListener;
-import java.beans.PropertyChangeSupport;
+import org.terasology.config.flexible.AutoConfig;
+import org.terasology.config.flexible.Setting;
+import org.terasology.config.flexible.constraints.NumberRangeConstraint;
 
-/**
- * @author Immortius
- */
-public class AudioConfig {
-    public static final String SOUND_VOLUME = "soundVolume";
-    public static final String MUSIC_VOLUME = "musicVolume";
+import static org.terasology.config.flexible.SettingArgument.constraint;
+import static org.terasology.config.flexible.SettingArgument.defaultValue;
+import static org.terasology.config.flexible.SettingArgument.type;
 
-    private float soundVolume = 1.0f;
-    private float musicVolume = 0.1f;
+public class AudioConfig extends AutoConfig {
+    public final Setting<Float> soundVolume =
+        setting(
+            type(Float.class),
+            defaultValue(1.0f),
+            // From AudioSettingsScreen
+            constraint(new NumberRangeConstraint<>(0.0f, 1.0f, true, true))
+        );
+
+    public final Setting<Float> musicVolume =
+        setting(
+            type(Float.class),
+            defaultValue(1.0f),
+            constraint(new NumberRangeConstraint<>(0.0f, 1.0f, true, true))
+        );
+
+    // TODO: Convert into Setting -- no uses yet
     private boolean disableSound;
-
-    private transient PropertyChangeSupport propertyChangeSupport = new PropertyChangeSupport(this);
-
-    public float getSoundVolume() {
-        return soundVolume;
-    }
-
-    public void setSoundVolume(float soundVolume) {
-        float oldValue = this.soundVolume;
-        this.soundVolume = soundVolume;
-        propertyChangeSupport.firePropertyChange(SOUND_VOLUME, oldValue, soundVolume);
-    }
-
-    public float getMusicVolume() {
-        return musicVolume;
-    }
-
-    public void setMusicVolume(float musicVolume) {
-        float oldValue = this.musicVolume;
-        this.musicVolume = musicVolume;
-        propertyChangeSupport.firePropertyChange(MUSIC_VOLUME, oldValue, musicVolume);
-    }
-
-    public boolean isDisableSound() {
-        return disableSound;
-    }
-
-    public void setDisableSound(boolean disableSound) {
-        this.disableSound = disableSound;
-    }
-
-    public void subscribe(PropertyChangeListener changeListener) {
-        this.propertyChangeSupport.addPropertyChangeListener(changeListener);
-    }
-
-    public void unsubscribe(PropertyChangeListener changeListener) {
-        this.propertyChangeSupport.removePropertyChangeListener(changeListener);
-    }
 }

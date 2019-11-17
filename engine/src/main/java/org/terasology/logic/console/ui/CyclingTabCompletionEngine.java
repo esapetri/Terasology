@@ -15,7 +15,6 @@
  */
 package org.terasology.logic.console.ui;
 
-import com.google.common.base.Function;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -28,7 +27,6 @@ import org.terasology.logic.console.commandSystem.ConsoleCommand;
 import org.terasology.logic.console.commandSystem.exceptions.CommandSuggestionException;
 import org.terasology.logic.players.LocalPlayer;
 import org.terasology.naming.Name;
-import org.terasology.registry.CoreRegistry;
 import org.terasology.rendering.FontColor;
 import org.terasology.utilities.CamelCaseMatcher;
 
@@ -40,19 +38,19 @@ import java.util.Set;
 /**
  * A text completion engine with cycle-through functionality
  *
- * @author Martin Steiger, Limeth
  */
 public class CyclingTabCompletionEngine implements TabCompletionEngine {
-    private static final int MAX_CYCLES = 10;
     private final Console console;
     private int selectionIndex;
     private List<String> previousMatches; //Alphabetically ordered list of matches
     private Message previousMessage;
     private Collection<String> commandNames;
     private String query;
+    private LocalPlayer localPlayer;
 
-    public CyclingTabCompletionEngine(Console console) {
+    public CyclingTabCompletionEngine(Console console, LocalPlayer localPlayer) {
         this.console = console;
+        this.localPlayer = localPlayer;
     }
 
     private boolean updateCommandNamesIfNecessary() {
@@ -62,12 +60,7 @@ public class CyclingTabCompletionEngine implements TabCompletionEngine {
             return false;
         }
 
-        commandNames = Collections2.transform(commands, new Function<ConsoleCommand, String>() {
-            @Override
-            public String apply(ConsoleCommand input) {
-                return input.getName().toString();
-            }
-        });
+        commandNames = Collections2.transform(commands, input -> input.getName().toString());
         return true;
     }
 
@@ -87,14 +80,12 @@ public class CyclingTabCompletionEngine implements TabCompletionEngine {
         }
 
         String currentValue = commandParameters.size() >= suggestedIndex ? commandParameters.get(suggestedIndex - 1) : null;
-        EntityRef sender = CoreRegistry.get(LocalPlayer.class).getClientEntity();
+        EntityRef sender = localPlayer.getClientEntity();
 
         try {
             return command.suggest(currentValue, finishedParameters, sender);
         } catch (CommandSuggestionException e) {
             String causeMessage = e.getLocalizedMessage();
-
-            e.printStackTrace();
 
             if (causeMessage == null) {
                 Throwable cause = e.getCause();
@@ -186,7 +177,7 @@ public class CyclingTabCompletionEngine implements TabCompletionEngine {
     private String generateResult(String suggestion, Name commandName,
                                   List<String> commandParameters, int suggestedIndex) {
         if (suggestedIndex <= 0) {
-            return suggestion;
+            return suggestion + " ";
         } else {
             StringBuilder result = new StringBuilder();
             result.append(commandName.toString());
@@ -198,6 +189,9 @@ public class CyclingTabCompletionEngine implements TabCompletionEngine {
 
             result.append(" ");
             result.append(suggestion);
+
+            result.append(" ");
+
             return result.toString();
         }
     }

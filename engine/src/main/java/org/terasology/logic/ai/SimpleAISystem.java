@@ -15,12 +15,11 @@
  */
 package org.terasology.logic.ai;
 
-import org.terasology.entitySystem.systems.BaseComponentSystem;
-import org.terasology.registry.CoreRegistry;
 import org.terasology.engine.Time;
 import org.terasology.entitySystem.entity.EntityManager;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.event.ReceiveEvent;
+import org.terasology.entitySystem.systems.BaseComponentSystem;
 import org.terasology.entitySystem.systems.RegisterMode;
 import org.terasology.entitySystem.systems.RegisterSystem;
 import org.terasology.entitySystem.systems.UpdateSubscriberSystem;
@@ -36,7 +35,6 @@ import org.terasology.utilities.random.Random;
 import org.terasology.world.WorldProvider;
 
 /**
- * @author Immortius <immortius@gmail.com>
  */
 @RegisterSystem(RegisterMode.AUTHORITY)
 public class SimpleAISystem extends BaseComponentSystem implements UpdateSubscriberSystem {
@@ -48,6 +46,8 @@ public class SimpleAISystem extends BaseComponentSystem implements UpdateSubscri
     private Random random = new FastRandom();
     @In
     private Time time;
+    @In
+    private LocalPlayer localPlayer;
 
     @Override
     public void update(float delta) {
@@ -63,7 +63,6 @@ public class SimpleAISystem extends BaseComponentSystem implements UpdateSubscri
 
             Vector3f drive = new Vector3f();
             // TODO: shouldn't use local player, need some way to find nearest player
-            LocalPlayer localPlayer = CoreRegistry.get(LocalPlayer.class);
             if (localPlayer != null) {
                 Vector3f dist = new Vector3f(worldPos);
                 dist.sub(localPlayer.getPosition());
@@ -76,7 +75,7 @@ public class SimpleAISystem extends BaseComponentSystem implements UpdateSubscri
                     entity.saveComponent(ai);
                 } else {
                     // Random walk
-                    if (CoreRegistry.get(Time.class).getGameTimeInMs() - ai.lastChangeOfDirectionAt > 12000 || ai.followingPlayer) {
+                    if (time.getGameTimeInMs() - ai.lastChangeOfDirectionAt > 12000 || ai.followingPlayer) {
                         ai.movementTarget.set(worldPos.x + random.nextFloat(-500.0f, 500.0f), worldPos.y, worldPos.z + random.nextFloat(-500.0f, 500.0f));
                         ai.lastChangeOfDirectionAt = time.getGameTimeInMs();
                         ai.followingPlayer = false;
@@ -93,7 +92,7 @@ public class SimpleAISystem extends BaseComponentSystem implements UpdateSubscri
                 location.getLocalRotation().set(new Vector3f(0, 1, 0), yaw);
                 entity.saveComponent(location);
             }
-            entity.send(new CharacterMoveInputEvent(0, 0, 0, drive, false, false));
+            entity.send(new CharacterMoveInputEvent(0, 0, 0, drive, false, false, time.getGameDeltaInMs()));
         }
     }
 

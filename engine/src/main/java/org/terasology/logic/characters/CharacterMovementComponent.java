@@ -28,7 +28,9 @@ import org.terasology.rendering.nui.properties.Range;
 import java.util.List;
 
 /**
- * @author Immortius <immortius@gmail.com>
+ * This component is attached to all character entities. It governs movement and stores
+ * associated paramenters. <br/>
+ * The {@link AliveCharacterComponent} should necessarily be attached to the character entity for the movement systems to work.
  */
 public final class CharacterMovementComponent implements Component {
 
@@ -58,6 +60,16 @@ public final class CharacterMovementComponent implements Component {
     @Replicate(FieldReplicateType.SERVER_TO_OWNER)
     @Range(min = 0, max = 1)
     public float slopeFactor = 0.6f; // Cosine of the maximum slope traversable. 1 is no slope, 0 is any slope
+
+    // Acrobatics settings
+    @Replicate(FieldReplicateType.SERVER_TO_OWNER)
+    public int baseNumberOfJumpsMax = 1; // Base maximum number of jumps allowed starting from solid ground.
+
+    @Replicate(FieldReplicateType.SERVER_TO_OWNER)
+    public int numberOfJumpsMax = 1; // Maximum number of jumps allowed starting from solid ground.
+
+    @Replicate(FieldReplicateType.SERVER_TO_OWNER)
+    public int numberOfJumpsLeft = baseNumberOfJumpsMax; // Remaining number of jumps a player can perform.
 
     public float distanceBetweenFootsteps = 1f;
     public boolean faceMovementDirection;

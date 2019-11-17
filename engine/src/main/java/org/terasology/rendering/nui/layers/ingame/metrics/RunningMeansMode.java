@@ -20,12 +20,11 @@ import gnu.trove.map.TObjectDoubleMap;
 import org.terasology.monitoring.PerformanceMonitor;
 
 /**
- * @author Immortius
  */
 final class RunningMeansMode extends TimeMetricsMode {
 
-    public RunningMeansMode() {
-        super("Running means", 10);
+     RunningMeansMode() {
+        super("\n- Means -", 10);
     }
 
     @Override

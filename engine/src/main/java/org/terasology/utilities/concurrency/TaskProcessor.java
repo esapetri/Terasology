@@ -18,13 +18,13 @@ package org.terasology.utilities.concurrency;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.terasology.engine.GameThread;
 import org.terasology.monitoring.ThreadActivity;
 import org.terasology.monitoring.ThreadMonitor;
 
 import java.util.concurrent.BlockingQueue;
 
 /**
- * @author Immortius
  */
 final class TaskProcessor<T extends Task> implements Runnable {
 
@@ -33,7 +33,7 @@ final class TaskProcessor<T extends Task> implements Runnable {
     private String name;
     private BlockingQueue<T> queue;
 
-    public TaskProcessor(String name, BlockingQueue<T> taskQueue) {
+     TaskProcessor(String name, BlockingQueue<T> taskQueue) {
         this.queue = taskQueue;
         this.name = name;
     }
@@ -55,9 +55,13 @@ final class TaskProcessor<T extends Task> implements Runnable {
             } catch (InterruptedException e) {
                 ThreadMonitor.addError(e);
                 logger.error("Thread interrupted", e);
-            } catch (Throwable e) {
+            } catch (RuntimeException e) {
                 ThreadMonitor.addError(e);
                 logger.error("Error in thread {}", Thread.currentThread().getName(), e);
+            } catch (Error e) {
+                GameThread.asynch(() -> {
+                    throw e;  // re-throw on game thread to terminate the entire application
+                });
             }
         }
         logger.debug("Thread shutdown safely");

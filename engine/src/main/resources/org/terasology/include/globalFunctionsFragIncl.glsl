@@ -40,14 +40,8 @@ float calcLambLight(vec3 normal, vec3 lightVec) {
     return diffuse;
 }
 
-float calcSpecLight(vec3 normal, vec3 lightVec, vec3 eyeVec, float exp) {
-    vec3 halfWay = normalize(eyeVec+lightVec);
-    return pow(clamp(dot(halfWay, normal), 0.0, 1.0), exp);
-}
-
 float calcSpecLightNormalized(vec3 normal, vec3 lightVec, vec3 eyeVec, float exp) {
-    vec3 halfWay = normalize(eyeVec+lightVec);
-    return ((exp + 8.0) / PI_TIMES_8) * pow(clamp(dot(halfWay, normal), 0.0, 1.0), exp);
+    return pow(max(0.0, dot(-eyeVec, reflect(lightVec, normal))), exp);
 }
 
 vec4 linearToSrgb(vec4 color) {
@@ -61,6 +55,18 @@ vec4 srgbToLinear(vec4 color) {
 float expBlockLightValue(float light) {
 	float lightScaled = (1.0 - light) * 16.0;
 	return pow(BLOCK_LIGHT_POW, lightScaled) * light * BLOCK_INTENSITY_FACTOR;
+}
+
+float rescaleRange(float inputvalue, float oldMin,float oldMax, float newMin,float newMax)
+{
+    float oldRange = (oldMax - oldMin);
+    if (oldRange == 0)
+        return newMin;
+    else
+    {
+        float newRange = (newMax - newMin);
+        return (((inputvalue - oldMin) * newRange) / oldRange) + newMin;
+    }
 }
 
 float expLightValue(float light) {
@@ -141,23 +147,27 @@ float calcPcfShadowTerm(sampler2D shadowMap, float lightDepth, vec2 texCoord, fl
 float calcVolumetricFog(vec3 fogWorldPosition, float volumetricHeightDensityAtViewer, float globalDensity, float heightFalloff) {
     vec3 cameraToFogWorldPosition = -fogWorldPosition;
 
-    float fogInt = length(cameraToFogWorldPosition) * volumetricHeightDensityAtViewer;
+    float totalFogToSample = length(cameraToFogWorldPosition) * globalDensity * volumetricHeightDensityAtViewer;
+    
     const float slopeThreshold = 0.01;
-
-    if (abs(cameraToFogWorldPosition.y) > slopeThreshold)
-    {
-        float t = heightFalloff * cameraToFogWorldPosition.y;
-        fogInt *= (1.0 - exp(-t)) / t;
+    float heightDensityFactor = heightFalloff * cameraToFogWorldPosition.y;
+    if (abs(heightDensityFactor) > slopeThreshold) {
+        totalFogToSample *= (1.0 - exp(-heightDensityFactor)) / heightDensityFactor;
     }
 
-    return exp(-globalDensity * fogInt);
+    return 1 - exp(-totalFogToSample);
 }
 
 float calcLuminance(vec3 color) {
     return 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;
 }
 
-vec3 calcBlocklightColor(float blocklightValue
+vec3 calcBlocklightColor(float blockBrightness) {
+    // Calculate the final blocklight color value and add a slight reddish tint to it
+    return vec3(blockBrightness) * vec3(1.0, 0.95, 0.94);
+}
+
+float calcBlocklightColorBrightness(float blocklightValue
 #if defined (FLICKERING_LIGHT)
 , float flickeringLightOffset
 #endif
@@ -165,11 +175,9 @@ vec3 calcBlocklightColor(float blocklightValue
     // Calculate the final block light brightness
     float blockBrightness = expBlockLightValue(blocklightValue);
 #if defined (FLICKERING_LIGHT)
-    blockBrightness -= flickeringLightOffset * blocklightValue;
+    blockBrightness -= clamp(flickeringLightOffset,0,1) * blocklightValue;
 #endif
-
-    // Calculate the final blocklight color value and add a slight reddish tint to it
-    return vec3(blockBrightness) * vec3(1.0, 0.95, 0.94);
+    return blockBrightness;
 }
 
 float calcDayAndNightLightingFactor(float daylightValue, float daylight) {

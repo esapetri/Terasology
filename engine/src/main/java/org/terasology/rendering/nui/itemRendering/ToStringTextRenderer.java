@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 MovingBlocks
+ * Copyright 2016 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,18 +14,29 @@
  * limitations under the License.
  */
 package org.terasology.rendering.nui.itemRendering;
-
+import org.terasology.i18n.TranslationSystem;
 import java.util.Objects;
 
 /**
  * This ItemRenderer displays the result of the object's toString() method. If the object is null, 'null' is displayed.
- *
- * @author Immortius
  */
 public class ToStringTextRenderer<T> extends StringTextRenderer<T> {
 
+    private TranslationSystem translationSystem;
+
+    public ToStringTextRenderer() { }
+
+    public ToStringTextRenderer(TranslationSystem translationSystemInput) {
+        translationSystem = translationSystemInput;
+    }
+
+
     @Override
     public String getString(T value) {
-        return Objects.toString(value);
+        if (translationSystem == null) {
+            return Objects.toString(value);
+        } else {
+            return translationSystem.translate(Objects.toString(value));
+        }
     }
 }

@@ -17,9 +17,7 @@ package org.terasology.world.generator.plugin;
 
 import java.util.List;
 
-/**
- * @author Immortius
- */
+@FunctionalInterface
 public interface WorldGeneratorPluginLibrary {
 
     <U extends WorldGeneratorPlugin> List<U> instantiateAllOfType(Class<U> ofType);

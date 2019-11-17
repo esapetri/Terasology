@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 MovingBlocks
+ * Copyright 2016 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,13 +27,12 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Interface of commands used in a {@link org.terasology.logic.console.Console}
- *
- * @author Limeth
+ * Interface of commands used in a {@link org.terasology.logic.console.Console}.
  */
 @API
 public interface ConsoleCommand extends Comparable<ConsoleCommand> {
     Comparator<ConsoleCommand> COMPARATOR = new Comparator<ConsoleCommand>() {
+
         @Override
         public int compare(ConsoleCommand o1, ConsoleCommand o2) {
             int nameComparison = o1.getName().compareTo(o2.getName());
@@ -49,7 +48,7 @@ public interface ConsoleCommand extends Comparable<ConsoleCommand> {
             }
 
             return o2.getRequiredParameterCount() - o1.getRequiredParameterCount();
-        }
+        };
     };
 
     /**

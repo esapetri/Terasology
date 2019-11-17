@@ -18,24 +18,23 @@ package org.terasology.rendering.nui.layers.mainMenu.videoSettings;
 import org.terasology.config.RenderingConfig;
 
 /**
- * @author Immortius
  */
 public enum WaterReflection {
-    SKY("Sky Only") {
+    SKY("${engine:menu#water-reflections-sky}") {
         @Override
         public void apply(RenderingConfig renderConfig) {
             renderConfig.setReflectiveWater(false);
             renderConfig.setLocalReflections(false);
         }
     },
-    GLOBAL("Global") {
+    GLOBAL("${engine:menu#water-reflections-global}") {
         @Override
         public void apply(RenderingConfig renderConfig) {
             renderConfig.setReflectiveWater(true);
             renderConfig.setLocalReflections(false);
         }
     },
-    LOCAL("SSR (EXPERIMENTAL)") {
+    LOCAL("${engine:menu#water-reflections-ssr}") {
         @Override
         public void apply(RenderingConfig renderConfig) {
             renderConfig.setReflectiveWater(false);
@@ -45,7 +44,7 @@ public enum WaterReflection {
 
     private String displayName;
 
-    private WaterReflection(String displayName) {
+    WaterReflection(String displayName) {
         this.displayName = displayName;
     }
 

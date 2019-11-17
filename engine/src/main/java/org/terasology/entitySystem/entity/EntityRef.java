@@ -16,16 +16,17 @@
 package org.terasology.entitySystem.entity;
 
 import com.google.common.base.Objects;
-import org.terasology.asset.AssetUri;
 import org.terasology.entitySystem.MutableComponentContainer;
+import org.terasology.entitySystem.entity.internal.EntityScope;
 import org.terasology.entitySystem.entity.internal.NullEntityRef;
 import org.terasology.entitySystem.event.Event;
 import org.terasology.entitySystem.prefab.Prefab;
+import org.terasology.entitySystem.sectors.SectorSimulationComponent;
 
 /**
  * A wrapper around an entity id providing access to common functionality
- **
- * @author Immortius <immortius@gmail.com>
+ * *
+ *
  */
 public abstract class EntityRef implements MutableComponentContainer {
 
@@ -35,6 +36,7 @@ public abstract class EntityRef implements MutableComponentContainer {
      * Copies this entity, creating a new entity with identical components.
      * Note: You will need to be careful when copying entities, particularly around ownership - this method does nothing to prevent you ending up
      * with multiple entities owning the same entities.
+     *
      * @return A copy of this entity.
      */
     public abstract EntityRef copy();
@@ -63,7 +65,7 @@ public abstract class EntityRef implements MutableComponentContainer {
 
     /**
      * @return The identifier of this entity. Should be avoided where possible and the EntityRef
-     *         used instead to allow it to be invalidated if the entity is destroyed.
+     * used instead to allow it to be invalidated if the entity is destroyed.
      */
     public abstract long getId();
 
@@ -73,15 +75,8 @@ public abstract class EntityRef implements MutableComponentContainer {
     public abstract boolean isPersistent();
 
     /**
-     * Sets whether this entity should be saved
-     *
-     * @param persistent
-     */
-    public abstract void setPersistent(boolean persistent);
-
-    /**
      * @return Whether this entity should remain active even when the part of the world/owner of the entity is not
-     *         relevant
+     * relevant
      */
     public abstract boolean isAlwaysRelevant();
 
@@ -90,13 +85,49 @@ public abstract class EntityRef implements MutableComponentContainer {
      * not relevant
      *
      * @param alwaysRelevant
+     * @deprecated replaced by {{@link #setScope(EntityScope)}}
      */
+    @Deprecated
     public abstract void setAlwaysRelevant(boolean alwaysRelevant);
 
     /**
      * @return The owning entity of this entity
      */
     public abstract EntityRef getOwner();
+
+    /**
+     * Sets the scope of the entity
+     *
+     * @param scope the new scope for the entity
+     */
+    public void setScope(EntityScope scope) {
+    }
+
+    /**
+     * Sets the scope of this entity to sector-scope, and sets the {@link SectorSimulationComponent#unloadedMaxDelta}
+     * and {@link SectorSimulationComponent#loadedMaxDelta} to the same given value.
+     *
+     * @param maxDelta the maximum delta for the sector-scope entity (loaded and unloaded)
+     */
+    public void setSectorScope(long maxDelta) {
+    }
+
+    /**
+     * Sets the scope of this entity to sector-scope, and sets the {@link SectorSimulationComponent#unloadedMaxDelta}
+     * and {@link SectorSimulationComponent#loadedMaxDelta} to the given values.
+     *
+     * @param unloadedMaxDelta the maximum unloaded delta for the sector-scope entity
+     * @param loadedMaxDelta the maximum loaded delta for the sector-scope entity
+     */
+    public void setSectorScope(long unloadedMaxDelta, long loadedMaxDelta) {
+    }
+
+    /**
+     * @return the scope of the entity
+     */
+    public EntityScope getScope() {
+        return null;
+    }
 
     /**
      * Sets the entity that owns this entity.
@@ -109,11 +140,6 @@ public abstract class EntityRef implements MutableComponentContainer {
      * @return The prefab this entity is based off of
      */
     public abstract Prefab getParentPrefab();
-
-    /**
-     * @return The AssetUri of this entity's prefab, or null if it isn't based on an entity.
-     */
-    public abstract AssetUri getPrefabURI();
 
     /**
      * @return A full, json style description of the entity.
@@ -135,5 +161,11 @@ public abstract class EntityRef implements MutableComponentContainer {
     @Override
     public final int hashCode() {
         return Objects.hashCode(getId());
+    }
+
+    /**
+     * Invalidates this EntityRef
+     */
+    public void invalidate() {
     }
 }

@@ -15,44 +15,61 @@
  */
 package org.terasology.rendering.nui.layers.ingame;
 
+import org.terasology.assets.ResourceUrn;
 import org.terasology.engine.GameEngine;
+import org.terasology.engine.Time;
 import org.terasology.engine.modes.StateMainMenu;
+import org.terasology.network.NetworkMode;
+import org.terasology.network.NetworkSystem;
 import org.terasology.registry.CoreRegistry;
+import org.terasology.registry.In;
 import org.terasology.rendering.nui.CoreScreenLayer;
-import org.terasology.rendering.nui.UIWidget;
 import org.terasology.rendering.nui.WidgetUtil;
-import org.terasology.rendering.nui.widgets.ActivateEventListener;
+import org.terasology.rendering.nui.animation.MenuAnimationSystems;
+import org.terasology.rendering.nui.layers.mainMenu.settings.SettingsMenuScreen;
 
 /**
- * @author Immortius
+ * In-game menu that appears when the player presses `ESC` (by default) to open the menu system.
+ *
+ * In single player mode this also pauses the game time.
  */
 public class PauseMenu extends CoreScreenLayer {
 
+    public static final ResourceUrn ASSET_URI = new ResourceUrn("engine:pauseMenu");
+
+    @In
+    private Time time;
+
+    @In
+    private NetworkSystem networkSystem;
+
     @Override
     public void initialise() {
-        WidgetUtil.trySubscribe(this, "close", new ActivateEventListener() {
-            @Override
-            public void onActivated(UIWidget widget) {
-                getManager().closeScreen(PauseMenu.this);
-            }
-        });
-        WidgetUtil.trySubscribe(this, "settings", new ActivateEventListener() {
-            @Override
-            public void onActivated(UIWidget widget) {
-                getManager().pushScreen("settingsMenuScreen");
-            }
-        });
-        WidgetUtil.trySubscribe(this, "mainMenu", new ActivateEventListener() {
-            @Override
-            public void onActivated(UIWidget widget) {
-                CoreRegistry.get(GameEngine.class).changeState(new StateMainMenu());
-            }
-        });
-        WidgetUtil.trySubscribe(this, "exit", new ActivateEventListener() {
-            @Override
-            public void onActivated(UIWidget widget) {
-                CoreRegistry.get(GameEngine.class).shutdown();
-            }
-        });
+        setAnimationSystem(MenuAnimationSystems.createDefaultSwipeAnimation());
+
+        WidgetUtil.trySubscribe(this, "close", widget -> triggerBackAnimation());
+        WidgetUtil.trySubscribe(this, "extra", widget -> triggerForwardAnimation(ExtraMenuScreen.ASSET_URI));
+        WidgetUtil.trySubscribe(this, "settings", widget -> triggerForwardAnimation(SettingsMenuScreen.ASSET_URI));
+        WidgetUtil.trySubscribe(this, "mainMenu", widget -> CoreRegistry.get(GameEngine.class).changeState(new StateMainMenu()));
+        WidgetUtil.trySubscribe(this, "exit", widget -> CoreRegistry.get(GameEngine.class).shutdown());
+
+    }
+
+    @Override
+    public void onScreenOpened() {
+        super.onScreenOpened();
+        getManager().removeOverlay("engine:onlinePlayersOverlay");
+    }
+
+    @Override
+    public void onClosed() {
+        if (networkSystem.getMode() == NetworkMode.NONE) {
+            time.setPaused(false);
+        }
+    }
+
+    @Override
+    public boolean isLowerLayerVisible() {
+        return false;
     }
 }

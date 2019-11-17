@@ -27,19 +27,18 @@ import java.util.Set;
  *
  * Has all the data of a player to create save it with a copy of the entity manager.
  *
- * @author Florian <florian@fkoeberle.de>
  */
 class PlayerStoreBuilder {
     private Long characterEntityId;
     private Vector3f relevanceLocation;
     private Set<EntityRef> storedEntities;
 
-    public PlayerStoreBuilder(Long characterEntityId, Vector3f relevanceLocation) {
+     PlayerStoreBuilder(Long characterEntityId, Vector3f relevanceLocation) {
         this.characterEntityId = characterEntityId;
         this.relevanceLocation = relevanceLocation;
     }
 
-    public EntityData.PlayerStore build (EngineEntityManager entityManager) {
+    public EntityData.PlayerStore build(EngineEntityManager entityManager) {
         EntityData.PlayerStore.Builder playerEntityStore = EntityData.PlayerStore.newBuilder();
         playerEntityStore.setCharacterPosX(relevanceLocation.x);
         playerEntityStore.setCharacterPosY(relevanceLocation.y);

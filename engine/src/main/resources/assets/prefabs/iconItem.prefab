@@ -1,6 +1,7 @@
 {
-    "parent" : "engine:itemBase",
-    "Item" : {
-        "pickupPrefab" : "engine:iconItemPickup"
-    }
+    "parent": "engine:itemBase",
+    "BoxShape": {
+        "extents": [2, 2, 0.2]
+    },
+    "RenderItemIconMesh": {}
 }

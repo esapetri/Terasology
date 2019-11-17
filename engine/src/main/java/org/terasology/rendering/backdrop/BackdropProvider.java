@@ -24,8 +24,6 @@ import org.terasology.math.geom.Vector3f;
  * This is generally intended to be the sky, but the theatrical term "backdrop" is used to include
  * anything in the background. On the other hand, the term "background" itself was avoided as it is
  * used in the context of background/foreground processes and threads.
- *
- * Created by manu on 13.01.2015.
  */
 public interface BackdropProvider {
 
@@ -39,8 +37,6 @@ public interface BackdropProvider {
     float getColorExp();
 
     float getSunPositionAngle();
-
-    Vector3f getQuantizedSunDirection(float stepSize);
 
     Vector3f getSunDirection(boolean moonlightFlip);
 

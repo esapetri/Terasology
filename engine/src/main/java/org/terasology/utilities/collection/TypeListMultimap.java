@@ -17,14 +17,14 @@ package org.terasology.utilities.collection;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
-import com.google.common.collect.Lists;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
- * @author Immortius
  */
 public class TypeListMultimap<T> extends TypeMultimap<T> {
 
@@ -43,28 +43,28 @@ public class TypeListMultimap<T> extends TypeMultimap<T> {
         return new TypeListMultimap<>(from);
     }
 
+    @Override
     public <U extends T> List<U> get(Class<U> key) {
         return convertList(key, inner.get(key));
     }
 
+    @Override
     public <U extends T> List<U> removeAll(Class<U> key) {
         return convertList(key, inner.removeAll(key));
     }
 
+    @Override
     public <U extends T> List<U> replaceValues(Class<U> key, Iterable<? extends U> values) {
         return convertList(key, inner.replaceValues(key, values));
     }
 
+    @Override
     public Collection<Map.Entry<Class<? extends T>, T>> entries() {
         return inner.entries();
     }
 
     private <U extends T> List<U> convertList(Class<U> type, Collection<T> values) {
-        List<U> results = Lists.newArrayListWithCapacity(values.size());
-        for (T value : values) {
-            results.add(type.cast(value));
-        }
-        return results;
+        return values.stream().map(type::cast).collect(Collectors.toCollection(ArrayList::new));
     }
 
 }

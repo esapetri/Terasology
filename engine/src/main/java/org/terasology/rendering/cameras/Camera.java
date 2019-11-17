@@ -17,6 +17,7 @@ package org.terasology.rendering.cameras;
 
 import org.terasology.config.Config;
 import org.terasology.math.AABB;
+import org.terasology.math.geom.Quat4f;
 import org.terasology.registry.CoreRegistry;
 import org.terasology.math.MatrixUtils;
 import org.terasology.math.geom.Matrix4f;
@@ -25,20 +26,19 @@ import org.terasology.math.geom.Vector3f;
 /**
  * Provides global access to fonts.
  *
- * @author Benjamin Glatzel <benjamin.glatzel@me.com>
  */
 
 /**
  * Camera base class.
  *
- * @author Benjamin Glatzel <benjamin.glatzel@me.com>
  */
 public abstract class Camera {
 
     /* CAMERA PARAMETERS */
     protected final Vector3f position = new Vector3f(0, 0, 0);
     protected final Vector3f up = new Vector3f(0, 1, 0);
-    protected final Vector3f viewingDirection = new Vector3f(1, 0, 0);
+    protected Vector3f viewingDirection = new Vector3f(1, 0, 0);
+    protected float viewingAngle;
 
     protected float zNear = 0.1f;
     // TODO: This is too large, but many properties have to be adjusted if it changes
@@ -120,12 +120,12 @@ public abstract class Camera {
             return;
         }
         if (activeFov < targetFov) {
-            activeFov += 50.0 * delta;
+            activeFov += 50.0f * delta;
             if (activeFov >= targetFov) {
                 activeFov = targetFov;
             }
         } else if (activeFov > targetFov) {
-            activeFov -= 50.0 * delta;
+            activeFov -= 50.0f * delta;
             if (activeFov <= targetFov) {
                 activeFov = targetFov;
             }
@@ -154,12 +154,6 @@ public abstract class Camera {
 
     public void updatePrevViewProjectionMatrix() {
         prevViewProjectionMatrix.set(viewProjectionMatrix);
-    }
-
-    public float getClipHeight() {
-        // msteiger: I believe the offset results from the
-        // slightly lowered water surface height.
-        return reflectionHeight - 0.5f;
     }
 
     public Matrix4f getViewMatrix() {
@@ -206,8 +200,21 @@ public abstract class Camera {
         return viewingDirection;
     }
 
-    public Vector3f getUp() {
-        return up;
+    /**
+     * Get the orientation of the camera.
+     * @return the orientation direction, a quaternion.
+     */
+    public Quat4f getOrientation() {
+        return new Quat4f(viewingDirection, viewingAngle);
+    }
+
+    /**
+     Try to set the viewing direction.
+     * @param direction
+     */
+    public void setOrientation(Quat4f direction) {
+        viewingDirection = direction.getAxis();
+        viewingAngle = direction.getAngle();
     }
 
     public ViewFrustum getViewFrustum() {

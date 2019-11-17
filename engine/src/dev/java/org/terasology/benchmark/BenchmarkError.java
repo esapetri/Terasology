@@ -21,16 +21,15 @@ import com.google.common.base.Preconditions;
  * BenchmarkError encapsulates an error that occurred during a benchmark.
  * It stores the type of the error and the exception object.
  *
- * @author Manuel Brotz <manu.brotz@gmx.ch>
  */
 public class BenchmarkError {
 
-    public static enum Type {
+    public enum Type {
         Setup(true), Warmup(true), PreRun(true), Run(true), PostRun(true), Finish(false);
 
         public final boolean abort;
 
-        private Type(boolean abort) {
+        Type(boolean abort) {
             this.abort = abort;
         }
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 MovingBlocks
+ * Copyright 2018 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ package org.terasology.logic.delay;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.SortedSetMultimap;
 import com.google.common.collect.TreeMultimap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.terasology.engine.Time;
 import org.terasology.entitySystem.entity.EntityRef;
 import org.terasology.entitySystem.entity.lifecycleEvents.BeforeDeactivateComponent;
@@ -36,16 +38,23 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * @author Marcin Sciesinski <marcins78@gmail.com>
+ * Provides support for scheduling events that will trigger at some point in the future.
  */
 @RegisterSystem(RegisterMode.AUTHORITY)
 @Share(value = DelayManager.class)
 public class DelayedActionSystem extends BaseComponentSystem implements UpdateSubscriberSystem, DelayManager {
+    private static final Logger logger = LoggerFactory.getLogger(DelayedActionSystem.class);
+
     @In
     private Time time;
 
     private SortedSetMultimap<Long, EntityRef> delayedOperationsSortedByTime = TreeMultimap.create(Ordering.natural(), Ordering.arbitrary());
     private SortedSetMultimap<Long, EntityRef> periodicOperationsSortedByTime = TreeMultimap.create(Ordering.natural(), Ordering.arbitrary());
+
+    // ONLY use this for testing. DO NOT use this during regular usage.
+    void setTime(Time t) {
+        time = t;
+    }
 
     @Override
     public void update(float delta) {
@@ -67,10 +76,11 @@ public class DelayedActionSystem extends BaseComponentSystem implements UpdateSu
             scheduledOperationsIterator.remove();
         }
 
-        for (EntityRef delayedEntity : operationsToInvoke) {
-            if (delayedEntity.exists()) {
-                final DelayedActionComponent delayedActions = delayedEntity.getComponent(DelayedActionComponent.class);
+        operationsToInvoke.stream().filter(EntityRef::exists).forEach(delayedEntity -> {
+            final DelayedActionComponent delayedActions = delayedEntity.getComponent(DelayedActionComponent.class);
 
+            // If there is a DelayedActionComponent, proceed. Else report an error to the log.
+            if (delayedActions != null) {
                 final Set<String> actionIds = delayedActions.removeActionsUpTo(currentWorldTime);
                 saveOrRemoveComponent(delayedEntity, delayedActions);
 
@@ -81,8 +91,11 @@ public class DelayedActionSystem extends BaseComponentSystem implements UpdateSu
                 for (String actionId : actionIds) {
                     delayedEntity.send(new DelayedActionTriggeredEvent(actionId));
                 }
+            } else {
+                logger.error("ERROR: This entity is missing a DelayedActionComponent: {}. " +
+                        "So skipping delayed actions for this entity.", delayedEntity);
             }
-        }
+        });
     }
 
     private void invokePeriodicOperations(long currentWorldTime) {
@@ -98,10 +111,11 @@ public class DelayedActionSystem extends BaseComponentSystem implements UpdateSu
             scheduledOperationsIterator.remove();
         }
 
-        for (EntityRef periodicEntity : operationsToInvoke) {
-            if (periodicEntity.exists()) {
-                final PeriodicActionComponent periodicActionComponent = periodicEntity.getComponent(PeriodicActionComponent.class);
+        operationsToInvoke.stream().filter(EntityRef::exists).forEach(periodicEntity -> {
+            final PeriodicActionComponent periodicActionComponent = periodicEntity.getComponent(PeriodicActionComponent.class);
 
+            // If there is a PeriodicActionComponent, proceed. Else report an error to the log.
+            if (periodicActionComponent != null) {
                 final Set<String> actionIds = periodicActionComponent.getTriggeredActionsAndReschedule(currentWorldTime);
                 saveOrRemoveComponent(periodicEntity, periodicActionComponent);
 
@@ -112,8 +126,11 @@ public class DelayedActionSystem extends BaseComponentSystem implements UpdateSu
                 for (String actionId : actionIds) {
                     periodicEntity.send(new PeriodicActionTriggeredEvent(actionId));
                 }
+            } else {
+                logger.error("ERROR: This entity is missing a DelayedActionComponent: {}. " +
+                        "So skipping delayed actions for this entity", periodicEntity);
             }
-        }
+        });
     }
 
     @ReceiveEvent
@@ -149,6 +166,10 @@ public class DelayedActionSystem extends BaseComponentSystem implements UpdateSu
             if (oldWakeUp < newWakeUp) {
                 delayedOperationsSortedByTime.remove(oldWakeUp, entity);
                 delayedOperationsSortedByTime.put(newWakeUp, entity);
+            } else {
+                // Even if the oldWakeUp time is greater than or equal to the new one, the next action should still be added
+                // to the delayedOperationsSortedByTime mapping.
+                delayedOperationsSortedByTime.put(scheduleTime, entity);
             }
         } else {
             delayedActionComponent = new DelayedActionComponent();
@@ -170,6 +191,10 @@ public class DelayedActionSystem extends BaseComponentSystem implements UpdateSu
             if (oldWakeUp < newWakeUp) {
                 periodicOperationsSortedByTime.remove(oldWakeUp, entity);
                 periodicOperationsSortedByTime.put(newWakeUp, entity);
+            } else {
+                // Even if the oldWakeUp time is greater than or equal to the new one, the next action should still be added
+                // to the delayedOperationsSortedByTime mapping.
+                periodicOperationsSortedByTime.put(scheduleTime, entity);
             }
         } else {
             periodicActionComponent = new PeriodicActionComponent();

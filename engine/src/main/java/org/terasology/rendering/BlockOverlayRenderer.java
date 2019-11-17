@@ -19,10 +19,16 @@ package org.terasology.rendering;
 import org.terasology.math.AABB;
 
 /**
- * @author Adeon
  */
 public interface BlockOverlayRenderer {
     void setAABB(AABB aabb);
 
-    void render(float lineThickness);
+    /**
+     * Maintained for API compatibility
+     */
+    default void render(float lineThickness) {
+        render();
+    }
+
+    void render();
 }

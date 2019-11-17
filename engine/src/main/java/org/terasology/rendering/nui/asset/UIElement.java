@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 MovingBlocks
+ * Copyright 2016 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,35 +15,63 @@
  */
 package org.terasology.rendering.nui.asset;
 
-import org.terasology.asset.AbstractAsset;
-import org.terasology.asset.AssetUri;
+import org.terasology.assets.Asset;
+import org.terasology.assets.AssetType;
+import org.terasology.assets.ResourceUrn;
+import org.terasology.assets.format.AssetDataFile;
 import org.terasology.module.sandbox.API;
 import org.terasology.rendering.nui.UIWidget;
 
-/**
- * @author Immortius
- */
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
+
 @API
-public class UIElement extends AbstractAsset<UIData> {
+public class UIElement extends Asset<UIData> {
 
     private UIWidget rootWidget;
 
-    public UIElement(AssetUri uri, UIData data) {
-        super(uri);
-        onReload(data);
+    private transient AssetDataFile source;
+
+    private final List<Consumer<UIElement>> reloadListeners = new CopyOnWriteArrayList<>();
+
+    public UIElement(ResourceUrn urn, AssetType<?, UIData> assetType, UIData data) {
+        super(urn, assetType);
+        reload(data);
+    }
+
+    /**
+     * Subscribe to reload events.
+     *
+     * @param reloadListener the listener to add
+     */
+    public void subscribe(Consumer<UIElement> reloadListener) {
+        reloadListeners.add(reloadListener);
+    }
+
+    /**
+     * Unsubscribe from reload events.
+     *
+     * @param reloadListener the listener to remove. Non-existing entries will be ignored.
+     */
+    public void unsubscribe(Consumer<UIElement> reloadListener) {
+        reloadListeners.remove(reloadListener);
     }
 
     @Override
-    protected void onReload(UIData data) {
+    protected void doReload(UIData data) {
         rootWidget = data.getRootWidget();
-    }
-
-    @Override
-    protected void onDispose() {
-        rootWidget = null;
+        source = data.getSource();
+        for (Consumer<UIElement> listener : reloadListeners) {
+            listener.accept(this);
+        }
     }
 
     public UIWidget getRootWidget() {
         return rootWidget;
+    }
+
+    public AssetDataFile getSource() {
+        return source;
     }
 }

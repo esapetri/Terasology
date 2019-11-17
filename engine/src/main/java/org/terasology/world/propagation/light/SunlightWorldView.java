@@ -15,13 +15,15 @@
  */
 package org.terasology.world.propagation.light;
 
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.world.chunks.ChunkProvider;
 import org.terasology.world.chunks.LitChunk;
 import org.terasology.world.propagation.AbstractFullWorldView;
 
 /**
- * @author Immortius
+ * Gets the sunlight from the chunk.
+ * <p>
+ * Simply delegates to the provided chunk for values
  */
 public class SunlightWorldView extends AbstractFullWorldView {
 

@@ -16,18 +16,20 @@
 package org.terasology.rendering.nui.widgets;
 
 import org.terasology.input.MouseInput;
-import org.terasology.math.Vector2i;
+import org.terasology.math.geom.Vector2i;
+import org.terasology.rendering.nui.ActivatableWidget;
 import org.terasology.rendering.nui.BaseInteractionListener;
 import org.terasology.rendering.nui.Canvas;
-import org.terasology.rendering.nui.CoreWidget;
 import org.terasology.rendering.nui.InteractionListener;
+import org.terasology.rendering.nui.TabbingManager;
 import org.terasology.rendering.nui.databinding.Binding;
 import org.terasology.rendering.nui.databinding.DefaultBinding;
+import org.terasology.rendering.nui.events.NUIMouseClickEvent;
 
 /**
- * @author Immortius
+ * A check-box. Hovering is supported.
  */
-public class UICheckbox extends CoreWidget {
+public class UICheckbox extends ActivatableWidget {
     public static final String HOVER_ACTIVE_MODE = "hover-active";
 
     private Binding<Boolean> active = new DefaultBinding<>(false);
@@ -35,9 +37,9 @@ public class UICheckbox extends CoreWidget {
     private InteractionListener interactionListener = new BaseInteractionListener() {
 
         @Override
-        public boolean onMouseClick(MouseInput button, Vector2i pos) {
-            if (button == MouseInput.MOUSE_LEFT) {
-                active.set(!active.get());
+        public boolean onMouseClick(NUIMouseClickEvent event) {
+            if (event.getMouseButton() == MouseInput.MOUSE_LEFT) {
+                activateWidget();
                 return true;
             }
             return false;
@@ -54,12 +56,16 @@ public class UICheckbox extends CoreWidget {
 
     @Override
     public void onDraw(Canvas canvas) {
-        canvas.addInteractionRegion(interactionListener);
+        if (isEnabled()) {
+            canvas.addInteractionRegion(interactionListener);
+        }
     }
 
     @Override
     public String getMode() {
-        if (interactionListener.isMouseOver()) {
+        if (!isEnabled()) {
+            return DISABLED_MODE;
+        } else if (interactionListener.isMouseOver() || (TabbingManager.focusedWidget != null && TabbingManager.focusedWidget.equals(this))) {
             if (active.get()) {
                 return HOVER_ACTIVE_MODE;
             }
@@ -70,13 +76,26 @@ public class UICheckbox extends CoreWidget {
         return DEFAULT_MODE;
     }
 
+    /**
+     * @return A boolean indicating the status of the checkbox
+     */
     public boolean isChecked() {
         return active.get();
     }
 
+    /**
+     * @param checked A boolean setting the ticked state of the checkbox
+     */
     public void setChecked(boolean checked) {
         active.set(checked);
     }
+
+    @Override
+    public void activateWidget() {
+        setChecked(!isChecked());
+        UICheckbox.super.activateWidget();
+    }
+
 
     public void bindChecked(Binding<Boolean> binding) {
         this.active = binding;
@@ -85,5 +104,23 @@ public class UICheckbox extends CoreWidget {
     @Override
     public Vector2i getPreferredContentSize(Canvas canvas, Vector2i sizeHint) {
         return Vector2i.zero();
+    }
+
+    /**
+     * Subscribes a listener that is called whenever this {@code UICheckBox} is activated.
+     *
+     * @param listener The {@link ActivateEventListener} to be subscribed
+     */
+    public void subscribe(ActivateEventListener listener) {
+        listeners.add(listener);
+    }
+
+    /**
+     * Unsubscribes a listener from this {@code UICheckBox}.
+     *
+     * @param listener The {@code ActivateEventListener}to be unsubscribed
+     */
+    public void unsubscribe(ActivateEventListener listener) {
+        listeners.remove(listener);
     }
 }

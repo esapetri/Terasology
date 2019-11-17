@@ -16,12 +16,11 @@
 
 package org.terasology.persistence.typeHandling.extensionTypes;
 
-import org.terasology.asset.Assets;
+import org.terasology.utilities.Assets;
 import org.terasology.entitySystem.prefab.Prefab;
 import org.terasology.persistence.typeHandling.StringRepresentationTypeHandler;
 
 /**
- * @author Immortius
  */
 public class PrefabTypeHandler extends StringRepresentationTypeHandler<Prefab> {
 
@@ -30,11 +29,17 @@ public class PrefabTypeHandler extends StringRepresentationTypeHandler<Prefab> {
 
     @Override
     public String getAsString(Prefab item) {
+        if (item == null) {
+            return "";
+        }
         return item.getName();
     }
 
     @Override
     public Prefab getFromString(String representation) {
-        return Assets.getPrefab(representation);
+        if (representation == null) {
+            return null;
+        }
+        return Assets.getPrefab(representation).orElse(null);
     }
 }

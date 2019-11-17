@@ -17,18 +17,18 @@
 package org.terasology.logic.notifications;
 
 import org.terasology.entitySystem.entity.EntityRef;
-import org.terasology.logic.common.DisplayNameComponent;
 import org.terasology.logic.console.CoreMessageType;
 import org.terasology.logic.console.Message;
 import org.terasology.logic.console.MessageEvent;
-import org.terasology.network.ColorComponent;
+import org.terasology.logic.players.PlayerUtil;
+import org.terasology.module.sandbox.API;
 import org.terasology.network.OwnerEvent;
-import org.terasology.rendering.FontColor;
 
 /**
  * A notification message
- * @author Martin Steiger
  */
+
+@API
 @OwnerEvent
 public class NotificationMessageEvent implements MessageEvent {
     private String message;
@@ -43,13 +43,13 @@ public class NotificationMessageEvent implements MessageEvent {
     }
     
     public static NotificationMessageEvent newJoinEvent(EntityRef client) {
-        String playerName = getColoredPlayerName(client);
+        String playerName = PlayerUtil.getColoredPlayerName(client);
         
         return new NotificationMessageEvent("Player \"" + playerName + "\" has joined the game", client);
     }
     
     public static NotificationMessageEvent newLeaveEvent(EntityRef client) {
-        String playerName = getColoredPlayerName(client);
+        String playerName = PlayerUtil.getColoredPlayerName(client);
         
         return new NotificationMessageEvent("Player \"" + playerName + "\" has left the game", client);
     }
@@ -72,14 +72,5 @@ public class NotificationMessageEvent implements MessageEvent {
         return getClass().getSimpleName() + "{from = " + from + ", message = '" + message + "'}";
     }
 
-    private static String getColoredPlayerName(EntityRef from) {
-        DisplayNameComponent displayInfo = from.getComponent(DisplayNameComponent.class);
-        ColorComponent colorInfo = from.getComponent(ColorComponent.class);
-        String playerName = (displayInfo != null) ? displayInfo.name : "Unknown";
-        
-        if (colorInfo != null) {
-            playerName = FontColor.getColored(playerName, colorInfo.color);
-        }
-        return playerName;
-    }
+
 }

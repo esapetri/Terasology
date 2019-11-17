@@ -20,7 +20,6 @@ import com.google.common.collect.Lists;
 import org.terasology.benchmark.AbstractBenchmark;
 import org.terasology.entitySystem.Component;
 import org.terasology.entitySystem.entity.internal.PojoEntityManager;
-import org.terasology.logic.inventory.InventoryComponent;
 import org.terasology.logic.location.LocationComponent;
 import org.terasology.rendering.logic.MeshComponent;
 import org.terasology.utilities.random.FastRandom;
@@ -28,9 +27,6 @@ import org.terasology.world.block.BlockComponent;
 
 import java.util.List;
 
-/**
- *
- */
 public class EntityCreateBenchmark extends AbstractBenchmark {
 
     private List<List<Component>> rawEntityData;
@@ -51,9 +47,6 @@ public class EntityCreateBenchmark extends AbstractBenchmark {
             if (rand.nextFloat() < 0.5f) {
                 entityData.add(new MeshComponent());
             }
-            if (rand.nextFloat() < 0.5f) {
-                entityData.add(new InventoryComponent());
-            }
             if (rand.nextFloat() < 0.25f) {
                 entityData.add(new BlockComponent());
             }
@@ -64,8 +57,6 @@ public class EntityCreateBenchmark extends AbstractBenchmark {
     @Override
     public void run() {
         PojoEntityManager entityManager = new PojoEntityManager();
-        for (List<Component> rawEntity : rawEntityData) {
-            entityManager.create(rawEntity);
-        }
+        rawEntityData.forEach(entityManager::create);
     }
 }

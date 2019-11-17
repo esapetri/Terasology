@@ -18,22 +18,21 @@ package org.terasology.input;
 import com.google.common.collect.Maps;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
-import org.terasology.registry.CoreRegistry;
 
 import java.util.Locale;
 import java.util.Map;
 
 /**
- * @author Immortius
+ * Unchanging final model of a keyboard. Identifies and creates accessible {@link Keyboard.Key}'s for all of the
+ * keys on the keyboard.
  */
 public final class Keyboard {
     private Keyboard() {
     }
 
-    public static boolean isKeyDown(int key) {
-        return CoreRegistry.get(InputSystem.class).getKeyboard().isKeyDown(key);
-    }
-
+    /**
+     * Individual identifying Ids for every key on the keyboard.
+     */
     public static class KeyId {
         public static final int NONE = 0x00;
         public static final int ESCAPE = 0x01;
@@ -168,6 +167,9 @@ public final class Keyboard {
         public static final int SLEEP = 0xDF;
     }
 
+    /**
+     * Defines accessible descriptions with key Id, name, and display name for every key on the keyboard.
+     */
     public enum Key implements Input {
         NONE(KeyId.NONE, "KEY_NONE", ""),
         ESCAPE(KeyId.ESCAPE, "KEY_ESCAPE", "Escape"),
@@ -265,7 +267,7 @@ public final class Keyboard {
         F19(KeyId.F19, "KEY_F19", "F19"),
         CONVERT(KeyId.CONVERT, "KEY_CONVERT", "Convert"), // Japanese Keyboard key (for converting Hiragana characters to Kanji?)
         NOCONVERT(KeyId.NOCONVERT, "KEY_NOCONVERT", "No Convert"), // Japanese Keyboard key
-        YEN(KeyId.YEN, "KEY_YEN", "¥"), // Japanese keyboard key for yen
+        YEN(KeyId.YEN, "KEY_YEN", "\u00A5"), // Japanese keyboard key for yen
         NUMPAD_EQUALS(KeyId.NUMPAD_EQUALS, "KEY_NUMPADEQUALS", "Numpad ="),
         CIRCUMFLEX(KeyId.CIRCUMFLEX, "KEY_CIRCUMFLEX", "^"), // Japanese keyboard
         AT(KeyId.AT, "KEY_AT", "@"), // (NEC PC98)
@@ -277,7 +279,7 @@ public final class Keyboard {
         UNLABELED(KeyId.UNLABELED, "KEY_UNLABELED", "Unlabelled"), // (J3100) (a mystery button?)
         NUMPAD_ENTER(KeyId.NUMPAD_ENTER, "KEY_NUMPADENTER", "Numpad Enter"),
         RIGHT_CTRL(KeyId.RIGHT_CTRL, "KEY_RCONTROL", "Right Ctrl"),
-        SECTION(KeyId.SECTION, "KEY_SECTION", "§"),
+        SECTION(KeyId.SECTION, "KEY_SECTION", "\u00A7"),
         NUMPAD_COMMA(KeyId.NUMPAD_COMMA, "KEY_NUMPADCOMMA", "Numpad ,"), // (NEC PC98)
         NUMPAD_DIVIDE(KeyId.NUMPAD_DIVIDE, "KEY_DIVIDE", "Numpad /"),
         PRINT_SCREEN(KeyId.PRINT_SCREEN, "KEY_SYSRQ", "Print Screen"),
@@ -317,7 +319,7 @@ public final class Keyboard {
             }
         }
 
-        private Key(int id, String name, String displayName) {
+        Key(int id, String name, String displayName) {
             this.id = id;
             this.name = name;
             this.displayName = displayName;
@@ -348,10 +350,21 @@ public final class Keyboard {
             return name;
         }
 
+        /**
+         * Returns a key based on the provided key name.
+         *
+         * @param name The name of the key.
+         * @return The key with this name.
+         */
         public static Input find(String name) {
             return lookupByName.get(name.toUpperCase(Locale.ENGLISH));
         }
 
+        /**
+         * Returns a key based on the provided key Id.
+         * @param id The id of the key.
+         * @return The key with this id.
+         */
         public static Input find(int id) {
             Input result = lookupById.get(id);
             if (result == null) {

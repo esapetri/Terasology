@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 MovingBlocks
+ * Copyright 2016 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.terasology.math.Side;
-import org.terasology.math.Vector3i;
+import org.terasology.math.geom.Vector3i;
 import org.terasology.world.chunks.Chunk;
 import org.terasology.world.chunks.LitChunk;
 import org.terasology.world.chunks.internal.GeneratingChunkProvider;
@@ -31,20 +31,16 @@ import org.terasology.world.propagation.StandardBatchPropagator;
 import org.terasology.world.propagation.SunlightRegenBatchPropagator;
 
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-/**
- * @author Immortius
- */
 public class LightMerger<T> {
     private static final int CENTER_INDEX = 13;
 
-    private static Logger logger = LoggerFactory.getLogger(LightMerger.class);
+    private static final Logger logger = LoggerFactory.getLogger(LightMerger.class);
 
     private ExecutorService executorService = Executors.newSingleThreadExecutor();
     private Future<T> resultFuture;
@@ -60,12 +56,9 @@ public class LightMerger<T> {
     }
 
     public void beginMerge(final Chunk chunk, final T data) {
-        resultFuture = executorService.submit(new Callable<T>() {
-            @Override
-            public T call() throws Exception {
-                merge(chunk);
-                return data;
-            }
+        resultFuture = executorService.submit(() -> {
+            merge(chunk);
+            return data;
         });
     }
 
@@ -76,7 +69,7 @@ public class LightMerger<T> {
                 resultFuture = null;
                 return result;
             } catch (InterruptedException | ExecutionException e) {
-                throw new RuntimeException("Error completing lighting merge");
+                throw new RuntimeException("Error completing lighting merge", e);
             }
         }
         return null;
@@ -85,52 +78,38 @@ public class LightMerger<T> {
     private void merge(Chunk chunk) {
         Chunk[] localChunks = assembleLocalChunks(chunk);
         localChunks[CENTER_INDEX] = chunk;
-        for (Chunk localChunk : localChunks) {
-            if (localChunk != null) {
-                localChunk.lock();
-            }
-        }
-        try {
+        List<BatchPropagator> propagators = Lists.newArrayList();
+        propagators.add(new StandardBatchPropagator(new LightPropagationRules(), new LocalChunkView(localChunks, lightRules)));
+        PropagatorWorldView regenWorldView = new LocalChunkView(localChunks, sunlightRegenRules);
+        PropagationRules sunlightRules = new SunlightPropagationRules(regenWorldView);
+        PropagatorWorldView sunlightWorldView = new LocalChunkView(localChunks, sunlightRules);
+        BatchPropagator sunlightPropagator = new StandardBatchPropagator(sunlightRules, sunlightWorldView);
+        propagators.add(new SunlightRegenBatchPropagator(sunlightRegenRules, regenWorldView, sunlightPropagator, sunlightWorldView));
+        propagators.add(sunlightPropagator);
 
-            List<BatchPropagator> propagators = Lists.newArrayList();
-            propagators.add(new StandardBatchPropagator(new LightPropagationRules(), new LocalChunkView(localChunks, lightRules)));
-            PropagatorWorldView regenWorldView = new LocalChunkView(localChunks, sunlightRegenRules);
-            PropagationRules sunlightRules = new SunlightPropagationRules(regenWorldView);
-            PropagatorWorldView sunlightWorldView = new LocalChunkView(localChunks, sunlightRules);
-            BatchPropagator sunlightPropagator = new StandardBatchPropagator(sunlightRules, sunlightWorldView);
-            propagators.add(new SunlightRegenBatchPropagator(sunlightRegenRules, regenWorldView, sunlightPropagator, sunlightWorldView));
-            propagators.add(sunlightPropagator);
-
-            for (BatchPropagator propagator : propagators) {
-                // Propagate Inwards
-                for (Side side : Side.values()) {
-                    Vector3i adjChunkPos = side.getAdjacentPos(chunk.getPosition());
-                    LitChunk adjChunk = chunkProvider.getChunkUnready(adjChunkPos);
-                    if (adjChunk != null) {
-                        propagator.propagateBetween(adjChunk, chunk, side.reverse(), false);
-                    }
-                }
-
-                // Propagate Outwards
-                for (Side side : Side.values()) {
-                    Vector3i adjChunkPos = side.getAdjacentPos(chunk.getPosition());
-                    LitChunk adjChunk = chunkProvider.getChunk(adjChunkPos);
-                    if (adjChunk != null) {
-                        propagator.propagateBetween(chunk, adjChunk, side, true);
-                    }
+        for (BatchPropagator propagator : propagators) {
+            // Propagate Inwards
+            for (Side side : Side.getAllSides()) {
+                Vector3i adjChunkPos = side.getAdjacentPos(chunk.getPosition());
+                LitChunk adjChunk = chunkProvider.getChunkUnready(adjChunkPos);
+                if (adjChunk != null) {
+                    propagator.propagateBetween(adjChunk, chunk, side.reverse(), false);
                 }
             }
-            for (BatchPropagator propagator : propagators) {
-                propagator.process();
-            }
-            chunk.deflateSunlight();
-        } finally {
-            for (Chunk localChunk : localChunks) {
-                if (localChunk != null) {
-                    localChunk.unlock();
+
+            // Propagate Outwards
+            for (Side side : Side.getAllSides()) {
+                Vector3i adjChunkPos = side.getAdjacentPos(chunk.getPosition());
+                LitChunk adjChunk = chunkProvider.getChunk(adjChunkPos);
+                if (adjChunk != null) {
+                    propagator.propagateBetween(chunk, adjChunk, side, true);
                 }
             }
         }
+        for (BatchPropagator propagator : propagators) {
+            propagator.process();
+        }
+        chunk.deflateSunlight();
     }
 
     private Chunk[] assembleLocalChunks(Chunk chunk) {
